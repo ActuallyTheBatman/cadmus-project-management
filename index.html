@@ -3,22 +3,29 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Cadmus Project Management | Public-Sector Project Management</title>
-  <meta name="description" content="Cadmus Project Management supports California agencies and prime contractors with public-sector project management, PMO support, DVBE partner support, and disciplined execution.">
+  <title>Cadmus Project Management | Elite Public-Sector Project Execution</title>
+  <meta name="description" content="Cadmus Project Management gives California agencies and prime contractors disciplined public-sector project management, PMO support, DVBE partnership, and execution leadership.">
+  <meta property="og:title" content="Cadmus Project Management">
+  <meta property="og:description" content="Mission-ready project management for California agencies and prime contractors.">
+  <meta property="og:image" content="https://cadmusprojects.com/assets/cadmus-hero.png">
+  <meta property="og:type" content="website">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Inter+Tight:wght@600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Libre+Baskerville:wght@700&display=swap" rel="stylesheet">
   <style>
     :root {
-      --navy: #0A1F3F;
-      --navy-dark: #06162D;
-      --steel: #4A4F57;
-      --line: #D5D7DB;
-      --white: #FFFFFF;
-      --accent: #C6D8F0;
-      --muted: #C7D3E4;
-      --panel: rgba(255, 255, 255, 0.075);
-      --panel-strong: rgba(255, 255, 255, 0.12);
+      --ink: #07090c;
+      --carbon: #111418;
+      --graphite: #1c2127;
+      --paper: #f5f1e8;
+      --muted: #b9b0a4;
+      --line: rgba(245, 241, 232, 0.16);
+      --brass: #d6a847;
+      --brass-soft: #f2d98a;
+      --signal: #ff4d3d;
+      --mint: #8fe3c1;
+      --steel: #8ea1ad;
+      --radius: 8px;
     }
 
     * {
@@ -26,19 +33,21 @@
     }
 
     html {
-      min-height: 100%;
       scroll-behavior: smooth;
-      background: var(--navy);
+      background: var(--ink);
     }
 
     body {
       margin: 0;
-      min-height: 100%;
-      overflow-x: hidden;
-      color: var(--white);
-      background: var(--navy);
+      color: var(--paper);
+      background: var(--ink);
       font-family: Inter, Arial, sans-serif;
       letter-spacing: 0;
+    }
+
+    body::selection {
+      color: var(--ink);
+      background: var(--brass-soft);
     }
 
     a {
@@ -46,18 +55,11 @@
       text-decoration: none;
     }
 
-    .page {
-      min-height: 100vh;
+    .site-shell {
+      overflow: hidden;
       background:
-        radial-gradient(circle at 78% 5%, rgba(198, 216, 240, 0.22), transparent 26rem),
-        linear-gradient(180deg, #06162D 0%, #0A1F3F 46%, #07182F 100%);
-    }
-
-    .grid {
-      background-image:
-        linear-gradient(rgba(213, 215, 219, 0.08) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(213, 215, 219, 0.08) 1px, transparent 1px);
-      background-size: 48px 48px;
+        linear-gradient(180deg, rgba(7, 9, 12, 0.08), var(--ink) 760px),
+        var(--ink);
     }
 
     .wrap {
@@ -66,16 +68,16 @@
     }
 
     .nav {
-      position: sticky;
-      top: 0;
-      z-index: 20;
-      border-bottom: 1px solid rgba(213, 215, 219, 0.14);
-      background: rgba(6, 22, 45, 0.88);
+      position: fixed;
+      inset: 0 0 auto;
+      z-index: 30;
+      border-bottom: 1px solid rgba(245, 241, 232, 0.11);
+      background: rgba(7, 9, 12, 0.76);
       backdrop-filter: blur(18px);
     }
 
     .nav-inner {
-      height: 72px;
+      min-height: 74px;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -83,470 +85,557 @@
     }
 
     .brand {
-      font-family: "Inter Tight", Inter, sans-serif;
-      font-size: 23px;
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 14px;
       font-weight: 900;
+      text-transform: uppercase;
     }
 
-    .brand span {
-      color: var(--accent);
+    .brand-mark {
+      width: 36px;
+      height: 36px;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(214, 168, 71, 0.6);
+      border-radius: 50%;
+      color: var(--brass-soft);
+      font-family: "Libre Baskerville", Georgia, serif;
+      font-size: 16px;
+      background: rgba(214, 168, 71, 0.08);
     }
 
-    .links {
+    .nav-links {
       display: flex;
       align-items: center;
-      gap: 24px;
-      color: #E4ECF6;
-      font-size: 13px;
+      gap: 22px;
+      color: rgba(245, 241, 232, 0.78);
+      font-size: 12px;
       font-weight: 800;
+      text-transform: uppercase;
     }
 
-    .links a {
+    .nav-links a {
       transition: color 160ms ease;
     }
 
-    .links a:hover {
-      color: var(--accent);
+    .nav-links a:hover {
+      color: var(--brass-soft);
+    }
+
+    .nav-cta,
+    .button {
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      border: 1px solid rgba(245, 241, 232, 0.26);
+      border-radius: var(--radius);
+      padding: 0 17px;
+      color: var(--paper);
+      font-size: 12px;
+      font-weight: 900;
+      text-transform: uppercase;
+      transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+    }
+
+    .nav-cta:hover,
+    .button:hover {
+      transform: translateY(-2px);
+      border-color: var(--brass-soft);
+      background: rgba(214, 168, 71, 0.1);
+    }
+
+    .button.primary {
+      border-color: var(--brass-soft);
+      color: #15120b;
+      background: linear-gradient(135deg, var(--brass-soft), var(--brass));
     }
 
     .hero {
-      min-height: 790px;
+      position: relative;
+      min-height: 100svh;
       display: grid;
-      grid-template-columns: minmax(0, 1.05fr) minmax(340px, 0.95fr);
-      gap: 58px;
-      align-items: center;
-      padding: 58px 0 76px;
+      align-items: end;
+      padding: 132px 0 54px;
+      background:
+        linear-gradient(90deg, rgba(7, 9, 12, 0.96) 0%, rgba(7, 9, 12, 0.82) 42%, rgba(7, 9, 12, 0.16) 72%),
+        linear-gradient(180deg, rgba(7, 9, 12, 0.24), var(--ink) 96%),
+        url("assets/cadmus-hero.png") center / cover no-repeat;
     }
 
-    .eyebrow {
-      color: var(--accent);
+    .hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(245, 241, 232, 0.055) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(245, 241, 232, 0.05) 1px, transparent 1px);
+      background-size: 64px 64px;
+      mask-image: linear-gradient(90deg, rgba(0, 0, 0, 0.85), transparent 75%);
+    }
+
+    .hero-content {
+      position: relative;
+      z-index: 1;
+      max-width: 860px;
+    }
+
+    .kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--mint);
       font-size: 12px;
       font-weight: 900;
-      letter-spacing: 0.16em;
       text-transform: uppercase;
+    }
+
+    .kicker::before {
+      content: "";
+      width: 36px;
+      height: 2px;
+      background: var(--mint);
     }
 
     h1,
     h2,
     h3,
-    .quote {
-      font-family: "Inter Tight", Inter, sans-serif;
+    .stat-value,
+    .pull-quote {
+      margin: 0;
+      font-family: Inter, Arial, sans-serif;
       letter-spacing: 0;
     }
 
     h1 {
-      margin: 18px 0 22px;
-      max-width: 760px;
-      font-size: clamp(54px, 8.2vw, 104px);
-      line-height: 0.92;
+      max-width: 820px;
+      margin-top: 22px;
+      font-size: clamp(56px, 8vw, 118px);
+      line-height: 0.9;
       font-weight: 900;
+      text-transform: uppercase;
     }
 
-    .lead {
-      max-width: 720px;
-      color: #DCE6F4;
-      font-size: clamp(18px, 2.1vw, 23px);
-      line-height: 1.45;
+    .hero-lead {
+      max-width: 700px;
+      margin: 26px 0 0;
+      color: rgba(245, 241, 232, 0.82);
+      font-size: clamp(18px, 2vw, 24px);
+      line-height: 1.48;
     }
 
-    .actions {
+    .hero-actions {
       display: flex;
       flex-wrap: wrap;
       gap: 14px;
       margin-top: 34px;
     }
 
-    .button {
-      min-height: 46px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      border: 1px solid rgba(255, 255, 255, 0.22);
-      padding: 0 18px;
-      font-size: 13px;
-      font-weight: 900;
-      transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
-    }
-
-    .button:hover {
-      transform: translateY(-2px);
-      border-color: var(--accent);
-      box-shadow: 0 16px 42px rgba(0, 0, 0, 0.28);
-    }
-
-    .button.primary {
-      border-color: var(--white);
-      color: var(--navy);
-      background: var(--white);
-    }
-
-    .credential-card {
+    .hero-bottom {
       position: relative;
-      max-width: 530px;
-      justify-self: end;
-      border: 1px solid rgba(213, 215, 219, 0.22);
-      padding: 30px;
-      background: linear-gradient(145deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.035));
-      box-shadow: 0 34px 100px rgba(0, 0, 0, 0.34);
-      backdrop-filter: blur(20px);
-      animation: float 6s ease-in-out infinite;
-    }
-
-    .credential-card::before {
-      content: "";
-      position: absolute;
-      inset: -1px;
-      z-index: -1;
-      background: linear-gradient(135deg, rgba(198, 216, 240, 0.54), transparent 38%, rgba(255, 255, 255, 0.12));
-    }
-
-    .credential-card h2 {
-      margin: 0 0 22px;
-      color: var(--accent);
-      font-size: 13px;
-      font-weight: 900;
-      letter-spacing: 0.16em;
-      text-transform: uppercase;
-    }
-
-    .cred-grid {
+      z-index: 1;
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 14px;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 28px;
+      align-items: end;
+      margin-top: 82px;
     }
 
-    .cred {
-      min-height: 118px;
-      border: 1px solid rgba(213, 215, 219, 0.18);
+    .proof-strip {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(17, 20, 24, 0.72);
+      backdrop-filter: blur(18px);
+    }
+
+    .proof {
+      min-height: 104px;
       padding: 18px;
-      background: rgba(6, 22, 45, 0.58);
+      border-right: 1px solid var(--line);
     }
 
-    .cred strong {
+    .proof:last-child {
+      border-right: 0;
+    }
+
+    .proof strong {
       display: block;
-      font-family: "Inter Tight", Inter, sans-serif;
-      font-size: clamp(26px, 3.2vw, 34px);
+      color: var(--brass-soft);
+      font-size: 22px;
+      font-weight: 900;
       line-height: 1;
     }
 
-    .cred span {
+    .proof span {
       display: block;
       margin-top: 10px;
-      color: #C6D2E2;
-      line-height: 1.25;
+      color: rgba(245, 241, 232, 0.7);
+      font-size: 13px;
+      line-height: 1.35;
     }
 
-    .trust-strip {
-      border-block: 1px solid rgba(213, 215, 219, 0.14);
-      background: rgba(255, 255, 255, 0.035);
+    .dispatch {
+      border-left: 3px solid var(--signal);
+      padding: 20px 0 20px 22px;
+      color: rgba(245, 241, 232, 0.72);
+      font-size: 14px;
+      line-height: 1.6;
     }
 
-    .trust-grid {
+    .section {
+      padding: 106px 0;
+      background: var(--ink);
+    }
+
+    .section.metal {
+      background:
+        linear-gradient(180deg, #0b0e12, #111418 42%, #0b0e12);
+    }
+
+    .section.paper {
+      color: var(--ink);
+      background: var(--paper);
+    }
+
+    .section-head {
+      display: grid;
+      grid-template-columns: minmax(0, 0.9fr) minmax(280px, 0.55fr);
+      gap: 40px;
+      align-items: end;
+      margin-bottom: 42px;
+    }
+
+    h2 {
+      font-size: clamp(42px, 6vw, 86px);
+      line-height: 0.92;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .section-head p {
+      margin: 0;
+      color: rgba(245, 241, 232, 0.7);
+      font-size: 16px;
+      line-height: 1.65;
+    }
+
+    .paper .section-head p {
+      color: rgba(7, 9, 12, 0.68);
+    }
+
+    .service-grid {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
     }
 
-    .trust-item {
-      min-height: 92px;
+    .service {
+      min-height: 330px;
       display: flex;
-      align-items: center;
-      gap: 12px;
-      border-left: 1px solid rgba(213, 215, 219, 0.10);
-      padding: 24px 18px;
-      color: #DBE5F2;
-      font-weight: 900;
+      flex-direction: column;
+      justify-content: space-between;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 24px;
+      background: linear-gradient(180deg, rgba(245, 241, 232, 0.08), rgba(245, 241, 232, 0.025));
+      transition: transform 170ms ease, border-color 170ms ease;
     }
 
-    .icon {
-      width: 38px;
-      height: 38px;
-      flex: 0 0 38px;
-      display: grid;
-      place-items: center;
-      border: 1px solid rgba(198, 216, 240, 0.25);
-      color: var(--accent);
-      background: rgba(198, 216, 240, 0.12);
+    .service:hover {
+      transform: translateY(-6px);
+      border-color: rgba(214, 168, 71, 0.55);
+    }
+
+    .service-number {
+      color: var(--signal);
       font-size: 12px;
       font-weight: 900;
     }
 
-    .section {
-      padding: 96px 0;
-      background: var(--navy);
-    }
-
-    .section.alt {
-      background: var(--navy-dark);
-    }
-
-    .section-head {
-      display: flex;
-      align-items: flex-end;
-      justify-content: space-between;
-      gap: 32px;
-      margin-bottom: 34px;
-    }
-
-    .section h2 {
-      margin: 0;
-      font-size: clamp(38px, 5.2vw, 72px);
-      line-height: 0.96;
+    .service h3 {
+      margin-top: 60px;
+      font-size: 27px;
+      line-height: 1.02;
       font-weight: 900;
+      text-transform: uppercase;
     }
 
-    .section-head p {
-      max-width: 475px;
-      margin: 0;
-      color: #CBD8E8;
-      line-height: 1.6;
-    }
-
-    .cards {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 18px;
-    }
-
-    .cards.four {
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-    }
-
-    .card {
-      min-height: 224px;
-      border: 1px solid rgba(213, 215, 219, 0.18);
-      padding: 26px;
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.035));
-      transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
-    }
-
-    .card:hover {
-      transform: translateY(-6px);
-      border-color: rgba(198, 216, 240, 0.55);
-      box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
-    }
-
-    .num {
-      color: var(--accent);
-      font-family: "Inter Tight", Inter, sans-serif;
-      font-size: 44px;
-      font-weight: 900;
-      line-height: 1;
-    }
-
-    .card h3 {
-      margin: 20px 0 10px;
-      font-size: 25px;
-      line-height: 1.05;
-      font-weight: 900;
-    }
-
-    .card p,
-    .card li {
-      color: #D4DEEA;
+    .service p,
+    .service li {
+      color: rgba(245, 241, 232, 0.72);
       line-height: 1.55;
     }
 
-    .card p {
-      margin: 0;
+    .service ul {
+      margin: 18px 0 0;
+      padding-left: 18px;
     }
 
-    .card ul {
-      margin: 12px 0 0;
-      padding-left: 18px;
+    .split {
+      display: grid;
+      grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+      gap: 60px;
+      align-items: center;
+    }
+
+    .signal-panel {
+      border: 1px solid rgba(7, 9, 12, 0.18);
+      border-radius: var(--radius);
+      background: #fffaf0;
+      box-shadow: 0 24px 80px rgba(7, 9, 12, 0.16);
+    }
+
+    .signal-row {
+      display: grid;
+      grid-template-columns: 108px 1fr;
+      gap: 22px;
+      align-items: start;
+      padding: 26px;
+      border-bottom: 1px solid rgba(7, 9, 12, 0.12);
+    }
+
+    .signal-row:last-child {
+      border-bottom: 0;
+    }
+
+    .tag {
+      display: inline-flex;
+      justify-content: center;
+      border-radius: 999px;
+      padding: 8px 10px;
+      color: var(--ink);
+      background: var(--mint);
+      font-size: 11px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .signal-row h3 {
+      font-size: 22px;
+      line-height: 1.12;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .signal-row p {
+      margin: 8px 0 0;
+      color: rgba(7, 9, 12, 0.68);
+      line-height: 1.55;
+    }
+
+    .pull-quote {
+      color: var(--ink);
+      font-size: clamp(38px, 5vw, 72px);
+      line-height: 0.95;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .body-copy {
+      margin: 24px 0 0;
+      color: rgba(7, 9, 12, 0.7);
+      font-size: 17px;
+      line-height: 1.72;
     }
 
     .timeline {
       display: grid;
       grid-template-columns: repeat(5, minmax(0, 1fr));
-      border-top: 1px solid rgba(213, 215, 219, 0.25);
-      margin-top: 44px;
+      border-top: 1px solid var(--line);
     }
 
     .step {
       position: relative;
-      min-height: 145px;
-      border-right: 1px solid rgba(213, 215, 219, 0.15);
-      padding: 24px 20px 0;
+      min-height: 180px;
+      padding: 28px 22px 0;
+      border-right: 1px solid var(--line);
+    }
+
+    .step:last-child {
+      border-right: 0;
     }
 
     .step::before {
       content: "";
       position: absolute;
       top: -6px;
-      left: 20px;
-      width: 11px;
-      height: 11px;
-      background: var(--accent);
+      left: 22px;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--brass-soft);
+      box-shadow: 0 0 0 6px rgba(214, 168, 71, 0.16);
     }
 
     .step strong {
       display: block;
-      font-family: "Inter Tight", Inter, sans-serif;
-      font-size: 23px;
-      line-height: 1.05;
+      font-size: 21px;
+      font-weight: 900;
+      text-transform: uppercase;
     }
 
     .step span {
       display: block;
-      margin-top: 8px;
-      color: #BDC9D8;
-      line-height: 1.45;
+      margin-top: 10px;
+      color: rgba(245, 241, 232, 0.68);
+      line-height: 1.5;
     }
 
-    .founder {
-      display: grid;
-      grid-template-columns: minmax(280px, 0.85fr) minmax(0, 1.15fr);
-      gap: 48px;
-      align-items: center;
-    }
-
-    .portrait {
-      min-height: 520px;
-      aspect-ratio: 4 / 5;
-      position: relative;
-      overflow: hidden;
-      background:
-        linear-gradient(160deg, #D9D9D9, #777 48%, #121212),
-        radial-gradient(circle at 42% 28%, rgba(255, 255, 255, 0.8), transparent 16rem);
-      filter: grayscale(1);
-    }
-
-    .portrait::after {
-      content: "GW";
-      position: absolute;
-      right: 26px;
-      bottom: 22px;
-      color: rgba(255, 255, 255, 0.3);
-      font-family: "Inter Tight", Inter, sans-serif;
-      font-size: 68px;
-      font-weight: 900;
-    }
-
-    .quote {
-      margin: 0 0 26px;
-      font-size: clamp(42px, 6vw, 82px);
-      line-height: 0.95;
-      font-weight: 900;
-    }
-
-    .bio {
-      max-width: 780px;
-      color: #D6DFEB;
-      font-size: 17px;
-      line-height: 1.7;
-    }
-
-    .cert-grid {
+    .credentials {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 16px;
     }
 
-    .cert {
-      border: 1px solid rgba(213, 215, 219, 0.20);
+    .credential {
+      min-height: 220px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      border: 1px solid rgba(7, 9, 12, 0.16);
+      border-radius: var(--radius);
       padding: 22px;
-      background: rgba(255, 255, 255, 0.055);
+      background: #fffaf0;
     }
 
-    .cert strong {
-      display: block;
-      font-family: "Inter Tight", Inter, sans-serif;
-      font-size: 28px;
-      line-height: 1;
+    .stat-value {
+      color: var(--ink);
+      font-size: clamp(34px, 4vw, 56px);
+      line-height: 0.9;
+      font-weight: 900;
+      text-transform: uppercase;
     }
 
-    .cert p {
-      margin: 12px 0 0;
-      color: #CBD8E8;
-      line-height: 1.45;
+    .credential p {
+      margin: 18px 0 0;
+      color: rgba(7, 9, 12, 0.68);
+      line-height: 1.5;
     }
 
     .capability {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      gap: 22px;
-      align-items: center;
-      border: 1px solid rgba(213, 215, 219, 0.20);
-      padding: 24px;
-      background: rgba(255, 255, 255, 0.06);
+      grid-template-columns: 0.88fr 1.12fr;
+      gap: 34px;
+      align-items: stretch;
     }
 
-    .pdf-viewer {
-      height: 320px;
-      grid-column: 1 / -1;
+    .capability-copy {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 32px;
+      background: rgba(245, 241, 232, 0.06);
+    }
+
+    .capability-list {
       display: grid;
-      place-items: center;
-      border: 1px dashed rgba(198, 216, 240, 0.45);
-      color: #CBD8E8;
-      background: rgba(6, 22, 45, 0.48);
+      gap: 12px;
+      margin-top: 28px;
+    }
+
+    .capability-list div {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 12px;
+      color: rgba(245, 241, 232, 0.74);
+      font-size: 14px;
+    }
+
+    .capability-list strong {
+      color: var(--paper);
+      text-transform: uppercase;
+    }
+
+    .capability-visual {
+      min-height: 420px;
+      display: grid;
+      align-content: end;
+      border-radius: var(--radius);
+      padding: 28px;
+      background:
+        linear-gradient(180deg, transparent, rgba(7, 9, 12, 0.94)),
+        url("assets/cadmus-hero.png") center / cover no-repeat;
+      border: 1px solid rgba(245, 241, 232, 0.15);
+    }
+
+    .capability-visual p {
+      max-width: 420px;
+      margin: 0;
+      color: rgba(245, 241, 232, 0.78);
+      line-height: 1.6;
     }
 
     .cta {
-      border-top: 1px solid rgba(213, 215, 219, 0.16);
-      padding: 92px 0;
-      background: #06152A;
+      padding: 110px 0;
+      background:
+        linear-gradient(135deg, rgba(214, 168, 71, 0.22), transparent 40%),
+        #0a0c10;
+    }
+
+    .cta-inner {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 38px;
+      align-items: end;
     }
 
     .cta h2 {
       max-width: 900px;
-      margin: 0 0 26px;
-      font-family: "Inter Tight", Inter, sans-serif;
-      font-size: clamp(44px, 7vw, 86px);
-      line-height: 0.95;
-      font-weight: 900;
     }
 
-    .footer {
-      border-top: 1px solid rgba(213, 215, 219, 0.12);
-      padding: 34px 0;
-      color: #AAB9CB;
-      background: #06152A;
+    .contact-block {
+      min-width: 300px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 24px;
+      background: rgba(245, 241, 232, 0.06);
+    }
+
+    .contact-block a,
+    .contact-block span {
+      display: block;
+      color: rgba(245, 241, 232, 0.82);
+      line-height: 1.7;
+    }
+
+    footer {
+      border-top: 1px solid var(--line);
+      padding: 32px 0;
+      color: rgba(245, 241, 232, 0.56);
+      background: #07090c;
       font-size: 13px;
     }
 
-    .fade {
-      opacity: 0;
-      transform: translateY(24px);
-      animation: rise 700ms ease forwards;
+    .footer-inner {
+      display: flex;
+      justify-content: space-between;
+      gap: 22px;
+      flex-wrap: wrap;
     }
 
-    .fade:nth-child(2) {
-      animation-delay: 80ms;
-    }
-
-    @keyframes rise {
-      to {
-        opacity: 1;
-        transform: none;
-      }
-    }
-
-    @keyframes float {
-      50% {
-        transform: translateY(-12px);
-      }
-    }
-
-    @media (max-width: 980px) {
-      .hero {
-        min-height: auto;
+    @media (max-width: 1040px) {
+      .hero-bottom,
+      .section-head,
+      .split,
+      .capability,
+      .cta-inner {
         grid-template-columns: 1fr;
-        padding: 54px 0 70px;
       }
 
-      .credential-card {
-        justify-self: stretch;
-        max-width: none;
-      }
-
-      .cards.four,
-      .timeline,
-      .cert-grid {
+      .service-grid,
+      .credentials {
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
 
-      .founder {
-        grid-template-columns: 1fr;
+      .timeline {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
       }
     }
 
@@ -555,252 +644,283 @@
         width: min(100% - 28px, 1180px);
       }
 
-      .links {
+      .nav-links,
+      .nav-cta {
         display: none;
       }
 
       .hero {
-        padding-top: 44px;
+        min-height: auto;
+        padding-top: 116px;
+        background-position: 64% center;
       }
 
       h1 {
-        font-size: clamp(46px, 17vw, 72px);
+        font-size: clamp(48px, 16vw, 72px);
       }
 
-      .trust-grid,
-      .cards,
-      .cards.four,
+      .hero-bottom {
+        margin-top: 54px;
+      }
+
+      .proof-strip,
+      .service-grid,
       .timeline,
-      .cert-grid {
+      .credentials {
         grid-template-columns: 1fr;
       }
 
-      .section-head {
-        display: block;
-      }
-
-      .section-head p {
-        margin-top: 18px;
-      }
-
+      .proof,
       .step {
         border-right: 0;
-        border-left: 1px solid rgba(213, 215, 219, 0.15);
+        border-bottom: 1px solid var(--line);
       }
 
-      .capability {
+      .proof:last-child,
+      .step:last-child {
+        border-bottom: 0;
+      }
+
+      .section {
+        padding: 76px 0;
+      }
+
+      .signal-row {
         grid-template-columns: 1fr;
+      }
+
+      .capability-list div {
+        display: block;
       }
     }
 
     @media (prefers-reduced-motion: reduce) {
-      * {
-        animation: none !important;
+      *,
+      *::before,
+      *::after {
+        scroll-behavior: auto !important;
         transition: none !important;
       }
     }
   </style>
 </head>
 <body>
-  <main class="page grid">
-    <nav class="nav">
+  <main class="site-shell">
+    <nav class="nav" aria-label="Primary navigation">
       <div class="wrap nav-inner">
-        <a class="brand" href="#top">Cadmus<span>.</span></a>
-        <div class="links" aria-label="Primary navigation">
-          <a href="#serve">Who We Serve</a>
-          <a href="#services">Services</a>
-          <a href="#why">Why Cadmus</a>
-          <a href="#founder">Founder</a>
-          <a href="#contact">Contact</a>
+        <a class="brand" href="#top" aria-label="Cadmus Project Management home">
+          <span class="brand-mark">C</span>
+          <span>Cadmus Project Management</span>
+        </a>
+        <div class="nav-links">
+          <a href="#work">Work</a>
+          <a href="#prime">Prime Support</a>
+          <a href="#proof">Proof</a>
+          <a href="#capability">Capability</a>
         </div>
+        <a class="nav-cta" href="mailto:Garrett@cadmusprojects.com?subject=Cadmus%20Project%20Support">Start a Conversation</a>
       </div>
     </nav>
 
-    <section id="top" class="wrap hero">
-      <div class="fade">
-        <div class="eyebrow">Disciplined execution for public-sector programs</div>
-        <h1>Mission-Ready Project Management</h1>
-        <p class="lead">Supporting California agencies and prime contractors through disciplined execution, PMO support, and public-sector expertise.</p>
-        <div class="actions">
-          <a class="button primary" href="mailto:Garrett@cadmusprojects.com?subject=Cadmus%20Project%20Support%20Call">Schedule a Call</a>
-          <a class="button" href="#capability">Download Capability Statement</a>
-        </div>
-      </div>
-
-      <aside class="credential-card fade" aria-label="Cadmus credentials">
-        <h2>Credentials</h2>
-        <div class="cred-grid">
-          <div class="cred">
-            <strong>DVBE</strong>
-            <span>California certified partner</span>
-          </div>
-          <div class="cred">
-            <strong>SDVOSB</strong>
-            <span>Service-disabled veteran-owned</span>
-          </div>
-          <div class="cred">
-            <strong>CMAS</strong>
-            <span>4-25-10-1019</span>
-          </div>
-          <div class="cred">
-            <strong>PMP</strong>
-            <span>Certified delivery leadership</span>
+    <section id="top" class="hero">
+      <div class="wrap">
+        <div class="hero-content">
+          <div class="kicker">DVBE + SDVOSB + CMAS + PMP</div>
+          <h1>Project control for the work that cannot drift.</h1>
+          <p class="hero-lead">Cadmus brings veteran discipline, PMO rigor, and California public-sector fluency to agencies and prime contractors that need clean execution under pressure.</p>
+          <div class="hero-actions">
+            <a class="button primary" href="mailto:Garrett@cadmusprojects.com?subject=Cadmus%20Project%20Support%20Call">Schedule a Call</a>
+            <a class="button" href="#capability">Request Capability Statement</a>
           </div>
         </div>
-      </aside>
-    </section>
 
-    <section class="trust-strip">
-      <div class="wrap trust-grid">
-        <div class="trust-item"><span class="icon">CA</span>California Public Sector</div>
-        <div class="trust-item"><span class="icon">PMO</span>PMO Leadership</div>
-        <div class="trust-item"><span class="icon">V</span>Veteran-Owned</div>
-        <div class="trust-item"><span class="icon">PMP</span>PMP Certified</div>
+        <div class="hero-bottom">
+          <div class="proof-strip" aria-label="Cadmus credential summary">
+            <div class="proof"><strong>DVBE</strong><span>California certified partner</span></div>
+            <div class="proof"><strong>CMAS</strong><span>Contract 4-25-10-1019</span></div>
+            <div class="proof"><strong>PMP</strong><span>Credentialed delivery leadership</span></div>
+            <div class="proof"><strong>9+ yrs</strong><span>California public-sector programs</span></div>
+          </div>
+          <p class="dispatch">Built for program rooms, steering committees, procurement realities, executive reporting, and the unglamorous follow-through that keeps big work from turning sideways.</p>
+        </div>
       </div>
     </section>
 
-    <section id="serve" class="section">
+    <section id="work" class="section metal">
       <div class="wrap">
         <div class="section-head">
-          <h2>Who We Serve</h2>
-          <p>Cadmus supports teams that need clarity, rhythm, and dependable delivery inside complex public-sector environments.</p>
+          <h2>Execution, not theater.</h2>
+          <p>Cadmus is focused on the operating layer that makes complex public-sector projects behave: cadence, visibility, risk discipline, and accountable follow-through.</p>
         </div>
-        <div class="cards">
-          <article class="card fade">
-            <div class="num">01</div>
-            <h3>Agencies</h3>
-            <p>Program delivery support for initiatives that require structure, reporting, and accountability.</p>
-          </article>
-          <article class="card fade">
-            <div class="num">02</div>
-            <h3>Prime Contractors</h3>
-            <p>DVBE participation, W-2 delivery, proposal support, and embedded PM expertise.</p>
-          </article>
-          <article class="card fade">
-            <div class="num">03</div>
-            <h3>Public-Sector PMOs</h3>
-            <p>Scheduling, governance, reporting, and risk discipline for active portfolios.</p>
-          </article>
-        </div>
-      </div>
-    </section>
-
-    <section id="services" class="section alt">
-      <div class="wrap">
-        <div class="section-head">
-          <h2>Core Services</h2>
-          <p>Built around execution: fewer slogans, stronger cadence, cleaner visibility.</p>
-        </div>
-        <div class="cards four">
-          <article class="card">
-            <span class="icon">01</span>
-            <h3>Project Management</h3>
+        <div class="service-grid">
+          <article class="service">
+            <div>
+              <span class="service-number">01 / Project Management</span>
+              <h3>Command the schedule.</h3>
+            </div>
             <ul>
-              <li>Large initiatives</li>
+              <li>Integrated plans and milestone discipline</li>
               <li>Cross-functional coordination</li>
-              <li>Schedule management</li>
-              <li>Stakeholder alignment</li>
+              <li>Stakeholder alignment and decision tracking</li>
             </ul>
           </article>
-          <article class="card">
-            <span class="icon">02</span>
-            <h3>PMO Support</h3>
+          <article class="service">
+            <div>
+              <span class="service-number">02 / PMO Support</span>
+              <h3>Make the portfolio legible.</h3>
+            </div>
             <ul>
-              <li>Resource management</li>
-              <li>Risk and issue control</li>
-              <li>Executive dashboards</li>
-              <li>Process improvement</li>
+              <li>Executive reporting and dashboard cadence</li>
+              <li>Risk, issue, and dependency control</li>
+              <li>Operating rhythms teams can actually use</li>
             </ul>
           </article>
-          <article class="card">
-            <span class="icon">03</span>
-            <h3>DVBE Partner Support</h3>
+          <article class="service">
+            <div>
+              <span class="service-number">03 / Recovery</span>
+              <h3>Stabilize the messy middle.</h3>
+            </div>
             <ul>
-              <li>Prime augmentation</li>
-              <li>W-2 delivery</li>
-              <li>CUF compliance</li>
-              <li>Proposal support</li>
+              <li>Scope clarification and delivery triage</li>
+              <li>Meeting discipline and action accountability</li>
+              <li>Clean escalation paths for stuck work</li>
             </ul>
           </article>
-          <article class="card">
-            <span class="icon">04</span>
-            <h3>Public Sector Expertise</h3>
+          <article class="service">
+            <div>
+              <span class="service-number">04 / Governance</span>
+              <h3>Keep leadership ahead.</h3>
+            </div>
             <ul>
-              <li>California programs</li>
-              <li>Procurement fluency</li>
-              <li>Governance cadence</li>
-              <li>Execution recovery</li>
+              <li>Briefing materials and decision records</li>
+              <li>Procurement-aware delivery support</li>
+              <li>Clear status without status-theater</li>
             </ul>
           </article>
         </div>
       </div>
     </section>
 
-    <section id="why" class="section">
-      <div class="wrap">
-        <div class="section-head">
-          <h2>Why Cadmus</h2>
-          <p>A career path shaped by operational pressure, public-sector delivery, and credentialed project discipline.</p>
-        </div>
-        <div class="timeline">
-          <div class="step"><strong>Army</strong><span>Mission focus under pressure</span></div>
-          <div class="step"><strong>UC Davis</strong><span>Analytical foundation</span></div>
-          <div class="step"><strong>PMP</strong><span>Professional delivery standard</span></div>
-          <div class="step"><strong>Public Sector</strong><span>9+ years supporting California programs</span></div>
-          <div class="step"><strong>CMAS</strong><span>Streamlined state engagement</span></div>
-        </div>
-      </div>
-    </section>
-
-    <section id="founder" class="section alt">
-      <div class="wrap founder">
-        <div class="portrait" aria-label="Black and white founder portrait placeholder"></div>
+    <section id="prime" class="section paper">
+      <div class="wrap split">
         <div>
-          <p class="quote">Execution beats complexity.</p>
-          <p class="bio">Garrett Wilkerson, PMP, is an Army Veteran, Bronze Star recipient, and founder of Cadmus Project Management. He has spent more than nine years supporting California public-sector programs, bringing disciplined coordination, stakeholder alignment, and execution-first leadership to complex initiatives.</p>
-          <p class="bio">Cadmus is focused on the practical work that keeps programs moving: clear schedules, visible risks, accountable follow-through, and calm executive reporting.</p>
+          <p class="pull-quote">A sharper DVBE partner for primes that need delivery muscle.</p>
+          <p class="body-copy">Cadmus supports prime contractors with compliant DVBE participation, W-2 delivery, proposal credibility, and senior project-management capacity that can stand in front of agency stakeholders without blinking.</p>
+          <p class="body-copy">The value is simple: real execution support, not a logo on a slide.</p>
+        </div>
+        <div class="signal-panel" aria-label="Prime contractor support">
+          <div class="signal-row">
+            <span class="tag">CUF Ready</span>
+            <div>
+              <h3>Useful work, clearly owned.</h3>
+              <p>Cadmus is structured around meaningful project delivery support that can be documented and defended.</p>
+            </div>
+          </div>
+          <div class="signal-row">
+            <span class="tag">W-2 Delivery</span>
+            <div>
+              <h3>Embedded where execution happens.</h3>
+              <p>Support can fit the delivery model primes need while keeping roles, reporting, and accountability clean.</p>
+            </div>
+          </div>
+          <div class="signal-row">
+            <span class="tag">Proposal Lift</span>
+            <div>
+              <h3>Credibility before kickoff.</h3>
+              <p>DVBE, SDVOSB, PMP, CMAS, Army veteran experience, and public-sector delivery history in one partner.</p>
+            </div>
+          </div>
         </div>
       </div>
     </section>
 
-    <section class="section">
+    <section id="proof" class="section">
       <div class="wrap">
         <div class="section-head">
-          <h2>Credentials</h2>
-          <p>Compliance-ready qualifications for agencies and prime contractors.</p>
+          <h2>Calm under constraint.</h2>
+          <p>Founder Garrett Wilkerson brings Army veteran discipline, PMP standards, and years of California public-sector program experience to the work.</p>
         </div>
-        <div class="cert-grid">
-          <div class="cert"><strong>DVBE</strong><p>2032694</p></div>
-          <div class="cert"><strong>SDVOSB</strong><p>Certified small business partner</p></div>
-          <div class="cert"><strong>CMAS</strong><p>4-25-10-1019</p></div>
-          <div class="cert"><strong>PMP</strong><p>Project Management Professional</p></div>
+        <div class="timeline" aria-label="Cadmus experience timeline">
+          <div class="step"><strong>Army Veteran</strong><span>Mission focus, pressure-tested coordination, and leadership discipline.</span></div>
+          <div class="step"><strong>Bronze Star</strong><span>Recognition earned in service, carried forward into delivery culture.</span></div>
+          <div class="step"><strong>UC Davis</strong><span>Analytical foundation for complex systems and stakeholder environments.</span></div>
+          <div class="step"><strong>PMP</strong><span>Professional project-management standards applied pragmatically.</span></div>
+          <div class="step"><strong>Public Sector</strong><span>More than nine years supporting California programs and teams.</span></div>
         </div>
       </div>
     </section>
 
-    <section id="capability" class="section alt">
+    <section class="section paper">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Procurement-ready credentials.</h2>
+          <p>The details agencies and primes need when the conversation moves from interest to action.</p>
+        </div>
+        <div class="credentials">
+          <article class="credential">
+            <div class="stat-value">DVBE</div>
+            <p>California certified Disabled Veteran Business Enterprise. Certification ID 2032694.</p>
+          </article>
+          <article class="credential">
+            <div class="stat-value">SDVOSB</div>
+            <p>Service-disabled veteran-owned small business partner for public-sector teams.</p>
+          </article>
+          <article class="credential">
+            <div class="stat-value">CMAS</div>
+            <p>California Multiple Award Schedule contract 4-25-10-1019.</p>
+          </article>
+          <article class="credential">
+            <div class="stat-value">PMP</div>
+            <p>Project Management Professional credential for disciplined delivery leadership.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="capability" class="section metal">
       <div class="wrap capability">
-        <div>
-          <h2>Capability Statement</h2>
-          <p class="bio">Request Cadmus Project Management's capability statement for agency and prime contractor review.</p>
+        <div class="capability-copy">
+          <div class="kicker">Capability Statement</div>
+          <h2>Bring the right page to the meeting.</h2>
+          <p class="hero-lead">Request the Cadmus capability statement for agency review, prime-contractor teaming, or procurement conversations.</p>
+          <div class="capability-list">
+            <div><strong>Company</strong><span>Cadmus Project Management LLC</span></div>
+            <div><strong>Location</strong><span>Rocklin, California</span></div>
+            <div><strong>Focus</strong><span>Public-sector project and PMO support</span></div>
+            <div><strong>Contract</strong><span>CMAS 4-25-10-1019</span></div>
+          </div>
+          <div class="hero-actions">
+            <a class="button primary" href="mailto:Garrett@cadmusprojects.com?subject=Capability%20Statement%20Request">Request PDF</a>
+          </div>
         </div>
-        <a class="button primary" href="mailto:Garrett@cadmusprojects.com?subject=Capability%20Statement%20Request">Request PDF</a>
-        <div class="pdf-viewer">Capability Statement available by request</div>
+        <div class="capability-visual">
+          <p>Disciplined support for the exact point where plans, people, politics, procurement, and deadlines collide.</p>
+        </div>
       </div>
     </section>
 
     <section id="contact" class="cta">
-      <div class="wrap">
-        <h2>Need disciplined project support?</h2>
-        <div class="actions">
-          <a class="button primary" href="mailto:Garrett@cadmusprojects.com?subject=Cadmus%20Project%20Support">Contact Cadmus</a>
-          <a class="button" href="#capability">Download Capability Statement</a>
+      <div class="wrap cta-inner">
+        <div>
+          <div class="kicker">Ready when the work is real</div>
+          <h2>Let’s make the next program room calmer.</h2>
+        </div>
+        <div class="contact-block">
+          <a href="mailto:Garrett@cadmusprojects.com">Garrett@cadmusprojects.com</a>
+          <a href="tel:17194256025">719-425-6025</a>
+          <span>Rocklin, CA</span>
+          <div class="hero-actions">
+            <a class="button primary" href="mailto:Garrett@cadmusprojects.com?subject=Cadmus%20Project%20Support">Contact Cadmus</a>
+          </div>
         </div>
       </div>
     </section>
 
-    <footer class="footer">
-      <div class="wrap">Cadmus Project Management LLC | Rocklin, CA | Garrett@cadmusprojects.com | 719-425-6025 | CMAS 4-25-10-1019</div>
+    <footer>
+      <div class="wrap footer-inner">
+        <span>Cadmus Project Management LLC</span>
+        <span>DVBE 2032694 | CMAS 4-25-10-1019 | PMP | SDVOSB</span>
+      </div>
     </footer>
   </main>
 </body>
