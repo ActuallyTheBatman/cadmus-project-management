@@ -55,6 +55,12 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://cadmusprojects.com/resources/epc-project-controls/</loc>
+    <lastmod>2026-08-10</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
     <loc>https://cadmusprojects.com/about/</loc>
     <lastmod>2026-07-29</lastmod>
     <changefreq>monthly</changefreq>
