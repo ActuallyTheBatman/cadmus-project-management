@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 const root = process.cwd();
-const today = "2026-07-29";
+const today = "2026-08-10";
 const baseUrl = "https://cadmusprojects.com";
 
 const pages = [
@@ -262,6 +262,7 @@ function nav() {
           <a href="/rocklin-project-management/">Rocklin</a>
           <a href="/sacramento-project-management/">Sacramento</a>
           <a href="/dvbe-project-management-california/">DVBE</a>
+          <a href="/resources/epc-project-controls/">Toolkit</a>
           <a href="/about/">About</a>
           <a href="/contact/">Contact</a>
         </div>
@@ -348,6 +349,13 @@ function renderPage(page) {
         <div class="detail">
           ${page.sections.map(([heading, text]) => `<article><h2>${heading}</h2><p>${text}</p></article>`).join("\n          ")}
         </div>
+        ${
+          page.path === "services/project-controls-schedule-risk/index.html"
+            ? `<div class="hero-actions">
+          <a class="button primary" href="/resources/epc-project-controls/">View Project Controls Toolkit</a>
+        </div>`
+            : ""
+        }
       </div>
     </section>
     <section class="section metal">
@@ -395,6 +403,7 @@ for (const page of pages) {
 const urls = [
   "",
   ...pages.map((page) => page.path.replace(/index\.html$/, "")),
+  "resources/epc-project-controls/",
 ];
 
 writeFileSync(
@@ -408,43 +417,44 @@ writeFileSync(
 );
 
 let index = readFileSync(join(root, "index.html"), "utf8");
+const homeSchema = JSON.stringify({
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "LocalBusiness",
+      "@id": `${baseUrl}/#business`,
+      name: "Cadmus Project Management LLC",
+      url: baseUrl,
+      image: `${baseUrl}/assets/cadmus-hero.png`,
+      telephone: "+1-719-425-6025",
+      email: "Garrett@cadmusprojects.com",
+      address: {
+        "@type": "PostalAddress",
+        addressLocality: "Rocklin",
+        addressRegion: "CA",
+        addressCountry: "US",
+      },
+      areaServed: ["Rocklin CA", "Sacramento CA", "Placer County CA", "California"],
+      description:
+        "California public-sector project management, PMO support, project controls, and DVBE partner support.",
+    },
+    {
+      "@type": "WebSite",
+      "@id": `${baseUrl}/#website`,
+      name: "Cadmus Project Management",
+      url: baseUrl,
+      publisher: { "@id": `${baseUrl}/#business` },
+    },
+  ],
+});
 index = index
   .replace(
-    /<meta property="og:type" content="website">/,
-    `<meta property="og:type" content="website">\n  <link rel="canonical" href="${baseUrl}/">\n  <script type="application/ld+json">${JSON.stringify({
-      "@context": "https://schema.org",
-      "@graph": [
-        {
-          "@type": "LocalBusiness",
-          "@id": `${baseUrl}/#business`,
-          name: "Cadmus Project Management LLC",
-          url: baseUrl,
-          image: `${baseUrl}/assets/cadmus-hero.png`,
-          telephone: "+1-719-425-6025",
-          email: "Garrett@cadmusprojects.com",
-          address: {
-            "@type": "PostalAddress",
-            addressLocality: "Rocklin",
-            addressRegion: "CA",
-            addressCountry: "US",
-          },
-          areaServed: ["Rocklin CA", "Sacramento CA", "Placer County CA", "California"],
-          description:
-            "California public-sector project management, PMO support, project controls, and DVBE partner support.",
-        },
-        {
-          "@type": "WebSite",
-          "@id": `${baseUrl}/#website`,
-          name: "Cadmus Project Management",
-          url: baseUrl,
-          publisher: { "@id": `${baseUrl}/#business` },
-        },
-      ],
-    })}</script>`,
+    /<meta property="og:type" content="website">[\s\S]*?<link rel="preconnect" href="https:\/\/fonts\.googleapis\.com">/,
+    `<meta property="og:type" content="website">\n  <link rel="canonical" href="${baseUrl}/">\n  <script type="application/ld+json">${homeSchema}</script>\n  <link rel="preconnect" href="https://fonts.googleapis.com">`,
   )
   .replace(
     /<div class="nav-links">[\s\S]*?<\/div>\s*<a class="nav-cta"/,
-    `<div class="nav-links">\n          <a href="#work">Work</a>\n          <a href="/services/public-sector-project-management/">Services</a>\n          <a href="/rocklin-project-management/">Rocklin</a>\n          <a href="/sacramento-project-management/">Sacramento</a>\n          <a href="/dvbe-project-management-california/">DVBE</a>\n          <a href="/about/">About</a>\n        </div>\n        <a class="nav-cta"`,
+    `<div class="nav-links">\n          <a href="#work">Work</a>\n          <a href="/services/public-sector-project-management/">Services</a>\n          <a href="/rocklin-project-management/">Rocklin</a>\n          <a href="/sacramento-project-management/">Sacramento</a>\n          <a href="/dvbe-project-management-california/">DVBE</a>\n          <a href="/resources/epc-project-controls/">Toolkit</a>\n          <a href="/about/">About</a>\n        </div>\n        <a class="nav-cta"`,
   )
   .replace("Letâ€™s make the next program room calmer.", "Let's make the next program room calmer.");
 
