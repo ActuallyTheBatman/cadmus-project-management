@@ -31,6 +31,23 @@ create table if not exists public.timesheet_admin_emails (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.timesheet_invitations (
+  id uuid primary key default gen_random_uuid(),
+  email text not null,
+  role text not null default 'resource' check (role in ('resource', 'manager', 'admin')),
+  project_id uuid references public.timesheet_projects(id),
+  manager_id uuid references public.timesheet_project_managers(id),
+  branch text,
+  division text,
+  invited_by uuid references auth.users(id),
+  active boolean not null default true,
+  accepted_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists timesheet_invitations_email_idx
+  on public.timesheet_invitations ((lower(email)), active, created_at desc);
+
 create table if not exists public.timesheet_branches (
   id uuid primary key default gen_random_uuid(),
   name text not null unique,
@@ -171,13 +188,30 @@ language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  invited_role text;
 begin
   if exists (select 1 from public.timesheet_admin_emails a where lower(a.email) = lower(new.email)) then
     new.role = 'admin';
   elsif exists (select 1 from public.timesheet_project_managers m where lower(m.manager_email) = lower(new.email)) then
     new.role = 'manager';
   else
-    new.role = 'resource';
+    select i.role
+    into invited_role
+    from public.timesheet_invitations i
+    where lower(i.email) = lower(new.email)
+      and i.active = true
+      and i.accepted_at is null
+    order by i.created_at desc
+    limit 1;
+
+    if invited_role is not null then
+      new.role = invited_role;
+    elsif tg_op = 'UPDATE' then
+      new.role = old.role;
+    else
+      new.role = 'resource';
+    end if;
   end if;
 
   return new;
@@ -217,6 +251,7 @@ execute function public.set_timesheet_updated_at();
 alter table public.timesheet_projects enable row level security;
 alter table public.timesheet_project_managers enable row level security;
 alter table public.timesheet_admin_emails enable row level security;
+alter table public.timesheet_invitations enable row level security;
 alter table public.timesheet_branches enable row level security;
 alter table public.timesheet_divisions enable row level security;
 alter table public.timesheet_tasks enable row level security;
@@ -262,6 +297,29 @@ for all
 to authenticated
 using (public.current_user_role() = 'admin')
 with check (public.current_user_role() = 'admin');
+
+drop policy if exists "Admins can manage invitations" on public.timesheet_invitations;
+create policy "Admins can manage invitations"
+on public.timesheet_invitations
+for all
+to authenticated
+using (public.current_user_role() = 'admin')
+with check (public.current_user_role() = 'admin');
+
+drop policy if exists "Invited users can read their own invitations" on public.timesheet_invitations;
+create policy "Invited users can read their own invitations"
+on public.timesheet_invitations
+for select
+to authenticated
+using (lower(email) = lower(auth.email()) and active = true);
+
+drop policy if exists "Invited users can accept their own invitations" on public.timesheet_invitations;
+create policy "Invited users can accept their own invitations"
+on public.timesheet_invitations
+for update
+to authenticated
+using (lower(email) = lower(auth.email()) and active = true)
+with check (lower(email) = lower(auth.email()));
 
 drop policy if exists "Authenticated users can read active branches" on public.timesheet_branches;
 create policy "Authenticated users can read active branches"

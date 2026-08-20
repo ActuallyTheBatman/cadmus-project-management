@@ -7,6 +7,11 @@ const reportingFormats = {
   weekly_grid: "Weekly Grid",
   work_log: "Work Log",
 };
+const ppmRoles = {
+  resource: "Resource",
+  manager: "Project Manager",
+  admin: "Portfolio Manager",
+};
 
 const app = {
   supabase: null,
@@ -17,6 +22,8 @@ const app = {
   branches: [],
   divisions: [],
   tasks: [],
+  pendingInvite: null,
+  adminProjectFocus: "all",
   report: null,
   dailyReports: [],
   reportFormat: "daily_cards",
@@ -63,6 +70,7 @@ const els = {
   reportStatus: document.querySelector("#reportStatus"),
   projectCode: document.querySelector("#projectCode"),
   portfolioStatus: document.querySelector("#portfolioStatus"),
+  portfolioProject: document.querySelector("#portfolioProject"),
   refreshPortfolio: document.querySelector("#refreshPortfolio"),
   portfolioList: document.querySelector("#portfolioList"),
   projectForm: document.querySelector("#projectForm"),
@@ -71,6 +79,8 @@ const els = {
   divisionForm: document.querySelector("#divisionForm"),
   taskForm: document.querySelector("#taskForm"),
   adminExportForm: document.querySelector("#adminExportForm"),
+  inviteForm: document.querySelector("#inviteForm"),
+  adminProjectFocus: document.querySelector("#adminProjectFocus"),
   adminProjectName: document.querySelector("#adminProjectName"),
   adminProjectCode: document.querySelector("#adminProjectCode"),
   adminProjectClient: document.querySelector("#adminProjectClient"),
@@ -90,6 +100,12 @@ const els = {
   adminExportDivision: document.querySelector("#adminExportDivision"),
   adminExportStart: document.querySelector("#adminExportStart"),
   adminExportEnd: document.querySelector("#adminExportEnd"),
+  inviteEmails: document.querySelector("#inviteEmails"),
+  inviteRole: document.querySelector("#inviteRole"),
+  inviteProject: document.querySelector("#inviteProject"),
+  inviteManager: document.querySelector("#inviteManager"),
+  inviteBranch: document.querySelector("#inviteBranch"),
+  inviteDivision: document.querySelector("#inviteDivision"),
   projectList: document.querySelector("#projectList"),
   managerList: document.querySelector("#managerList"),
   branchList: document.querySelector("#branchList"),
@@ -228,6 +244,7 @@ function bindEvents() {
   });
   els.refreshPortfolio.addEventListener("click", loadPortfolio);
   els.portfolioStatus.addEventListener("change", loadPortfolio);
+  els.portfolioProject.addEventListener("change", loadPortfolio);
   els.projectForm.addEventListener("submit", addProject);
   els.managerForm.addEventListener("submit", addManager);
   els.branchForm.addEventListener("submit", addBranch);
@@ -235,6 +252,13 @@ function bindEvents() {
   els.taskForm.addEventListener("submit", addTask);
   els.adminExportForm.addEventListener("submit", exportAdminWork);
   els.adminExportBranch.addEventListener("change", populateAdminExportDivisions);
+  els.adminProjectFocus.addEventListener("change", () => {
+    app.adminProjectFocus = els.adminProjectFocus.value;
+    renderAdminConsole();
+  });
+  els.inviteForm.addEventListener("submit", sendBulkInvitations);
+  els.inviteProject.addEventListener("change", populateInviteManagers);
+  els.inviteBranch.addEventListener("change", populateInviteDivisions);
 }
 
 async function signIn(event) {
@@ -326,6 +350,7 @@ async function renderForAuthState() {
 
   els.userEmail.textContent = app.user.email;
   await loadReferenceData();
+  await loadPendingInvitation();
   await loadProfile();
 
   if (!app.profile) {
@@ -334,18 +359,19 @@ async function renderForAuthState() {
     return;
   }
 
-  els.rolePill.textContent = app.profile.role;
+  els.rolePill.textContent = roleLabel(app.profile.role);
   els.rolePill.classList.remove("hidden");
   els.appView.classList.remove("hidden");
   renderProfileSummary();
   await loadWeek();
 
-  if (["manager", "admin"].includes(app.profile.role)) {
+  if (canReviewPortfolio()) {
     els.portfolioView.classList.remove("hidden");
+    populatePortfolioProjectFilter();
     await loadPortfolio();
   }
 
-  if (app.profile.role === "admin") {
+  if (isPortfolioManager()) {
     els.adminView.classList.remove("hidden");
     renderAdminConsole();
     setDefaultAdminExportWindow();
@@ -404,15 +430,41 @@ async function loadProfile() {
   app.profile = data;
 }
 
+async function loadPendingInvitation() {
+  const inviteId = new URL(window.location.href).searchParams.get("invite");
+  let query = app.supabase
+    .from("timesheet_invitations")
+    .select("id, email, role, project_id, manager_id, branch, division, accepted_at")
+    .eq("active", true)
+    .is("accepted_at", null)
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  if (inviteId) {
+    query = query.eq("id", inviteId);
+  } else {
+    query = query.ilike("email", app.user.email);
+  }
+
+  const { data, error } = await query.maybeSingle();
+  if (error) {
+    app.pendingInvite = null;
+    return;
+  }
+
+  app.pendingInvite = data || null;
+}
+
 function renderProfileForm() {
   populateProjectSelect();
   populateBranchSelect();
+  const invite = app.pendingInvite || {};
   els.profileName.value = app.profile?.full_name || app.user.user_metadata?.full_name || "";
   els.profileCompany.value = app.profile?.company || "Cadmus Project Management";
-  els.profileBranch.value = app.profile?.branch || app.branches[0]?.name || "";
-  populateDivisionSelect(app.profile?.division || "");
-  els.profileProject.value = app.profile?.project_id || app.projects.find((project) => project.code === "BENCON")?.id || app.projects[0]?.id || "";
-  populateManagerSelect(app.profile?.manager_id);
+  els.profileBranch.value = app.profile?.branch || invite.branch || app.branches[0]?.name || "";
+  populateDivisionSelect(app.profile?.division || invite.division || "");
+  els.profileProject.value = app.profile?.project_id || invite.project_id || app.projects.find((project) => project.code === "BENCON")?.id || app.projects[0]?.id || "";
+  populateManagerSelect(app.profile?.manager_id || invite.manager_id || "");
 }
 
 function populateProjectSelect() {
@@ -477,6 +529,15 @@ async function saveProfile(event) {
   if (error) {
     setMessage(els.profileMessage, `Profile save failed: ${error.message}`, true);
     return;
+  }
+
+  if (app.pendingInvite?.id) {
+    await app.supabase
+      .from("timesheet_invitations")
+      .update({ accepted_at: new Date().toISOString(), active: false })
+      .eq("id", app.pendingInvite.id);
+    app.pendingInvite = null;
+    cleanAuthUrl();
   }
 
   setMessage(els.profileMessage, "Profile saved.");
@@ -590,7 +651,7 @@ function renderFormatSelector(enabledFormats) {
     els.reportFormat.append(new Option(reportingFormats[format] || format, format));
   }
   els.reportFormat.value = app.reportFormat;
-  els.reportFormat.classList.toggle("hidden", enabledFormats.length <= 1);
+  els.reportFormat.disabled = enabledFormats.length <= 1;
   els.reportFormatTitle.textContent = reportingFormats[app.reportFormat] || "Daily Boxes";
 }
 
@@ -779,7 +840,7 @@ async function saveWeek(targetStatus) {
 
   setMessage(els.appMessage, targetStatus === "submitted" ? "Week submitted." : "Draft saved.");
   await loadWeek();
-  if (["manager", "admin"].includes(app.profile.role)) await loadPortfolio();
+  if (canReviewPortfolio()) await loadPortfolio();
 }
 
 function collectDailyReports() {
@@ -838,7 +899,7 @@ function updateTotalsFromDom() {
 }
 
 async function loadPortfolio() {
-  if (!app.profile || !["manager", "admin"].includes(app.profile.role)) return;
+  if (!app.profile || !canReviewPortfolio()) return;
 
   els.portfolioList.innerHTML = `<div class="empty-state"><p>Loading portfolio reports...</p></div>`;
   let query = app.supabase
@@ -849,6 +910,10 @@ async function loadPortfolio() {
 
   if (els.portfolioStatus.value !== "all") {
     query = query.eq("status", els.portfolioStatus.value);
+  }
+
+  if (els.portfolioProject.value && els.portfolioProject.value !== "all") {
+    query = query.eq("project_id", els.portfolioProject.value);
   }
 
   const { data: reports, error } = await query;
@@ -907,7 +972,7 @@ function renderReviewCard(report, profile, days) {
     </div>
   `;
 
-  if (["submitted", "rejected"].includes(report.status) && ["manager", "admin"].includes(app.profile.role)) {
+  if (["submitted", "rejected"].includes(report.status) && canReviewPortfolio()) {
     const actions = document.createElement("div");
     actions.className = "toolbar";
     const approve = document.createElement("button");
@@ -964,13 +1029,13 @@ function renderAdminConsole() {
 }
 
 function populateAdminSelects() {
-  const projectSelects = [els.adminManagerProject, els.adminTaskProject];
+  populateProjectSelectElement(els.adminProjectFocus, "All active projects", "all");
+  els.adminProjectFocus.value = app.adminProjectFocus;
+
+  const projectSelects = [els.adminManagerProject, els.adminTaskProject, els.inviteProject];
   for (const select of projectSelects) {
-    select.innerHTML = "";
-    select.append(new Option("Select project", ""));
-    for (const project of app.projects) {
-      select.append(new Option(projectLabel(project), project.id));
-    }
+    populateProjectSelectElement(select, "Select project", "");
+    if (app.adminProjectFocus !== "all") select.value = app.adminProjectFocus;
   }
 
   els.adminDivisionBranch.innerHTML = "";
@@ -985,6 +1050,22 @@ function populateAdminSelects() {
     els.adminExportBranch.append(new Option(branch.name, branch.name));
   }
   populateAdminExportDivisions();
+  populateInviteBranches();
+  populateInviteManagers();
+}
+
+function populatePortfolioProjectFilter() {
+  const current = els.portfolioProject.value || "all";
+  populateProjectSelectElement(els.portfolioProject, "All projects", "all");
+  els.portfolioProject.value = app.projects.some((project) => project.id === current) ? current : "all";
+}
+
+function populateProjectSelectElement(select, placeholder, placeholderValue) {
+  select.innerHTML = "";
+  select.append(new Option(placeholder, placeholderValue));
+  for (const project of app.projects) {
+    select.append(new Option(projectLabel(project), project.id));
+  }
 }
 
 function populateAdminExportDivisions() {
@@ -997,11 +1078,48 @@ function populateAdminExportDivisions() {
   }
 }
 
+function populateInviteBranches() {
+  const current = els.inviteBranch.value;
+  els.inviteBranch.innerHTML = "";
+  els.inviteBranch.append(new Option("Select branch", ""));
+  for (const branch of app.branches) {
+    els.inviteBranch.append(new Option(branch.name, branch.name));
+  }
+  els.inviteBranch.value = app.branches.some((branch) => branch.name === current) ? current : "";
+  populateInviteDivisions();
+}
+
+function populateInviteDivisions() {
+  const selectedBranch = app.branches.find((branch) => branch.name === els.inviteBranch.value);
+  const divisions = app.divisions.filter((division) => division.branch_id === selectedBranch?.id);
+  const current = els.inviteDivision.value;
+  els.inviteDivision.innerHTML = "";
+  els.inviteDivision.append(new Option("Select division", ""));
+  for (const division of divisions) {
+    els.inviteDivision.append(new Option(division.name, division.name));
+  }
+  els.inviteDivision.value = divisions.some((division) => division.name === current) ? current : "";
+}
+
+function populateInviteManagers() {
+  const projectId = els.inviteProject.value;
+  const managers = app.managers.filter((manager) => manager.project_id === projectId);
+  const current = els.inviteManager.value;
+  els.inviteManager.innerHTML = "";
+  els.inviteManager.append(new Option(managers.length ? "Select manager" : "No managers configured", ""));
+  for (const manager of managers) {
+    els.inviteManager.append(new Option(`${manager.manager_name} - ${manager.manager_email}`, manager.id));
+  }
+  els.inviteManager.value = managers.some((manager) => manager.id === current) ? current : "";
+}
+
 function renderAdminLists() {
   renderProjectAdminList();
+  const managers = filterByFocusedProject(app.managers);
+  const tasks = filterByFocusedProject(app.tasks);
   renderAdminList(
     els.managerList,
-    app.managers,
+    managers,
     (manager) => manager.manager_name,
     (manager) => `${projectLabel(getProject(manager.project_id))} - ${manager.manager_email}`,
     (manager) => deactivateAdminItem("timesheet_project_managers", manager.id, "Resource manager removed."),
@@ -1022,11 +1140,16 @@ function renderAdminLists() {
   );
   renderAdminList(
     els.taskList,
-    app.tasks,
+    tasks,
     (task) => taskLabel(task),
     (task) => projectLabel(getProject(task.project_id)),
     (task) => deactivateAdminItem("timesheet_tasks", task.id, "Task removed."),
   );
+}
+
+function filterByFocusedProject(items) {
+  if (app.adminProjectFocus === "all") return items;
+  return items.filter((item) => item.project_id === app.adminProjectFocus || item.id === app.adminProjectFocus);
 }
 
 function renderProjectAdminList() {
@@ -1218,6 +1341,67 @@ async function addTask(event) {
 
   const { error } = await app.supabase.from("timesheet_tasks").upsert(payload, { onConflict: "project_id,name" });
   await finishAdminSave(error, els.taskForm, "Task saved.");
+}
+
+async function sendBulkInvitations(event) {
+  event.preventDefault();
+  if (!isPortfolioManager()) return;
+
+  const emails = parseEmailList(els.inviteEmails.value);
+  const payloadBase = {
+    role: els.inviteRole.value,
+    project_id: els.inviteProject.value || null,
+    manager_id: els.inviteManager.value || null,
+    branch: els.inviteBranch.value || null,
+    division: els.inviteDivision.value || null,
+    invited_by: app.user.id,
+    active: true,
+  };
+
+  if (!emails.length || !payloadBase.project_id) {
+    setMessage(els.adminMessage, "Add at least one email and choose a project.", true);
+    return;
+  }
+
+  setMessage(els.adminMessage, `Sending ${emails.length} invitations...`);
+  let sent = 0;
+  const failed = [];
+
+  for (const email of emails) {
+    const invitation = {
+      id: crypto.randomUUID(),
+      email,
+      ...payloadBase,
+    };
+    const { error: inviteError } = await app.supabase.from("timesheet_invitations").insert(invitation);
+    if (inviteError) {
+      failed.push(`${email}: ${inviteError.message}`);
+      continue;
+    }
+
+    const redirectTo = `${window.location.origin}/timesheets/?invite=${invitation.id}`;
+    const { error: emailError } = await app.supabase.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: redirectTo, shouldCreateUser: true },
+    });
+
+    if (emailError) {
+      failed.push(`${email}: ${friendlyAuthError(emailError)}`);
+      await app.supabase.from("timesheet_invitations").update({ active: false }).eq("id", invitation.id);
+    } else {
+      sent += 1;
+    }
+  }
+
+  if (failed.length) {
+    setMessage(els.adminMessage, `Sent ${sent}. Failed ${failed.length}: ${failed.join(" | ")}`, true);
+    return;
+  }
+
+  els.inviteForm.reset();
+  populateInviteBranches();
+  populateInviteManagers();
+  setMessage(els.adminMessage, `Sent ${sent} invitations.`);
 }
 
 async function finishAdminSave(error, form, successMessage) {
@@ -1437,6 +1621,18 @@ function getTasksForProject(projectId) {
   return app.tasks.filter((task) => !task.project_id || task.project_id === projectId);
 }
 
+function canReviewPortfolio() {
+  return ["manager", "admin"].includes(app.profile?.role);
+}
+
+function isPortfolioManager() {
+  return app.profile?.role === "admin";
+}
+
+function roleLabel(role) {
+  return ppmRoles[role] || role || "Resource";
+}
+
 function getEnabledFormatsForProject(projectId) {
   const project = getProject(projectId);
   const formats = Array.isArray(project?.reporting_formats) ? project.reporting_formats : ["daily_cards"];
@@ -1475,6 +1671,18 @@ function taskLabel(task) {
 
 function normalizeLookup(value) {
   return String(value || "").trim().toLowerCase();
+}
+
+function parseEmailList(value) {
+  const seen = new Set();
+  return String(value || "")
+    .split(/[\s,;]+/)
+    .map((email) => email.trim().toLowerCase())
+    .filter((email) => {
+      if (!email || seen.has(email) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return false;
+      seen.add(email);
+      return true;
+    });
 }
 
 function groupBy(items, key) {

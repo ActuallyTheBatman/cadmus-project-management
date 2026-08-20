@@ -181,7 +181,11 @@
               <h2>Portfolio Review</h2>
               <p class="helper">Managers see their project resources. Admins see the full reporting portfolio.</p>
             </div>
-            <div class="toolbar">
+              <div class="toolbar">
+              <label class="field inline-filter">
+                <span>Project</span>
+                <select id="portfolioProject" aria-label="Filter reports by project"></select>
+              </label>
               <select id="portfolioStatus" aria-label="Filter reports by status">
                 <option value="submitted">Submitted</option>
                 <option value="draft">Draft</option>
@@ -198,9 +202,13 @@
         <section id="adminView" class="panel portfolio-panel hidden">
           <div class="panel-head">
             <div>
-              <h2>Admin Setup</h2>
-              <p class="helper">Manage the dropdown values resources use for projects, managers, branches, divisions, and task codes.</p>
+              <h2>Portfolio Manager Setup</h2>
+              <p class="helper">Manage project setup, invitations, reporting views, and controlled values across the portfolio.</p>
             </div>
+            <label class="field inline-filter">
+              <span>Project Focus</span>
+              <select id="adminProjectFocus"></select>
+            </label>
           </div>
           <div class="admin-grid">
             <form id="projectForm" class="admin-card">
@@ -257,6 +265,23 @@
               <label class="field"><span>Start date</span><input id="adminExportStart" type="date" required></label>
               <label class="field"><span>End date</span><input id="adminExportEnd" type="date" required></label>
               <button class="button primary" type="submit">Export Work</button>
+            </form>
+
+            <form id="inviteForm" class="admin-card wide-card">
+              <h3>Bulk Invitations</h3>
+              <label class="field"><span>Email list</span><textarea id="inviteEmails" placeholder="one.email@example.com&#10;two.email@example.com" required></textarea></label>
+              <div class="profile-grid tight-grid">
+                <label class="field"><span>Tier</span><select id="inviteRole">
+                  <option value="resource">Resource</option>
+                  <option value="manager">Project Manager</option>
+                  <option value="admin">Portfolio Manager</option>
+                </select></label>
+                <label class="field"><span>Project</span><select id="inviteProject" required></select></label>
+                <label class="field"><span>Project Manager</span><select id="inviteManager"></select></label>
+                <label class="field"><span>Branch</span><select id="inviteBranch"></select></label>
+                <label class="field"><span>Division</span><select id="inviteDivision"></select></label>
+              </div>
+              <button class="button primary" type="submit">Send Invitations</button>
             </form>
           </div>
           <div class="panel-body">
