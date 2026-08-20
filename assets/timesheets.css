@@ -422,6 +422,43 @@ select option { color: #111418; }
   padding: 13px;
 }
 
+.task-line-list {
+  gap: 14px;
+}
+
+.task-line-card {
+  display: grid;
+  gap: 10px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.task-line-card:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.task-line-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.task-line-head strong {
+  color: rgba(245, 241, 232, 0.72);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.add-task-line {
+  display: flex;
+  justify-content: flex-start;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
 .weekly-grid-table {
   display: grid;
   grid-column: 1 / -1;
@@ -486,7 +523,7 @@ select option { color: #111418; }
 
 .work-log-row {
   display: grid;
-  grid-template-columns: 110px minmax(170px, 1.2fr) 90px minmax(220px, 1.6fr) minmax(160px, 1fr) minmax(160px, 1fr);
+  grid-template-columns: 110px minmax(170px, 1.2fr) 90px minmax(220px, 1.6fr) minmax(160px, 1fr) minmax(160px, 1fr) auto;
   gap: 10px;
   align-items: end;
   border: 1px solid rgba(245, 241, 232, 0.14);
@@ -751,7 +788,7 @@ footer {
   .work-log-list { min-width: 680px; }
 
   .work-log-row {
-    grid-template-columns: 100px minmax(160px, 1fr) 90px minmax(190px, 1.4fr) minmax(150px, 1fr) minmax(150px, 1fr);
+    grid-template-columns: 100px minmax(160px, 1fr) 90px minmax(190px, 1.4fr) minmax(150px, 1fr) minmax(150px, 1fr) auto;
   }
 }
 

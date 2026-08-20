@@ -583,9 +583,10 @@ async function loadWeek() {
 
   const { data: days, error: daysError } = await app.supabase
     .from("timesheet_daily_reports")
-    .select("id, weekly_report_id, day_index, work_date, task_id, hours, accomplishments, blockers, next_steps")
+    .select("id, weekly_report_id, day_index, line_index, work_date, task_id, hours, accomplishments, blockers, next_steps")
     .eq("weekly_report_id", app.report.id)
-    .order("day_index");
+    .order("day_index")
+    .order("line_index");
 
   if (daysError) {
     setMessage(els.appMessage, `Daily boxes failed: ${daysError.message}`, true);
@@ -602,6 +603,7 @@ function buildBlankDailyReports(reportId) {
     id: "",
     weekly_report_id: reportId || "",
     day_index: index,
+    line_index: 0,
     work_date: toDateInput(addDays(app.weekStart, index)),
     task_id: "",
     hours: 0,
@@ -612,8 +614,18 @@ function buildBlankDailyReports(reportId) {
 }
 
 function mergeDailyReports(days) {
-  const byIndex = new Map(days.map((day) => [day.day_index, day]));
-  return buildBlankDailyReports(app.report.id).map((blank) => ({ ...blank, ...(byIndex.get(blank.day_index) || {}) }));
+  const merged = [];
+  for (let index = 0; index < weekdays.length; index += 1) {
+    const lines = days
+      .filter((day) => day.day_index === index)
+      .sort((a, b) => Number(a.line_index || 0) - Number(b.line_index || 0));
+    if (lines.length) {
+      merged.push(...lines.map((line, lineIndex) => ({ ...line, line_index: Number(line.line_index ?? lineIndex) })));
+    } else {
+      merged.push(buildBlankDailyReports(app.report.id)[index]);
+    }
+  }
+  return merged;
 }
 
 function renderDailyReports() {
@@ -656,47 +668,28 @@ function renderFormatSelector(enabledFormats) {
 }
 
 function renderDailyCards({ locked, projectTasks }) {
-  for (const day of app.dailyReports) {
-    const selectedTask = getTask(day.task_id);
+  for (let dayIndex = 0; dayIndex < weekdays.length; dayIndex += 1) {
+    const dayLines = getLinesForDay(dayIndex);
+    const dayTotal = dayLines.reduce((sum, line) => sum + Number(line.hours || 0), 0);
     const card = document.createElement("article");
     card.className = "day-card";
-    card.dataset.dayIndex = String(day.day_index);
+    card.dataset.dayIndex = String(dayIndex);
     card.innerHTML = `
       <header>
         <div>
-          <h3>${weekdays[day.day_index]}</h3>
-          <time>${formatShortDate(day.work_date)}</time>
+          <h3>${weekdays[dayIndex]}</h3>
+          <time>${formatShortDate(toDateInput(addDays(app.weekStart, dayIndex)))}</time>
         </div>
-        <span class="status-pill">${formatHours(day.hours)}h</span>
+        <span class="status-pill">${formatHours(dayTotal)}h</span>
       </header>
-      <div class="day-body">
-        <label class="field">
-          <span>Task</span>
-          <input data-field="task_search" type="search" list="taskOptions" value="${escapeHtml(taskLabel(selectedTask))}" placeholder="${projectTasks.length ? "Search task code or name" : "No tasks configured"}">
-        </label>
-        <label class="field">
-          <span>Hours</span>
-          <input data-field="hours" type="number" min="0" max="24" step="0.25" value="${Number(day.hours || 0)}">
-        </label>
-        <label class="field">
-          <span>Work performed</span>
-          <textarea data-field="accomplishments" placeholder="Completed tasks, meetings, deliverables">${escapeHtml(day.accomplishments || "")}</textarea>
-        </label>
-        <label class="field">
-          <span>Blockers</span>
-          <textarea data-field="blockers" placeholder="Risks, delays, decisions needed">${escapeHtml(day.blockers || "")}</textarea>
-        </label>
-        <label class="field">
-          <span>Next steps</span>
-          <textarea data-field="next_steps" placeholder="Planned follow-up or tomorrow's focus">${escapeHtml(day.next_steps || "")}</textarea>
-        </label>
-      </div>
+      <div class="day-body task-line-list"></div>
     `;
 
-    for (const input of card.querySelectorAll("input, textarea")) {
-      input.disabled = locked;
-      input.addEventListener("input", updateTotalsFromDom);
+    const body = card.querySelector(".task-line-list");
+    for (const line of dayLines) {
+      body.append(renderTaskLine(line, { locked, projectTasks, variant: "card" }));
     }
+    body.append(renderAddTaskButton(dayIndex, locked));
 
     els.dailyGrid.append(card);
   }
@@ -709,36 +702,52 @@ function renderWeeklyGrid({ locked }) {
     <div class="weekly-grid-head">Day</div>
     <div class="weekly-grid-head">Task</div>
     <div class="weekly-grid-head">Hours</div>
-    <div class="weekly-grid-head">Work Performed</div>
+    <div class="weekly-grid-head">Notes</div>
   `;
 
-  for (const day of app.dailyReports) {
-    const selectedTask = getTask(day.task_id);
+  for (let dayIndex = 0; dayIndex < weekdays.length; dayIndex += 1) {
+    const dayLines = getLinesForDay(dayIndex);
+    let first = true;
+    for (const day of dayLines) {
+      const selectedTask = getTask(day.task_id);
+      const lineKey = lineKeyFor(day);
+      table.insertAdjacentHTML("beforeend", `
+        <div class="weekly-grid-day">
+          ${first ? `<strong>${weekdays[dayIndex]}</strong><span>${formatShortDate(day.work_date)}</span>` : `<span>Task ${Number(day.line_index || 0) + 1}</span>`}
+        </div>
+        <label class="field compact-field task-line" data-day-index="${dayIndex}" data-line-key="${escapeHtml(lineKey)}" data-existing-id="${escapeHtml(day.id || "")}">
+          <span>Task</span>
+          <input data-field="task_search" type="search" list="taskOptions" value="${escapeHtml(taskLabel(selectedTask))}">
+        </label>
+        <label class="field compact-field">
+          <span>Hours</span>
+          <input data-day-index="${dayIndex}" data-line-key="${escapeHtml(lineKey)}" data-field="hours" type="number" min="0" max="24" step="0.25" value="${Number(day.hours || 0)}">
+        </label>
+        <label class="field compact-field">
+          <span>Notes</span>
+          <input data-day-index="${dayIndex}" data-line-key="${escapeHtml(lineKey)}" data-field="accomplishments" type="text" value="${escapeHtml(day.accomplishments || "")}">
+        </label>
+        <input data-day-index="${dayIndex}" data-line-key="${escapeHtml(lineKey)}" data-field="blockers" type="hidden" value="${escapeHtml(day.blockers || "")}">
+        <input data-day-index="${dayIndex}" data-line-key="${escapeHtml(lineKey)}" data-field="next_steps" type="hidden" value="${escapeHtml(day.next_steps || "")}">
+      `);
+      first = false;
+    }
     table.insertAdjacentHTML("beforeend", `
       <div class="weekly-grid-day">
-        <strong>${weekdays[day.day_index]}</strong>
-        <span>${formatShortDate(day.work_date)}</span>
+        <button class="button small-button" type="button" data-add-task="${dayIndex}" ${locked ? "disabled" : ""}>Add Task</button>
       </div>
-      <label class="field compact-field">
-        <span>Task</span>
-        <input data-day-index="${day.day_index}" data-field="task_search" type="search" list="taskOptions" value="${escapeHtml(taskLabel(selectedTask))}">
-      </label>
-      <label class="field compact-field">
-        <span>Hours</span>
-        <input data-day-index="${day.day_index}" data-field="hours" type="number" min="0" max="24" step="0.25" value="${Number(day.hours || 0)}">
-      </label>
-      <label class="field compact-field">
-        <span>Work performed</span>
-        <input data-day-index="${day.day_index}" data-field="accomplishments" type="text" value="${escapeHtml(day.accomplishments || "")}">
-      </label>
-      <input data-day-index="${day.day_index}" data-field="blockers" type="hidden" value="${escapeHtml(day.blockers || "")}">
-      <input data-day-index="${day.day_index}" data-field="next_steps" type="hidden" value="${escapeHtml(day.next_steps || "")}">
+      <div class="weekly-grid-day muted-cell"></div>
+      <div class="weekly-grid-day muted-cell"></div>
+      <div class="weekly-grid-day muted-cell"></div>
     `);
   }
 
   for (const input of table.querySelectorAll("input")) {
     input.disabled = locked;
     input.addEventListener("input", updateTotalsFromDom);
+  }
+  for (const button of table.querySelectorAll("[data-add-task]")) {
+    button.addEventListener("click", () => addTaskLine(Number(button.dataset.addTask)));
   }
   els.dailyGrid.append(table);
 }
@@ -749,9 +758,12 @@ function renderWorkLog({ locked }) {
 
   for (const day of app.dailyReports) {
     const selectedTask = getTask(day.task_id);
+    const lineKey = lineKeyFor(day);
     const row = document.createElement("article");
-    row.className = "work-log-row";
+    row.className = "work-log-row task-line";
     row.dataset.dayIndex = String(day.day_index);
+    row.dataset.lineKey = lineKey;
+    row.dataset.existingId = day.id || "";
     row.innerHTML = `
       <div class="work-log-date">
         <strong>${weekdays[day.day_index]}</strong>
@@ -759,19 +771,145 @@ function renderWorkLog({ locked }) {
       </div>
       <label class="field"><span>Task</span><input data-field="task_search" type="search" list="taskOptions" value="${escapeHtml(taskLabel(selectedTask))}"></label>
       <label class="field hours-field"><span>Hours</span><input data-field="hours" type="number" min="0" max="24" step="0.25" value="${Number(day.hours || 0)}"></label>
-      <label class="field"><span>Work performed</span><input data-field="accomplishments" type="text" value="${escapeHtml(day.accomplishments || "")}"></label>
+      <label class="field"><span>Notes</span><input data-field="accomplishments" type="text" value="${escapeHtml(day.accomplishments || "")}"></label>
       <label class="field"><span>Blockers</span><input data-field="blockers" type="text" value="${escapeHtml(day.blockers || "")}"></label>
       <label class="field"><span>Next steps</span><input data-field="next_steps" type="text" value="${escapeHtml(day.next_steps || "")}"></label>
+      <button class="button danger small-button" type="button" data-remove-line>Remove</button>
     `;
 
-    for (const input of row.querySelectorAll("input")) {
+    for (const input of row.querySelectorAll("input, button")) {
       input.disabled = locked;
-      input.addEventListener("input", updateTotalsFromDom);
+      if (input.matches("input")) input.addEventListener("input", updateTotalsFromDom);
     }
+    row.querySelector("[data-remove-line]").addEventListener("click", () => removeTaskLine(lineKey));
     list.append(row);
   }
 
+  for (let dayIndex = 0; dayIndex < weekdays.length; dayIndex += 1) {
+    list.append(renderAddTaskButton(dayIndex, locked));
+  }
   els.dailyGrid.append(list);
+}
+
+function renderTaskLine(line, { locked, projectTasks, variant }) {
+  const selectedTask = getTask(line.task_id);
+  const lineKey = lineKeyFor(line);
+  const item = document.createElement("div");
+  item.className = `task-line ${variant === "card" ? "task-line-card" : ""}`;
+  item.dataset.dayIndex = String(line.day_index);
+  item.dataset.lineKey = lineKey;
+  item.dataset.existingId = line.id || "";
+  item.innerHTML = `
+    <div class="task-line-head">
+      <strong>Task ${Number(line.line_index || 0) + 1}</strong>
+      <button class="button danger small-button" type="button" data-remove-line>Remove</button>
+    </div>
+    <label class="field">
+      <span>Task</span>
+      <input data-field="task_search" type="search" list="taskOptions" value="${escapeHtml(taskLabel(selectedTask))}" placeholder="${projectTasks.length ? "Search task code or name" : "No tasks configured"}">
+    </label>
+    <label class="field">
+      <span>Hours</span>
+      <input data-field="hours" type="number" min="0" max="24" step="0.25" value="${Number(line.hours || 0)}">
+    </label>
+    <label class="field">
+      <span>Notes</span>
+      <textarea data-field="accomplishments" placeholder="Completed tasks, meetings, deliverables">${escapeHtml(line.accomplishments || "")}</textarea>
+    </label>
+    <label class="field">
+      <span>Blockers</span>
+      <textarea data-field="blockers" placeholder="Risks, delays, decisions needed">${escapeHtml(line.blockers || "")}</textarea>
+    </label>
+    <label class="field">
+      <span>Next steps</span>
+      <textarea data-field="next_steps" placeholder="Planned follow-up or tomorrow's focus">${escapeHtml(line.next_steps || "")}</textarea>
+    </label>
+  `;
+
+  for (const input of item.querySelectorAll("input, textarea, button")) {
+    input.disabled = locked;
+    if (input.matches("input, textarea")) input.addEventListener("input", updateTotalsFromDom);
+  }
+  item.querySelector("[data-remove-line]").addEventListener("click", () => removeTaskLine(lineKey));
+  return item;
+}
+
+function renderAddTaskButton(dayIndex, locked) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "add-task-line";
+  wrapper.innerHTML = `<button class="button small-button" type="button" ${locked ? "disabled" : ""}>Add ${weekdays[dayIndex]} Task</button>`;
+  wrapper.querySelector("button").addEventListener("click", () => addTaskLine(dayIndex));
+  return wrapper;
+}
+
+function addTaskLine(dayIndex) {
+  snapshotVisibleLines();
+  const nextLineIndex = Math.max(-1, ...getLinesForDay(dayIndex).map((line) => Number(line.line_index || 0))) + 1;
+  app.dailyReports.push({
+    id: "",
+    weekly_report_id: app.report?.id || "",
+    day_index: dayIndex,
+    line_index: nextLineIndex,
+    work_date: toDateInput(addDays(app.weekStart, dayIndex)),
+    task_id: "",
+    hours: 0,
+    accomplishments: "",
+    blockers: "",
+    next_steps: "",
+    local_key: crypto.randomUUID(),
+  });
+  renumberDailyLines();
+  renderDailyReports();
+}
+
+function removeTaskLine(lineKey) {
+  snapshotVisibleLines();
+  const line = app.dailyReports.find((item) => lineKeyFor(item) === lineKey);
+  if (!line) return;
+  const dayLines = getLinesForDay(line.day_index);
+  if (dayLines.length <= 1) {
+    Object.assign(line, { task_id: "", hours: 0, accomplishments: "", blockers: "", next_steps: "" });
+  } else {
+    app.dailyReports = app.dailyReports.filter((item) => lineKeyFor(item) !== lineKey);
+  }
+  renumberDailyLines();
+  renderDailyReports();
+}
+
+function getLinesForDay(dayIndex) {
+  return app.dailyReports
+    .filter((line) => line.day_index === dayIndex)
+    .sort((a, b) => Number(a.line_index || 0) - Number(b.line_index || 0));
+}
+
+function snapshotVisibleLines() {
+  const lineElements = [...els.dailyGrid.querySelectorAll(".task-line")];
+  if (!lineElements.length) return;
+  for (const lineElement of lineElements) {
+    const line = app.dailyReports.find((item) => lineKeyFor(item) === lineElement.dataset.lineKey);
+    if (!line) continue;
+    const values = getReportInputsForLine(lineElement);
+    Object.assign(line, {
+      task_id: resolveTaskId(values.task_search, app.profile.project_id) || line.task_id || "",
+      hours: Number(values.hours || 0),
+      accomplishments: values.accomplishments,
+      blockers: values.blockers,
+      next_steps: values.next_steps,
+    });
+  }
+}
+
+function renumberDailyLines() {
+  for (let dayIndex = 0; dayIndex < weekdays.length; dayIndex += 1) {
+    getLinesForDay(dayIndex).forEach((line, index) => {
+      line.line_index = index;
+      line.work_date = toDateInput(addDays(app.weekStart, dayIndex));
+    });
+  }
+}
+
+function lineKeyFor(line) {
+  return line.id || line.local_key || `${line.day_index}-${line.line_index}`;
 }
 
 async function saveWeek(targetStatus) {
@@ -812,11 +950,20 @@ async function saveWeek(targetStatus) {
   }));
 
   const { error: dayError } = await app.supabase.from("timesheet_daily_reports").upsert(rows, {
-    onConflict: "weekly_report_id,day_index",
+    onConflict: "weekly_report_id,day_index,line_index",
   });
 
   if (dayError) {
     setMessage(els.appMessage, `Daily save failed: ${dayError.message}`, true);
+    return;
+  }
+
+  const savedIds = rows.map((row) => row.id).filter(Boolean);
+  let deleteQuery = app.supabase.from("timesheet_daily_reports").delete().eq("weekly_report_id", report.id);
+  if (savedIds.length) deleteQuery = deleteQuery.not("id", "in", `(${savedIds.join(",")})`);
+  const { error: deleteError } = await deleteQuery;
+  if (deleteError) {
+    setMessage(els.appMessage, `Cleanup failed: ${deleteError.message}`, true);
     return;
   }
 
@@ -845,9 +992,11 @@ async function saveWeek(targetStatus) {
 
 function collectDailyReports() {
   const rows = [];
-  for (const day of app.dailyReports) {
-    const dayIndex = day.day_index;
-    const values = getReportInputsForDay(dayIndex);
+  const lineElements = [...els.dailyGrid.querySelectorAll(".task-line")];
+  for (const line of lineElements) {
+    const dayIndex = Number(line.dataset.dayIndex);
+    const lineKey = line.dataset.lineKey;
+    const values = getReportInputsForLine(line);
     const hours = Number(values.hours || 0);
     const taskSearch = values.task_search.trim();
     const taskId = resolveTaskId(taskSearch, app.profile.project_id);
@@ -860,10 +1009,11 @@ function collectDailyReports() {
       return { error: "Choose tasks from the task list. Admins can add missing tasks in Admin Setup." };
     }
 
-    const existing = app.dailyReports.find((day) => day.day_index === dayIndex);
+    const existing = app.dailyReports.find((day) => lineKeyFor(day) === lineKey);
     rows.push({
-      id: existing?.id || "",
+      id: line.dataset.existingId || existing?.id || "",
       day_index: dayIndex,
+      line_index: Number(existing?.line_index ?? rows.filter((row) => row.day_index === dayIndex).length),
       work_date: toDateInput(addDays(app.weekStart, dayIndex)),
       task_id: taskId || null,
       hours,
@@ -876,11 +1026,9 @@ function collectDailyReports() {
   return { rows };
 }
 
-function getReportInputsForDay(dayIndex) {
-  const scoped = els.dailyGrid.querySelector(`[data-day-index="${dayIndex}"][data-field="hours"]`)
-    ? (field) => els.dailyGrid.querySelector(`[data-day-index="${dayIndex}"][data-field="${field}"]`)
-    : (field) => els.dailyGrid.querySelector(`.day-card[data-day-index="${dayIndex}"] [data-field="${field}"], .work-log-row[data-day-index="${dayIndex}"] [data-field="${field}"]`);
-
+function getReportInputsForLine(line) {
+  const scoped = (field) => line.querySelector(`[data-field="${field}"]`)
+    || els.dailyGrid.querySelector(`[data-line-key="${line.dataset.lineKey}"][data-field="${field}"]`);
   return {
     task_search: scoped("task_search")?.value || "",
     hours: scoped("hours")?.value || "0",
@@ -931,7 +1079,7 @@ async function loadPortfolio() {
   const userIds = [...new Set(reports.map((report) => report.user_id))];
   const [{ data: profiles }, { data: days }] = await Promise.all([
     app.supabase.from("timesheet_profiles").select("id, full_name, email, company, branch, division").in("id", userIds),
-    app.supabase.from("timesheet_daily_reports").select("weekly_report_id, day_index, work_date, task_id, hours, accomplishments, blockers, next_steps").in("weekly_report_id", reportIds).order("day_index"),
+    app.supabase.from("timesheet_daily_reports").select("weekly_report_id, day_index, line_index, work_date, task_id, hours, accomplishments, blockers, next_steps").in("weekly_report_id", reportIds).order("day_index").order("line_index"),
   ]);
 
   const profileMap = new Map((profiles || []).map((profile) => [profile.id, profile]));
@@ -1365,7 +1513,9 @@ async function sendBulkInvitations(event) {
 
   setMessage(els.adminMessage, `Sending ${emails.length} invitations...`);
   let sent = 0;
+  let linkOnly = 0;
   const failed = [];
+  const inviteLinks = [];
 
   for (const email of emails) {
     const invitation = {
@@ -1380,28 +1530,37 @@ async function sendBulkInvitations(event) {
     }
 
     const redirectTo = `${window.location.origin}/timesheets/?invite=${invitation.id}`;
+    inviteLinks.push({ email, role: payloadBase.role, link: redirectTo });
     const { error: emailError } = await app.supabase.auth.signInWithOtp({
       email,
       options: { emailRedirectTo: redirectTo, shouldCreateUser: true },
     });
 
     if (emailError) {
-      failed.push(`${email}: ${friendlyAuthError(emailError)}`);
-      await app.supabase.from("timesheet_invitations").update({ active: false }).eq("id", invitation.id);
+      if (isEmailThrottleError(emailError)) {
+        linkOnly += 1;
+      } else {
+        failed.push(`${email}: ${friendlyAuthError(emailError)}`);
+        await app.supabase.from("timesheet_invitations").update({ active: false }).eq("id", invitation.id);
+      }
     } else {
       sent += 1;
     }
   }
 
+  if (inviteLinks.length) {
+    downloadInvitationLinks(inviteLinks);
+  }
+
   if (failed.length) {
-    setMessage(els.adminMessage, `Sent ${sent}. Failed ${failed.length}: ${failed.join(" | ")}`, true);
+    setMessage(els.adminMessage, `Sent ${sent}. Created ${linkOnly} manual links. Failed ${failed.length}: ${failed.join(" | ")}`, true);
     return;
   }
 
   els.inviteForm.reset();
   populateInviteBranches();
   populateInviteManagers();
-  setMessage(els.adminMessage, `Sent ${sent} invitations.`);
+  setMessage(els.adminMessage, linkOnly ? `Sent ${sent}. Supabase throttled ${linkOnly}; manual invite links were downloaded.` : `Sent ${sent} invitations.`);
 }
 
 async function finishAdminSave(error, form, successMessage) {
@@ -1492,11 +1651,12 @@ async function exportAdminWork(event) {
   const reportIds = reports.map((report) => report.id);
   const { data: days, error: dayError } = await app.supabase
     .from("timesheet_daily_reports")
-    .select("weekly_report_id, day_index, work_date, task_id, hours, accomplishments, blockers, next_steps")
+    .select("weekly_report_id, day_index, line_index, work_date, task_id, hours, accomplishments, blockers, next_steps")
     .in("weekly_report_id", reportIds)
     .gte("work_date", startDate)
     .lte("work_date", endDate)
-    .order("work_date", { ascending: true });
+    .order("work_date", { ascending: true })
+    .order("line_index", { ascending: true });
 
   if (dayError) {
     setMessage(els.adminMessage, `Work lookup failed: ${dayError.message}`, true);
@@ -1528,7 +1688,7 @@ function downloadAdminWorkCsv({ profiles, reports, days, branch, division, start
     "Manager",
     "Task",
     "Hours",
-    "Work Performed",
+    "Notes",
     "Blockers",
     "Next Steps",
     "Status",
@@ -1563,7 +1723,7 @@ function downloadAdminWorkCsv({ profiles, reports, days, branch, division, start
 }
 
 function exportCsv() {
-  const rows = [["Week", "Date", "Day", "Project", "Task", "Branch", "Division", "Manager", "Hours", "Work Performed", "Blockers", "Next Steps", "Status"]];
+  const rows = [["Week", "Date", "Day", "Project", "Task", "Branch", "Division", "Manager", "Hours", "Notes", "Blockers", "Next Steps", "Status"]];
   const project = getProject(app.profile.project_id);
   const manager = getManager(app.profile.manager_id);
 
@@ -1683,6 +1843,20 @@ function parseEmailList(value) {
       seen.add(email);
       return true;
     });
+}
+
+function isEmailThrottleError(error) {
+  const message = String(error?.message || "").toLowerCase();
+  return message.includes("rate limit") || message.includes("too many");
+}
+
+function downloadInvitationLinks(inviteLinks) {
+  const rows = [["Email", "Tier", "Setup Link"]];
+  for (const invite of inviteLinks) {
+    rows.push([invite.email, roleLabel(invite.role), invite.link]);
+  }
+  const csv = rows.map((row) => row.map(csvCell).join(",")).join("\n");
+  downloadCsv(csv, `cadmus-invite-links-${toDateInput(new Date())}.csv`);
 }
 
 function groupBy(items, key) {

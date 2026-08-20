@@ -123,6 +123,7 @@ create table if not exists public.timesheet_daily_reports (
   id uuid primary key default gen_random_uuid(),
   weekly_report_id uuid not null references public.timesheet_weekly_reports(id) on delete cascade,
   day_index int not null check (day_index between 0 and 4),
+  line_index int not null default 0 check (line_index >= 0),
   work_date date not null,
   task_id uuid references public.timesheet_tasks(id),
   hours numeric(5, 2) not null default 0 check (hours >= 0 and hours <= 24),
@@ -131,11 +132,20 @@ create table if not exists public.timesheet_daily_reports (
   next_steps text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  unique (weekly_report_id, day_index)
+  unique (weekly_report_id, day_index, line_index)
 );
 
 alter table public.timesheet_daily_reports
   add column if not exists task_id uuid references public.timesheet_tasks(id);
+
+alter table public.timesheet_daily_reports
+  add column if not exists line_index int not null default 0 check (line_index >= 0);
+
+alter table public.timesheet_daily_reports
+  drop constraint if exists timesheet_daily_reports_weekly_report_id_day_index_key;
+
+create unique index if not exists timesheet_daily_reports_week_day_line_idx
+  on public.timesheet_daily_reports (weekly_report_id, day_index, line_index);
 
 do $$
 begin
