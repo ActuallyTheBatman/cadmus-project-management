@@ -1,0 +1,4 @@
+window.CADMUS_TIMESHEETS_CONFIG = {
+  supabaseUrl: "https://mqxzllibfjqoiwozromy.supabase.co",
+  supabaseAnonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1xeHpsbGliZmpxb2l3b3pyb215Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcyNDMzMTQsImV4cCI6MjEwMjgxOTMxNH0.RtySq7n56IZ4Trtl6WkDQM-zDQFYnYAG4aDBF0M7A9c",
+};
