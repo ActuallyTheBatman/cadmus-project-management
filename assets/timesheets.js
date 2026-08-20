@@ -98,9 +98,10 @@ async function signIn(event) {
   event.preventDefault();
   setMessage(els.authMessage, "Sending sign-in link...");
   const email = els.email.value.trim();
+  const redirectTo = `${window.location.origin}/timesheets/`;
   const { error } = await app.supabase.auth.signInWithOtp({
     email,
-    options: { emailRedirectTo: window.location.href },
+    options: { emailRedirectTo: redirectTo },
   });
 
   if (error) {
