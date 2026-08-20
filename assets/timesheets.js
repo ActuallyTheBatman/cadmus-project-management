@@ -22,6 +22,10 @@ const els = {
   portfolioView: document.querySelector("#portfolioView"),
   authForm: document.querySelector("#authForm"),
   email: document.querySelector("#email"),
+  password: document.querySelector("#password"),
+  passwordSignIn: document.querySelector("#passwordSignIn"),
+  passwordSignUp: document.querySelector("#passwordSignUp"),
+  magicLink: document.querySelector("#magicLink"),
   authMessage: document.querySelector("#authMessage"),
   userEmail: document.querySelector("#userEmail"),
   rolePill: document.querySelector("#rolePill"),
@@ -77,6 +81,8 @@ async function boot() {
 
 function bindEvents() {
   els.authForm.addEventListener("submit", signIn);
+  els.passwordSignIn.addEventListener("click", signInWithPassword);
+  els.passwordSignUp.addEventListener("click", signUpWithPassword);
   els.profileForm.addEventListener("submit", saveProfile);
   els.profileProject.addEventListener("change", () => populateManagerSelect());
   els.signOut.addEventListener("click", () => app.supabase.auth.signOut());
@@ -97,6 +103,7 @@ function bindEvents() {
 async function signIn(event) {
   event.preventDefault();
   setMessage(els.authMessage, "Sending sign-in link...");
+  setMagicLinkCooldown();
   const email = els.email.value.trim();
   const redirectTo = `${window.location.origin}/timesheets/`;
   const { error } = await app.supabase.auth.signInWithOtp({
@@ -110,6 +117,63 @@ async function signIn(event) {
   }
 
   setMessage(els.authMessage, "Check your email for the sign-in link.");
+}
+
+async function signInWithPassword() {
+  const email = els.email.value.trim();
+  const password = els.password.value;
+
+  if (!email || !password) {
+    setMessage(els.authMessage, "Enter email and password.", true);
+    return;
+  }
+
+  setMessage(els.authMessage, "Signing in...");
+  const { error } = await app.supabase.auth.signInWithPassword({ email, password });
+  if (error) {
+    setMessage(els.authMessage, error.message, true);
+    return;
+  }
+
+  setMessage(els.authMessage, "Signed in.");
+}
+
+async function signUpWithPassword() {
+  const email = els.email.value.trim();
+  const password = els.password.value;
+
+  if (!email || password.length < 8) {
+    setMessage(els.authMessage, "Use an email and a password with at least 8 characters.", true);
+    return;
+  }
+
+  setMessage(els.authMessage, "Creating account...");
+  const { error } = await app.supabase.auth.signUp({
+    email,
+    password,
+    options: { emailRedirectTo: `${window.location.origin}/timesheets/` },
+  });
+
+  if (error) {
+    setMessage(els.authMessage, error.message, true);
+    return;
+  }
+
+  setMessage(els.authMessage, "Account created. If confirmation is enabled, check your email once; otherwise sign in now.");
+}
+
+function setMagicLinkCooldown() {
+  let remaining = 60;
+  els.magicLink.disabled = true;
+  els.magicLink.textContent = `Email Link (${remaining})`;
+  const timer = window.setInterval(() => {
+    remaining -= 1;
+    els.magicLink.textContent = remaining > 0 ? `Email Link (${remaining})` : "Email Link";
+    if (remaining <= 0) {
+      els.magicLink.disabled = false;
+      window.clearInterval(timer);
+    }
+  }, 1000);
 }
 
 async function renderForAuthState() {

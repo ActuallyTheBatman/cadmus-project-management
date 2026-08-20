@@ -61,13 +61,21 @@
 
         <section id="authView" class="auth-panel">
           <h2>Sign in</h2>
-          <p>Enter your work email and Supabase will send a secure sign-in link.</p>
+          <p>Use a password for normal access. Magic links are available as a backup, but Supabase rate-limits those emails.</p>
           <form id="authForm" class="form-grid">
             <label class="field">
               <span>Email</span>
               <input id="email" type="email" autocomplete="email" required>
             </label>
-            <button class="button primary" type="submit">Send Sign-In Link</button>
+            <label class="field">
+              <span>Password</span>
+              <input id="password" type="password" autocomplete="current-password" minlength="8">
+            </label>
+            <div class="toolbar auth-actions">
+              <button id="passwordSignIn" class="button primary" type="button">Sign In</button>
+              <button id="passwordSignUp" class="button" type="button">Create Account</button>
+              <button id="magicLink" class="button" type="submit">Email Link</button>
+            </div>
             <div id="authMessage" class="message" role="status"></div>
           </form>
         </section>
