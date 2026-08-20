@@ -118,6 +118,7 @@ async function boot() {
   });
   bindEvents();
   await handleAuthCallback();
+  subscribeToProjectSettings();
 
   const { data } = await app.supabase.auth.getSession();
   app.user = data.session?.user || null;
@@ -127,6 +128,18 @@ async function boot() {
     app.user = session?.user || null;
     await renderForAuthState();
   });
+}
+
+function subscribeToProjectSettings() {
+  app.supabase
+    .channel("timesheet-project-settings")
+    .on("postgres_changes", { event: "*", schema: "public", table: "timesheet_projects" }, async () => {
+      if (!app.user) return;
+      await loadReferenceData();
+      if (app.profile) renderDailyReports();
+      if (app.profile?.role === "admin") renderAdminConsole();
+    })
+    .subscribe();
 }
 
 async function handleAuthCallback() {
@@ -985,52 +998,91 @@ function populateAdminExportDivisions() {
 }
 
 function renderAdminLists() {
-  renderAdminList(
-    els.projectList,
-    app.projects,
-    (project) => projectLabel(project),
-    (project) => `${project.client || "No client entered"} - ${getEnabledFormatsForProject(project.id).map(formatLabel).join(", ")}`,
-  );
+  renderProjectAdminList();
   renderAdminList(
     els.managerList,
     app.managers,
     (manager) => manager.manager_name,
     (manager) => `${projectLabel(getProject(manager.project_id))} - ${manager.manager_email}`,
+    (manager) => deactivateAdminItem("timesheet_project_managers", manager.id, "Resource manager removed."),
   );
   renderAdminList(
     els.branchList,
     app.branches,
     (branch) => branch.name,
     () => "Available for profile setup",
+    (branch) => deactivateAdminItem("timesheet_branches", branch.id, "Branch removed."),
   );
   renderAdminList(
     els.divisionList,
     app.divisions,
     (division) => division.name,
     (division) => app.branches.find((branch) => branch.id === division.branch_id)?.name || "All branches",
+    (division) => deactivateAdminItem("timesheet_divisions", division.id, "Division removed."),
   );
   renderAdminList(
     els.taskList,
     app.tasks,
     (task) => taskLabel(task),
     (task) => projectLabel(getProject(task.project_id)),
+    (task) => deactivateAdminItem("timesheet_tasks", task.id, "Task removed."),
   );
 }
 
-function renderAdminList(container, items, titleFor, detailFor) {
+function renderProjectAdminList() {
+  els.projectList.innerHTML = "";
+  if (!app.projects.length) {
+    els.projectList.innerHTML = `<li class="admin-item"><span>No active projects configured.</span></li>`;
+    return;
+  }
+
+  for (const project of app.projects) {
+    const formats = getEnabledFormatsForProject(project.id);
+    const item = document.createElement("li");
+    item.className = "admin-item admin-item-stacked";
+    item.innerHTML = `
+      <div class="admin-item-main">
+        <div>
+          <strong>${escapeHtml(projectLabel(project))}</strong>
+          <span>${escapeHtml(project.client || "No client entered")}</span>
+        </div>
+        <button class="button danger small-button" type="button">Remove</button>
+      </div>
+      <div class="format-options compact-options">
+        ${Object.entries(reportingFormats).map(([value, label]) => `
+          <label><input type="checkbox" value="${escapeHtml(value)}" ${formats.includes(value) ? "checked" : ""}> ${escapeHtml(label)}</label>
+        `).join("")}
+      </div>
+    `;
+
+    item.querySelector("button").addEventListener("click", () => deactivateAdminItem("timesheet_projects", project.id, "Project removed."));
+    for (const input of item.querySelectorAll('.format-options input[type="checkbox"]')) {
+      input.addEventListener("change", () => updateProjectFormats(project.id, item));
+    }
+    els.projectList.append(item);
+  }
+}
+
+function renderAdminList(container, items, titleFor, detailFor, removeAction) {
   if (!items.length) {
     container.innerHTML = `<li class="admin-item"><span>No values configured.</span></li>`;
     return;
   }
 
-  container.innerHTML = items
-    .map((item) => `
-      <li class="admin-item">
+  container.innerHTML = "";
+  for (const item of items) {
+    const row = document.createElement("li");
+    row.className = "admin-item";
+    row.innerHTML = `
+      <div>
         <strong>${escapeHtml(titleFor(item) || "-")}</strong>
         <span>${escapeHtml(detailFor(item) || "-")}</span>
-      </li>
-    `)
-    .join("");
+      </div>
+      <button class="button danger small-button" type="button">Remove</button>
+    `;
+    row.querySelector("button").addEventListener("click", () => removeAction(item));
+    container.append(row);
+  }
 }
 
 async function addProject(event) {
@@ -1051,6 +1103,48 @@ async function addProject(event) {
 
   const { error } = await app.supabase.from("timesheet_projects").upsert(payload, { onConflict: "code" });
   await finishAdminSave(error, els.projectForm, "Project saved.");
+}
+
+async function updateProjectFormats(projectId, row) {
+  const selected = [...row.querySelectorAll('.format-options input[type="checkbox"]:checked')].map((input) => input.value);
+  if (selected.length === 0) {
+    setMessage(els.adminMessage, "Each active project needs at least one reporting format.", true);
+    renderAdminConsole();
+    return;
+  }
+
+  setMessage(els.adminMessage, "Updating project views...");
+  const { error } = await app.supabase
+    .from("timesheet_projects")
+    .update({ reporting_formats: selected })
+    .eq("id", projectId);
+
+  if (error) {
+    setMessage(els.adminMessage, error.message, true);
+    renderAdminConsole();
+    return;
+  }
+
+  const project = getProject(projectId);
+  if (project) project.reporting_formats = selected;
+  if (app.profile?.project_id === projectId) renderDailyReports();
+  setMessage(els.adminMessage, "Project views updated.");
+}
+
+async function deactivateAdminItem(table, id, successMessage) {
+  setMessage(els.adminMessage, "Removing value...");
+  const { error } = await app.supabase.from(table).update({ active: false }).eq("id", id);
+
+  if (error) {
+    setMessage(els.adminMessage, error.message, true);
+    return;
+  }
+
+  await loadReferenceData();
+  if (app.profile?.role === "admin") renderAdminConsole();
+  if (app.profile) renderProfileSummary();
+  if (app.profile) renderDailyReports();
+  setMessage(els.adminMessage, successMessage);
 }
 
 async function addManager(event) {

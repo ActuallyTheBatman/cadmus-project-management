@@ -587,8 +587,42 @@ select option { color: #111418; }
   line-height: 1.35;
 }
 
+.admin-item > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
 .admin-item strong {
   color: var(--paper);
+}
+
+.admin-item-stacked {
+  display: grid;
+  align-items: stretch;
+}
+
+.admin-item-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.small-button {
+  min-height: 32px;
+  padding: 0 10px;
+  font-size: 11px;
+}
+
+.compact-options {
+  margin-top: 8px;
+}
+
+.compact-options label {
+  min-height: 30px;
+  padding: 0 9px;
+  font-size: 11px;
 }
 
 .review-card {

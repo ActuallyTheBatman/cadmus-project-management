@@ -120,6 +120,15 @@ create table if not exists public.timesheet_daily_reports (
 alter table public.timesheet_daily_reports
   add column if not exists task_id uuid references public.timesheet_tasks(id);
 
+do $$
+begin
+  alter publication supabase_realtime add table public.timesheet_projects;
+exception
+  when duplicate_object then null;
+  when undefined_object then null;
+end;
+$$;
+
 create or replace function public.current_user_role()
 returns text
 language sql
