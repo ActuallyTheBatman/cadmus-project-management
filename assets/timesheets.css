@@ -438,6 +438,52 @@ select option { color: #111418; }
   padding: 18px;
 }
 
+.admin-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  padding: 18px;
+}
+
+.admin-card {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  border: 1px solid rgba(245, 241, 232, 0.14);
+  border-radius: var(--radius);
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.028);
+}
+
+.admin-card h3 {
+  font-size: 16px;
+  text-transform: uppercase;
+}
+
+.admin-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 4px;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+  color: rgba(245, 241, 232, 0.76);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.admin-item strong {
+  color: var(--paper);
+}
+
 .review-card {
   display: grid;
   gap: 14px;
@@ -538,6 +584,7 @@ footer {
   .toolbar { justify-content: flex-start; }
   .workspace,
   .profile-grid,
+  .admin-grid,
   .review-meta,
   .review-days { grid-template-columns: 1fr; }
 }

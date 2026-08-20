@@ -9,6 +9,9 @@ const app = {
   profile: null,
   projects: [],
   managers: [],
+  branches: [],
+  divisions: [],
+  tasks: [],
   report: null,
   dailyReports: [],
   weekStart: startOfWeek(new Date()),
@@ -20,6 +23,7 @@ const els = {
   profileView: document.querySelector("#profileView"),
   appView: document.querySelector("#appView"),
   portfolioView: document.querySelector("#portfolioView"),
+  adminView: document.querySelector("#adminView"),
   authForm: document.querySelector("#authForm"),
   email: document.querySelector("#email"),
   password: document.querySelector("#password"),
@@ -53,6 +57,29 @@ const els = {
   portfolioStatus: document.querySelector("#portfolioStatus"),
   refreshPortfolio: document.querySelector("#refreshPortfolio"),
   portfolioList: document.querySelector("#portfolioList"),
+  projectForm: document.querySelector("#projectForm"),
+  managerForm: document.querySelector("#managerForm"),
+  branchForm: document.querySelector("#branchForm"),
+  divisionForm: document.querySelector("#divisionForm"),
+  taskForm: document.querySelector("#taskForm"),
+  adminProjectName: document.querySelector("#adminProjectName"),
+  adminProjectCode: document.querySelector("#adminProjectCode"),
+  adminProjectClient: document.querySelector("#adminProjectClient"),
+  adminManagerProject: document.querySelector("#adminManagerProject"),
+  adminManagerName: document.querySelector("#adminManagerName"),
+  adminManagerEmail: document.querySelector("#adminManagerEmail"),
+  adminBranchName: document.querySelector("#adminBranchName"),
+  adminDivisionBranch: document.querySelector("#adminDivisionBranch"),
+  adminDivisionName: document.querySelector("#adminDivisionName"),
+  adminTaskProject: document.querySelector("#adminTaskProject"),
+  adminTaskName: document.querySelector("#adminTaskName"),
+  adminTaskCode: document.querySelector("#adminTaskCode"),
+  projectList: document.querySelector("#projectList"),
+  managerList: document.querySelector("#managerList"),
+  branchList: document.querySelector("#branchList"),
+  divisionList: document.querySelector("#divisionList"),
+  taskList: document.querySelector("#taskList"),
+  adminMessage: document.querySelector("#adminMessage"),
 };
 
 boot();
@@ -66,8 +93,15 @@ async function boot() {
     return;
   }
 
-  app.supabase = createClient(config.supabaseUrl, config.supabaseAnonKey);
+  app.supabase = createClient(config.supabaseUrl, config.supabaseAnonKey, {
+    auth: {
+      detectSessionInUrl: true,
+      persistSession: true,
+      autoRefreshToken: true,
+    },
+  });
   bindEvents();
+  await handleAuthCallback();
 
   const { data } = await app.supabase.auth.getSession();
   app.user = data.session?.user || null;
@@ -79,12 +113,75 @@ async function boot() {
   });
 }
 
+async function handleAuthCallback() {
+  const url = new URL(window.location.href);
+  const search = url.searchParams;
+  const hash = new URLSearchParams(url.hash.replace(/^#/, ""));
+  const error = search.get("error_description") || hash.get("error_description") || search.get("error") || hash.get("error");
+
+  if (error) {
+    setMessage(els.authMessage, friendlyAuthError({ message: error.replaceAll("+", " ") }), true);
+    cleanAuthUrl();
+    return;
+  }
+
+  const tokenHash = search.get("token_hash") || hash.get("token_hash");
+  const type = search.get("type") || hash.get("type");
+  if (tokenHash && type) {
+    setMessage(els.authMessage, "Confirming email...");
+    const { error: verifyError } = await app.supabase.auth.verifyOtp({ token_hash: tokenHash, type });
+    if (verifyError) {
+      setMessage(els.authMessage, friendlyAuthError(verifyError), true);
+      return;
+    }
+    cleanAuthUrl();
+    setMessage(els.authMessage, "Email confirmed. You are signed in.");
+    return;
+  }
+
+  const code = search.get("code");
+  if (code) {
+    setMessage(els.authMessage, "Finishing sign-in...");
+    const { error: exchangeError } = await app.supabase.auth.exchangeCodeForSession(code);
+    if (exchangeError) {
+      setMessage(els.authMessage, friendlyAuthError(exchangeError), true);
+      return;
+    }
+    cleanAuthUrl();
+    setMessage(els.authMessage, "Email confirmed. You are signed in.");
+  }
+}
+
+function cleanAuthUrl() {
+  window.history.replaceState({}, document.title, `${window.location.origin}/timesheets/`);
+}
+
+function friendlyAuthError(error) {
+  const message = error?.message || "Sign-in failed.";
+  const normalized = message.toLowerCase();
+
+  if (normalized.includes("email not confirmed") || normalized.includes("confirm")) {
+    return "That email is waiting for confirmation. Open the confirmation email first, then come back and sign in.";
+  }
+
+  if (normalized.includes("rate limit") || normalized.includes("too many")) {
+    return "Too many email attempts were sent. Check for an existing confirmation or sign-in email, then wait a minute before requesting another.";
+  }
+
+  if (normalized.includes("invalid login credentials")) {
+    return "That email and password did not match. If this is a new account, check your confirmation email first.";
+  }
+
+  return message;
+}
+
 function bindEvents() {
   els.authForm.addEventListener("submit", signIn);
   els.passwordSignIn.addEventListener("click", signInWithPassword);
   els.passwordSignUp.addEventListener("click", signUpWithPassword);
   els.profileForm.addEventListener("submit", saveProfile);
   els.profileProject.addEventListener("change", () => populateManagerSelect());
+  els.profileBranch.addEventListener("change", () => populateDivisionSelect());
   els.signOut.addEventListener("click", () => app.supabase.auth.signOut());
   els.weekStart.addEventListener("change", async () => {
     app.weekStart = startOfWeek(parseLocalDate(els.weekStart.value));
@@ -98,6 +195,11 @@ function bindEvents() {
   els.exportCsv.addEventListener("click", exportCsv);
   els.refreshPortfolio.addEventListener("click", loadPortfolio);
   els.portfolioStatus.addEventListener("change", loadPortfolio);
+  els.projectForm.addEventListener("submit", addProject);
+  els.managerForm.addEventListener("submit", addManager);
+  els.branchForm.addEventListener("submit", addBranch);
+  els.divisionForm.addEventListener("submit", addDivision);
+  els.taskForm.addEventListener("submit", addTask);
 }
 
 async function signIn(event) {
@@ -112,7 +214,7 @@ async function signIn(event) {
   });
 
   if (error) {
-    setMessage(els.authMessage, error.message, true);
+    setMessage(els.authMessage, friendlyAuthError(error), true);
     return;
   }
 
@@ -131,7 +233,7 @@ async function signInWithPassword() {
   setMessage(els.authMessage, "Signing in...");
   const { error } = await app.supabase.auth.signInWithPassword({ email, password });
   if (error) {
-    setMessage(els.authMessage, error.message, true);
+    setMessage(els.authMessage, friendlyAuthError(error), true);
     return;
   }
 
@@ -155,7 +257,7 @@ async function signUpWithPassword() {
   });
 
   if (error) {
-    setMessage(els.authMessage, error.message, true);
+    setMessage(els.authMessage, friendlyAuthError(error), true);
     return;
   }
 
@@ -207,6 +309,11 @@ async function renderForAuthState() {
     els.portfolioView.classList.remove("hidden");
     await loadPortfolio();
   }
+
+  if (app.profile.role === "admin") {
+    els.adminView.classList.remove("hidden");
+    renderAdminConsole();
+  }
 }
 
 function hideAllViews() {
@@ -214,19 +321,35 @@ function hideAllViews() {
   els.profileView.classList.add("hidden");
   els.appView.classList.add("hidden");
   els.portfolioView.classList.add("hidden");
+  els.adminView.classList.add("hidden");
 }
 
 async function loadReferenceData() {
-  const [{ data: projects, error: projectError }, { data: managers, error: managerError }] = await Promise.all([
+  const [
+    { data: projects, error: projectError },
+    { data: managers, error: managerError },
+    { data: branches, error: branchError },
+    { data: divisions, error: divisionError },
+    { data: tasks, error: taskError },
+  ] = await Promise.all([
     app.supabase.from("timesheet_projects").select("id, name, code, client").eq("active", true).order("name"),
     app.supabase.from("timesheet_project_managers").select("id, project_id, manager_name, manager_email").eq("active", true).order("manager_name"),
+    app.supabase.from("timesheet_branches").select("id, name").eq("active", true).order("name"),
+    app.supabase.from("timesheet_divisions").select("id, branch_id, name").eq("active", true).order("name"),
+    app.supabase.from("timesheet_tasks").select("id, project_id, name, code").eq("active", true).order("name"),
   ]);
 
   if (projectError) setMessage(els.profileMessage, `Project load failed: ${projectError.message}`, true);
   if (managerError) setMessage(els.profileMessage, `Manager load failed: ${managerError.message}`, true);
+  if (branchError) setMessage(els.profileMessage, `Branch load failed: ${branchError.message}`, true);
+  if (divisionError) setMessage(els.profileMessage, `Division load failed: ${divisionError.message}`, true);
+  if (taskError) setMessage(els.profileMessage, `Task load failed: ${taskError.message}`, true);
 
   app.projects = projects || [];
   app.managers = managers || [];
+  app.branches = branches || [];
+  app.divisions = divisions || [];
+  app.tasks = tasks || [];
 }
 
 async function loadProfile() {
@@ -247,10 +370,11 @@ async function loadProfile() {
 
 function renderProfileForm() {
   populateProjectSelect();
+  populateBranchSelect();
   els.profileName.value = app.profile?.full_name || app.user.user_metadata?.full_name || "";
   els.profileCompany.value = app.profile?.company || "Cadmus Project Management";
-  els.profileBranch.value = app.profile?.branch || "";
-  els.profileDivision.value = app.profile?.division || "";
+  els.profileBranch.value = app.profile?.branch || app.branches[0]?.name || "";
+  populateDivisionSelect(app.profile?.division || "");
   els.profileProject.value = app.profile?.project_id || app.projects.find((project) => project.code === "BENCON")?.id || app.projects[0]?.id || "";
   populateManagerSelect(app.profile?.manager_id);
 }
@@ -272,6 +396,25 @@ function populateManagerSelect(selectedId = "") {
     els.profileManager.append(new Option(`${manager.manager_name} - ${manager.manager_email}`, manager.id));
   }
   els.profileManager.value = selectedId && managers.some((manager) => manager.id === selectedId) ? selectedId : "";
+}
+
+function populateBranchSelect() {
+  els.profileBranch.innerHTML = "";
+  els.profileBranch.append(new Option("Select branch", ""));
+  for (const branch of app.branches) {
+    els.profileBranch.append(new Option(branch.name, branch.name));
+  }
+}
+
+function populateDivisionSelect(selectedValue = "") {
+  const branch = app.branches.find((item) => item.name === els.profileBranch.value);
+  const divisions = app.divisions.filter((division) => !division.branch_id || division.branch_id === branch?.id);
+  els.profileDivision.innerHTML = "";
+  els.profileDivision.append(new Option(divisions.length ? "Select division" : "No divisions configured", ""));
+  for (const division of divisions) {
+    els.profileDivision.append(new Option(division.name, division.name));
+  }
+  els.profileDivision.value = selectedValue && divisions.some((division) => division.name === selectedValue) ? selectedValue : "";
 }
 
 async function saveProfile(event) {
@@ -343,7 +486,7 @@ async function loadWeek() {
 
   const { data: days, error: daysError } = await app.supabase
     .from("timesheet_daily_reports")
-    .select("id, weekly_report_id, day_index, work_date, hours, accomplishments, blockers, next_steps")
+    .select("id, weekly_report_id, day_index, work_date, task_id, hours, accomplishments, blockers, next_steps")
     .eq("weekly_report_id", app.report.id)
     .order("day_index");
 
@@ -363,6 +506,7 @@ function buildBlankDailyReports(reportId) {
     weekly_report_id: reportId || "",
     day_index: index,
     work_date: toDateInput(addDays(app.weekStart, index)),
+    task_id: "",
     hours: 0,
     accomplishments: "",
     blockers: "",
@@ -377,6 +521,9 @@ function mergeDailyReports(days) {
 
 function renderDailyReports() {
   const locked = app.report && ["submitted", "approved"].includes(app.report.status);
+  const taskOptions = getTasksForProject(app.profile?.project_id)
+    .map((task) => `<option value="${escapeHtml(task.id)}">${escapeHtml(taskLabel(task))}</option>`)
+    .join("");
   els.dailyGrid.innerHTML = "";
 
   for (const day of app.dailyReports) {
@@ -392,6 +539,13 @@ function renderDailyReports() {
         <span class="status-pill">${formatHours(day.hours)}h</span>
       </header>
       <div class="day-body">
+        <label class="field">
+          <span>Task</span>
+          <select data-field="task_id">
+            <option value="">Select task</option>
+            ${taskOptions}
+          </select>
+        </label>
         <label class="field">
           <span>Hours</span>
           <input data-field="hours" type="number" min="0" max="24" step="0.25" value="${Number(day.hours || 0)}">
@@ -411,7 +565,9 @@ function renderDailyReports() {
       </div>
     `;
 
-    for (const input of card.querySelectorAll("input, textarea")) {
+    card.querySelector('[data-field="task_id"]').value = day.task_id || "";
+
+    for (const input of card.querySelectorAll("input, textarea, select")) {
       input.disabled = locked;
       input.addEventListener("input", updateTotalsFromDom);
     }
@@ -510,6 +666,7 @@ function collectDailyReports() {
       id: existing?.id || "",
       day_index: dayIndex,
       work_date: toDateInput(addDays(app.weekStart, dayIndex)),
+      task_id: card.querySelector('[data-field="task_id"]').value || null,
       hours,
       accomplishments: card.querySelector('[data-field="accomplishments"]').value.trim(),
       blockers: card.querySelector('[data-field="blockers"]').value.trim(),
@@ -557,7 +714,7 @@ async function loadPortfolio() {
   const userIds = [...new Set(reports.map((report) => report.user_id))];
   const [{ data: profiles }, { data: days }] = await Promise.all([
     app.supabase.from("timesheet_profiles").select("id, full_name, email, company, branch, division").in("id", userIds),
-    app.supabase.from("timesheet_daily_reports").select("weekly_report_id, day_index, work_date, hours, accomplishments, blockers, next_steps").in("weekly_report_id", reportIds).order("day_index"),
+    app.supabase.from("timesheet_daily_reports").select("weekly_report_id, day_index, work_date, task_id, hours, accomplishments, blockers, next_steps").in("weekly_report_id", reportIds).order("day_index"),
   ]);
 
   const profileMap = new Map((profiles || []).map((profile) => [profile.id, profile]));
@@ -623,10 +780,12 @@ function reviewMeta(label, value) {
 }
 
 function renderReviewDay(day) {
+  const task = getTask(day.task_id);
   return `
     <div class="review-day">
       <span>${escapeHtml(weekdays[day.day_index] || "Day")}</span>
       <strong>${formatHours(day.hours)}h</strong>
+      ${task ? `<p>Task: ${escapeHtml(taskLabel(task))}</p>` : ""}
       <p>${escapeHtml(day.accomplishments || "No update entered.")}</p>
       ${day.blockers ? `<p>Blocker: ${escapeHtml(day.blockers)}</p>` : ""}
     </div>
@@ -647,8 +806,184 @@ async function reviewReport(reportId, status) {
   await loadPortfolio();
 }
 
+function renderAdminConsole() {
+  populateAdminSelects();
+  renderAdminLists();
+}
+
+function populateAdminSelects() {
+  const projectSelects = [els.adminManagerProject, els.adminTaskProject];
+  for (const select of projectSelects) {
+    select.innerHTML = "";
+    select.append(new Option("Select project", ""));
+    for (const project of app.projects) {
+      select.append(new Option(projectLabel(project), project.id));
+    }
+  }
+
+  els.adminDivisionBranch.innerHTML = "";
+  els.adminDivisionBranch.append(new Option("Select branch", ""));
+  for (const branch of app.branches) {
+    els.adminDivisionBranch.append(new Option(branch.name, branch.id));
+  }
+}
+
+function renderAdminLists() {
+  renderAdminList(
+    els.projectList,
+    app.projects,
+    (project) => projectLabel(project),
+    (project) => project.client || "No client entered",
+  );
+  renderAdminList(
+    els.managerList,
+    app.managers,
+    (manager) => manager.manager_name,
+    (manager) => `${projectLabel(getProject(manager.project_id))} - ${manager.manager_email}`,
+  );
+  renderAdminList(
+    els.branchList,
+    app.branches,
+    (branch) => branch.name,
+    () => "Available for profile setup",
+  );
+  renderAdminList(
+    els.divisionList,
+    app.divisions,
+    (division) => division.name,
+    (division) => app.branches.find((branch) => branch.id === division.branch_id)?.name || "All branches",
+  );
+  renderAdminList(
+    els.taskList,
+    app.tasks,
+    (task) => taskLabel(task),
+    (task) => projectLabel(getProject(task.project_id)),
+  );
+}
+
+function renderAdminList(container, items, titleFor, detailFor) {
+  if (!items.length) {
+    container.innerHTML = `<li class="admin-item"><span>No values configured.</span></li>`;
+    return;
+  }
+
+  container.innerHTML = items
+    .map((item) => `
+      <li class="admin-item">
+        <strong>${escapeHtml(titleFor(item) || "-")}</strong>
+        <span>${escapeHtml(detailFor(item) || "-")}</span>
+      </li>
+    `)
+    .join("");
+}
+
+async function addProject(event) {
+  event.preventDefault();
+  setMessage(els.adminMessage, "Adding project...");
+  const payload = {
+    name: els.adminProjectName.value.trim(),
+    code: els.adminProjectCode.value.trim().toUpperCase() || null,
+    client: els.adminProjectClient.value.trim() || "Cadmus",
+    active: true,
+  };
+
+  if (!payload.name) {
+    setMessage(els.adminMessage, "Project name is required.", true);
+    return;
+  }
+
+  const { error } = await app.supabase.from("timesheet_projects").upsert(payload, { onConflict: "code" });
+  await finishAdminSave(error, els.projectForm, "Project saved.");
+}
+
+async function addManager(event) {
+  event.preventDefault();
+  setMessage(els.adminMessage, "Adding resource manager...");
+  const payload = {
+    project_id: els.adminManagerProject.value,
+    manager_name: els.adminManagerName.value.trim(),
+    manager_email: els.adminManagerEmail.value.trim(),
+    active: true,
+  };
+
+  if (!payload.project_id || !payload.manager_name || !payload.manager_email) {
+    setMessage(els.adminMessage, "Project, manager name, and email are required.", true);
+    return;
+  }
+
+  const { error } = await app.supabase.from("timesheet_project_managers").upsert(payload, { onConflict: "project_id,manager_email" });
+  await finishAdminSave(error, els.managerForm, "Resource manager saved.");
+}
+
+async function addBranch(event) {
+  event.preventDefault();
+  setMessage(els.adminMessage, "Adding branch...");
+  const payload = {
+    name: els.adminBranchName.value.trim(),
+    active: true,
+  };
+
+  if (!payload.name) {
+    setMessage(els.adminMessage, "Branch name is required.", true);
+    return;
+  }
+
+  const { error } = await app.supabase.from("timesheet_branches").upsert(payload, { onConflict: "name" });
+  await finishAdminSave(error, els.branchForm, "Branch saved.");
+}
+
+async function addDivision(event) {
+  event.preventDefault();
+  setMessage(els.adminMessage, "Adding division...");
+  const payload = {
+    branch_id: els.adminDivisionBranch.value || null,
+    name: els.adminDivisionName.value.trim(),
+    active: true,
+  };
+
+  if (!payload.branch_id || !payload.name) {
+    setMessage(els.adminMessage, "Branch and division name are required.", true);
+    return;
+  }
+
+  const { error } = await app.supabase.from("timesheet_divisions").upsert(payload, { onConflict: "branch_id,name" });
+  await finishAdminSave(error, els.divisionForm, "Division saved.");
+}
+
+async function addTask(event) {
+  event.preventDefault();
+  setMessage(els.adminMessage, "Adding task...");
+  const payload = {
+    project_id: els.adminTaskProject.value,
+    name: els.adminTaskName.value.trim(),
+    code: els.adminTaskCode.value.trim().toUpperCase() || null,
+    active: true,
+  };
+
+  if (!payload.project_id || !payload.name) {
+    setMessage(els.adminMessage, "Project and task name are required.", true);
+    return;
+  }
+
+  const { error } = await app.supabase.from("timesheet_tasks").upsert(payload, { onConflict: "project_id,name" });
+  await finishAdminSave(error, els.taskForm, "Task saved.");
+}
+
+async function finishAdminSave(error, form, successMessage) {
+  if (error) {
+    setMessage(els.adminMessage, error.message, true);
+    return;
+  }
+
+  form.reset();
+  await loadReferenceData();
+  renderAdminConsole();
+  renderDailyReports();
+  setMessage(els.adminMessage, successMessage);
+}
+
 function exportCsv() {
-  const rows = [["Week", "Date", "Day", "Project", "Branch", "Division", "Manager", "Hours", "Work Performed", "Blockers", "Next Steps", "Status"]];
+  const rows = [["Week", "Date", "Day", "Project", "Task", "Branch", "Division", "Manager", "Hours", "Work Performed", "Blockers", "Next Steps", "Status"]];
   const project = getProject(app.profile.project_id);
   const manager = getManager(app.profile.manager_id);
 
@@ -658,6 +993,7 @@ function exportCsv() {
       day.work_date,
       weekdays[day.day_index],
       projectLabel(project),
+      taskLabel(getTask(day.task_id)),
       app.profile.branch,
       app.profile.division,
       manager?.manager_name || "",
@@ -693,9 +1029,22 @@ function getManager(id) {
   return app.managers.find((manager) => manager.id === id);
 }
 
+function getTask(id) {
+  return app.tasks.find((task) => task.id === id);
+}
+
+function getTasksForProject(projectId) {
+  return app.tasks.filter((task) => !task.project_id || task.project_id === projectId);
+}
+
 function projectLabel(project) {
   if (!project) return "-";
   return [project.code, project.name].filter(Boolean).join(" - ");
+}
+
+function taskLabel(task) {
+  if (!task) return "";
+  return [task.code, task.name].filter(Boolean).join(" - ");
 }
 
 function groupBy(items, key) {

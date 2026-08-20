@@ -98,11 +98,11 @@
             </label>
             <label class="field">
               <span>Branch</span>
-              <input id="profileBranch" type="text" placeholder="Financial Services" required>
+              <select id="profileBranch" required></select>
             </label>
             <label class="field">
               <span>Division</span>
-              <input id="profileDivision" type="text" placeholder="Accounting" required>
+              <select id="profileDivision" required></select>
             </label>
             <label class="field">
               <span>Project</span>
@@ -192,6 +192,61 @@
             </div>
           </div>
           <div id="portfolioList" class="portfolio-list"></div>
+        </section>
+
+        <section id="adminView" class="panel portfolio-panel hidden">
+          <div class="panel-head">
+            <div>
+              <h2>Admin Setup</h2>
+              <p class="helper">Manage the dropdown values resources use for projects, managers, branches, divisions, and task codes.</p>
+            </div>
+          </div>
+          <div class="admin-grid">
+            <form id="projectForm" class="admin-card">
+              <h3>Projects</h3>
+              <label class="field"><span>Project name</span><input id="adminProjectName" type="text" required></label>
+              <label class="field"><span>Code</span><input id="adminProjectCode" type="text" required></label>
+              <label class="field"><span>Client</span><input id="adminProjectClient" type="text" value="Cadmus"></label>
+              <button class="button primary" type="submit">Add Project</button>
+              <ul id="projectList" class="admin-list"></ul>
+            </form>
+
+            <form id="managerForm" class="admin-card">
+              <h3>Resource Managers</h3>
+              <label class="field"><span>Project</span><select id="adminManagerProject" required></select></label>
+              <label class="field"><span>Manager name</span><input id="adminManagerName" type="text" required></label>
+              <label class="field"><span>Manager email</span><input id="adminManagerEmail" type="email" required></label>
+              <button class="button primary" type="submit">Add Manager</button>
+              <ul id="managerList" class="admin-list"></ul>
+            </form>
+
+            <form id="branchForm" class="admin-card">
+              <h3>Branches</h3>
+              <label class="field"><span>Branch name</span><input id="adminBranchName" type="text" required></label>
+              <button class="button primary" type="submit">Add Branch</button>
+              <ul id="branchList" class="admin-list"></ul>
+            </form>
+
+            <form id="divisionForm" class="admin-card">
+              <h3>Divisions</h3>
+              <label class="field"><span>Branch</span><select id="adminDivisionBranch" required></select></label>
+              <label class="field"><span>Division name</span><input id="adminDivisionName" type="text" required></label>
+              <button class="button primary" type="submit">Add Division</button>
+              <ul id="divisionList" class="admin-list"></ul>
+            </form>
+
+            <form id="taskForm" class="admin-card">
+              <h3>Task Codes</h3>
+              <label class="field"><span>Project</span><select id="adminTaskProject" required></select></label>
+              <label class="field"><span>Task name</span><input id="adminTaskName" type="text" required></label>
+              <label class="field"><span>Code</span><input id="adminTaskCode" type="text"></label>
+              <button class="button primary" type="submit">Add Task</button>
+              <ul id="taskList" class="admin-list"></ul>
+            </form>
+          </div>
+          <div class="panel-body">
+            <div id="adminMessage" class="message" role="status"></div>
+          </div>
         </section>
       </div>
     </section>

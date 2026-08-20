@@ -27,6 +27,32 @@ create table if not exists public.timesheet_admin_emails (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.timesheet_branches (
+  id uuid primary key default gen_random_uuid(),
+  name text not null unique,
+  active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.timesheet_divisions (
+  id uuid primary key default gen_random_uuid(),
+  branch_id uuid references public.timesheet_branches(id) on delete set null,
+  name text not null,
+  active boolean not null default true,
+  created_at timestamptz not null default now(),
+  unique (branch_id, name)
+);
+
+create table if not exists public.timesheet_tasks (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid references public.timesheet_projects(id) on delete cascade,
+  name text not null,
+  code text,
+  active boolean not null default true,
+  created_at timestamptz not null default now(),
+  unique (project_id, name)
+);
+
 create table if not exists public.timesheet_profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   email text not null,
@@ -77,6 +103,7 @@ create table if not exists public.timesheet_daily_reports (
   weekly_report_id uuid not null references public.timesheet_weekly_reports(id) on delete cascade,
   day_index int not null check (day_index between 0 and 4),
   work_date date not null,
+  task_id uuid references public.timesheet_tasks(id),
   hours numeric(5, 2) not null default 0 check (hours >= 0 and hours <= 24),
   accomplishments text,
   blockers text,
@@ -85,6 +112,9 @@ create table if not exists public.timesheet_daily_reports (
   updated_at timestamptz not null default now(),
   unique (weekly_report_id, day_index)
 );
+
+alter table public.timesheet_daily_reports
+  add column if not exists task_id uuid references public.timesheet_tasks(id);
 
 create or replace function public.current_user_role()
 returns text
@@ -174,6 +204,9 @@ execute function public.set_timesheet_updated_at();
 alter table public.timesheet_projects enable row level security;
 alter table public.timesheet_project_managers enable row level security;
 alter table public.timesheet_admin_emails enable row level security;
+alter table public.timesheet_branches enable row level security;
+alter table public.timesheet_divisions enable row level security;
+alter table public.timesheet_tasks enable row level security;
 alter table public.timesheet_profiles enable row level security;
 alter table public.timesheet_entries enable row level security;
 alter table public.timesheet_weekly_reports enable row level security;
@@ -204,6 +237,51 @@ with check (public.current_user_role() = 'admin');
 drop policy if exists "Admins can manage admin emails" on public.timesheet_admin_emails;
 create policy "Admins can manage admin emails"
 on public.timesheet_admin_emails
+for all
+to authenticated
+using (public.current_user_role() = 'admin')
+with check (public.current_user_role() = 'admin');
+
+drop policy if exists "Authenticated users can read active branches" on public.timesheet_branches;
+create policy "Authenticated users can read active branches"
+on public.timesheet_branches
+for select
+to authenticated
+using (active = true);
+
+drop policy if exists "Admins can manage branches" on public.timesheet_branches;
+create policy "Admins can manage branches"
+on public.timesheet_branches
+for all
+to authenticated
+using (public.current_user_role() = 'admin')
+with check (public.current_user_role() = 'admin');
+
+drop policy if exists "Authenticated users can read active divisions" on public.timesheet_divisions;
+create policy "Authenticated users can read active divisions"
+on public.timesheet_divisions
+for select
+to authenticated
+using (active = true);
+
+drop policy if exists "Admins can manage divisions" on public.timesheet_divisions;
+create policy "Admins can manage divisions"
+on public.timesheet_divisions
+for all
+to authenticated
+using (public.current_user_role() = 'admin')
+with check (public.current_user_role() = 'admin');
+
+drop policy if exists "Authenticated users can read active tasks" on public.timesheet_tasks;
+create policy "Authenticated users can read active tasks"
+on public.timesheet_tasks
+for select
+to authenticated
+using (active = true);
+
+drop policy if exists "Admins can manage tasks" on public.timesheet_tasks;
+create policy "Admins can manage tasks"
+on public.timesheet_tasks
 for all
 to authenticated
 using (public.current_user_role() = 'admin')
@@ -420,3 +498,39 @@ on conflict (project_id, manager_email) do update set
 insert into public.timesheet_admin_emails (email)
 values ('Garrett@cadmusprojects.com')
 on conflict (email) do nothing;
+
+insert into public.timesheet_branches (name)
+values
+  ('Financial Services'),
+  ('Operations'),
+  ('Technology'),
+  ('Program Delivery')
+on conflict (name) do update set active = true;
+
+insert into public.timesheet_divisions (branch_id, name)
+select b.id, division_name
+from public.timesheet_branches b
+cross join (
+  values
+    ('Accounting'),
+    ('Budget'),
+    ('Project Controls')
+) as divisions(division_name)
+where b.name = 'Financial Services'
+on conflict (branch_id, name) do update set active = true;
+
+insert into public.timesheet_tasks (project_id, name, code)
+select p.id, task_name, task_code
+from public.timesheet_projects p
+cross join (
+  values
+    ('Project coordination', 'COORD'),
+    ('Stakeholder meeting', 'MEET'),
+    ('Documentation', 'DOC'),
+    ('Risk or issue follow-up', 'RISK'),
+    ('Reporting', 'RPT')
+) as tasks(task_name, task_code)
+where p.code = 'BENCON'
+on conflict (project_id, name) do update set
+  code = excluded.code,
+  active = true;
