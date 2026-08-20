@@ -2,6 +2,11 @@ import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 
 const weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
 const config = window.CADMUS_TIMESHEETS_CONFIG || {};
+const reportingFormats = {
+  daily_cards: "Daily Cards",
+  weekly_grid: "Weekly Grid",
+  work_log: "Work Log",
+};
 
 const app = {
   supabase: null,
@@ -14,6 +19,7 @@ const app = {
   tasks: [],
   report: null,
   dailyReports: [],
+  reportFormat: "daily_cards",
   weekStart: startOfWeek(new Date()),
 };
 
@@ -49,6 +55,8 @@ const els = {
   saveWeek: document.querySelector("#saveWeek"),
   submitWeek: document.querySelector("#submitWeek"),
   exportCsv: document.querySelector("#exportCsv"),
+  reportFormat: document.querySelector("#reportFormat"),
+  reportFormatTitle: document.querySelector("#reportFormatTitle"),
   dailyGrid: document.querySelector("#dailyGrid"),
   appMessage: document.querySelector("#appMessage"),
   totalHours: document.querySelector("#totalHours"),
@@ -66,6 +74,9 @@ const els = {
   adminProjectName: document.querySelector("#adminProjectName"),
   adminProjectCode: document.querySelector("#adminProjectCode"),
   adminProjectClient: document.querySelector("#adminProjectClient"),
+  adminFormatDaily: document.querySelector("#adminFormatDaily"),
+  adminFormatGrid: document.querySelector("#adminFormatGrid"),
+  adminFormatLog: document.querySelector("#adminFormatLog"),
   adminManagerProject: document.querySelector("#adminManagerProject"),
   adminManagerName: document.querySelector("#adminManagerName"),
   adminManagerEmail: document.querySelector("#adminManagerEmail"),
@@ -198,6 +209,10 @@ function bindEvents() {
   els.saveWeek.addEventListener("click", () => saveWeek("draft"));
   els.submitWeek.addEventListener("click", () => saveWeek("submitted"));
   els.exportCsv.addEventListener("click", exportCsv);
+  els.reportFormat.addEventListener("change", () => {
+    app.reportFormat = els.reportFormat.value;
+    renderDailyReports();
+  });
   els.refreshPortfolio.addEventListener("click", loadPortfolio);
   els.portfolioStatus.addEventListener("change", loadPortfolio);
   els.projectForm.addEventListener("submit", addProject);
@@ -340,7 +355,7 @@ async function loadReferenceData() {
     { data: divisions, error: divisionError },
     { data: tasks, error: taskError },
   ] = await Promise.all([
-    app.supabase.from("timesheet_projects").select("id, name, code, client").eq("active", true).order("name"),
+    app.supabase.from("timesheet_projects").select("id, name, code, client, reporting_formats").eq("active", true).order("name"),
     app.supabase.from("timesheet_project_managers").select("id, project_id, manager_name, manager_email").eq("active", true).order("manager_name"),
     app.supabase.from("timesheet_branches").select("id, name").eq("active", true).order("name"),
     app.supabase.from("timesheet_divisions").select("id, branch_id, name").eq("active", true).order("name"),
@@ -529,12 +544,44 @@ function mergeDailyReports(days) {
 
 function renderDailyReports() {
   const locked = app.report && ["submitted", "approved"].includes(app.report.status);
+  const enabledFormats = getEnabledFormatsForProject(app.profile?.project_id);
+  if (!enabledFormats.includes(app.reportFormat)) {
+    app.reportFormat = enabledFormats[0] || "daily_cards";
+  }
+  renderFormatSelector(enabledFormats);
+
   const projectTasks = getTasksForProject(app.profile?.project_id);
   const taskOptions = projectTasks
     .map((task) => `<option value="${escapeHtml(taskLabel(task))}"></option>`)
     .join("");
   els.dailyGrid.innerHTML = `<datalist id="taskOptions">${taskOptions}</datalist>`;
 
+  if (app.reportFormat === "weekly_grid") {
+    renderWeeklyGrid({ locked, projectTasks });
+  } else if (app.reportFormat === "work_log") {
+    renderWorkLog({ locked, projectTasks });
+  } else {
+    renderDailyCards({ locked, projectTasks });
+  }
+
+  const status = app.report?.status || "draft";
+  els.reportStatus.textContent = status[0].toUpperCase() + status.slice(1);
+  els.saveWeek.disabled = locked;
+  els.submitWeek.disabled = locked;
+  updateTotalsFromDom();
+}
+
+function renderFormatSelector(enabledFormats) {
+  els.reportFormat.innerHTML = "";
+  for (const format of enabledFormats) {
+    els.reportFormat.append(new Option(reportingFormats[format] || format, format));
+  }
+  els.reportFormat.value = app.reportFormat;
+  els.reportFormat.classList.toggle("hidden", enabledFormats.length <= 1);
+  els.reportFormatTitle.textContent = reportingFormats[app.reportFormat] || "Daily Boxes";
+}
+
+function renderDailyCards({ locked, projectTasks }) {
   for (const day of app.dailyReports) {
     const selectedTask = getTask(day.task_id);
     const card = document.createElement("article");
@@ -579,12 +626,78 @@ function renderDailyReports() {
 
     els.dailyGrid.append(card);
   }
+}
 
-  const status = app.report?.status || "draft";
-  els.reportStatus.textContent = status[0].toUpperCase() + status.slice(1);
-  els.saveWeek.disabled = locked;
-  els.submitWeek.disabled = locked;
-  updateTotalsFromDom();
+function renderWeeklyGrid({ locked }) {
+  const table = document.createElement("div");
+  table.className = "weekly-grid-table";
+  table.innerHTML = `
+    <div class="weekly-grid-head">Day</div>
+    <div class="weekly-grid-head">Task</div>
+    <div class="weekly-grid-head">Hours</div>
+    <div class="weekly-grid-head">Work Performed</div>
+  `;
+
+  for (const day of app.dailyReports) {
+    const selectedTask = getTask(day.task_id);
+    table.insertAdjacentHTML("beforeend", `
+      <div class="weekly-grid-day">
+        <strong>${weekdays[day.day_index]}</strong>
+        <span>${formatShortDate(day.work_date)}</span>
+      </div>
+      <label class="field compact-field">
+        <span>Task</span>
+        <input data-day-index="${day.day_index}" data-field="task_search" type="search" list="taskOptions" value="${escapeHtml(taskLabel(selectedTask))}">
+      </label>
+      <label class="field compact-field">
+        <span>Hours</span>
+        <input data-day-index="${day.day_index}" data-field="hours" type="number" min="0" max="24" step="0.25" value="${Number(day.hours || 0)}">
+      </label>
+      <label class="field compact-field">
+        <span>Work performed</span>
+        <input data-day-index="${day.day_index}" data-field="accomplishments" type="text" value="${escapeHtml(day.accomplishments || "")}">
+      </label>
+      <input data-day-index="${day.day_index}" data-field="blockers" type="hidden" value="${escapeHtml(day.blockers || "")}">
+      <input data-day-index="${day.day_index}" data-field="next_steps" type="hidden" value="${escapeHtml(day.next_steps || "")}">
+    `);
+  }
+
+  for (const input of table.querySelectorAll("input")) {
+    input.disabled = locked;
+    input.addEventListener("input", updateTotalsFromDom);
+  }
+  els.dailyGrid.append(table);
+}
+
+function renderWorkLog({ locked }) {
+  const list = document.createElement("div");
+  list.className = "work-log-list";
+
+  for (const day of app.dailyReports) {
+    const selectedTask = getTask(day.task_id);
+    const row = document.createElement("article");
+    row.className = "work-log-row";
+    row.dataset.dayIndex = String(day.day_index);
+    row.innerHTML = `
+      <div class="work-log-date">
+        <strong>${weekdays[day.day_index]}</strong>
+        <span>${formatShortDate(day.work_date)}</span>
+      </div>
+      <label class="field"><span>Task</span><input data-field="task_search" type="search" list="taskOptions" value="${escapeHtml(taskLabel(selectedTask))}"></label>
+      <label class="field hours-field"><span>Hours</span><input data-field="hours" type="number" min="0" max="24" step="0.25" value="${Number(day.hours || 0)}"></label>
+      <label class="field"><span>Work performed</span><input data-field="accomplishments" type="text" value="${escapeHtml(day.accomplishments || "")}"></label>
+      <label class="field"><span>Blockers</span><input data-field="blockers" type="text" value="${escapeHtml(day.blockers || "")}"></label>
+      <label class="field"><span>Next steps</span><input data-field="next_steps" type="text" value="${escapeHtml(day.next_steps || "")}"></label>
+    `;
+
+    for (const input of row.querySelectorAll("input")) {
+      input.disabled = locked;
+      input.addEventListener("input", updateTotalsFromDom);
+    }
+    list.append(row);
+  }
+
+  els.dailyGrid.append(list);
 }
 
 async function saveWeek(targetStatus) {
@@ -658,10 +771,11 @@ async function saveWeek(targetStatus) {
 
 function collectDailyReports() {
   const rows = [];
-  for (const card of els.dailyGrid.querySelectorAll(".day-card")) {
-    const dayIndex = Number(card.dataset.dayIndex);
-    const hours = Number(card.querySelector('[data-field="hours"]').value || 0);
-    const taskSearch = card.querySelector('[data-field="task_search"]').value.trim();
+  for (const day of app.dailyReports) {
+    const dayIndex = day.day_index;
+    const values = getReportInputsForDay(dayIndex);
+    const hours = Number(values.hours || 0);
+    const taskSearch = values.task_search.trim();
     const taskId = resolveTaskId(taskSearch, app.profile.project_id);
 
     if (!Number.isFinite(hours) || hours < 0 || hours > 24) {
@@ -679,13 +793,27 @@ function collectDailyReports() {
       work_date: toDateInput(addDays(app.weekStart, dayIndex)),
       task_id: taskId || null,
       hours,
-      accomplishments: card.querySelector('[data-field="accomplishments"]').value.trim(),
-      blockers: card.querySelector('[data-field="blockers"]').value.trim(),
-      next_steps: card.querySelector('[data-field="next_steps"]').value.trim(),
+      accomplishments: values.accomplishments.trim(),
+      blockers: values.blockers.trim(),
+      next_steps: values.next_steps.trim(),
     });
   }
 
   return { rows };
+}
+
+function getReportInputsForDay(dayIndex) {
+  const scoped = els.dailyGrid.querySelector(`[data-day-index="${dayIndex}"][data-field="hours"]`)
+    ? (field) => els.dailyGrid.querySelector(`[data-day-index="${dayIndex}"][data-field="${field}"]`)
+    : (field) => els.dailyGrid.querySelector(`.day-card[data-day-index="${dayIndex}"] [data-field="${field}"], .work-log-row[data-day-index="${dayIndex}"] [data-field="${field}"]`);
+
+  return {
+    task_search: scoped("task_search")?.value || "",
+    hours: scoped("hours")?.value || "0",
+    accomplishments: scoped("accomplishments")?.value || "",
+    blockers: scoped("blockers")?.value || "",
+    next_steps: scoped("next_steps")?.value || "",
+  };
 }
 
 function updateTotalsFromDom() {
@@ -861,7 +989,7 @@ function renderAdminLists() {
     els.projectList,
     app.projects,
     (project) => projectLabel(project),
-    (project) => project.client || "No client entered",
+    (project) => `${project.client || "No client entered"} - ${getEnabledFormatsForProject(project.id).map(formatLabel).join(", ")}`,
   );
   renderAdminList(
     els.managerList,
@@ -912,11 +1040,12 @@ async function addProject(event) {
     name: els.adminProjectName.value.trim(),
     code: els.adminProjectCode.value.trim().toUpperCase() || null,
     client: els.adminProjectClient.value.trim() || "Cadmus",
+    reporting_formats: getSelectedAdminFormats(),
     active: true,
   };
 
-  if (!payload.name) {
-    setMessage(els.adminMessage, "Project name is required.", true);
+  if (!payload.name || payload.reporting_formats.length === 0) {
+    setMessage(els.adminMessage, "Project name and at least one reporting format are required.", true);
     return;
   }
 
@@ -1004,6 +1133,11 @@ async function finishAdminSave(error, form, successMessage) {
   }
 
   form.reset();
+  if (form === els.projectForm) {
+    els.adminFormatDaily.checked = true;
+    els.adminFormatGrid.checked = false;
+    els.adminFormatLog.checked = false;
+  }
   await loadReferenceData();
   renderAdminConsole();
   renderDailyReports();
@@ -1207,6 +1341,26 @@ function getTask(id) {
 
 function getTasksForProject(projectId) {
   return app.tasks.filter((task) => !task.project_id || task.project_id === projectId);
+}
+
+function getEnabledFormatsForProject(projectId) {
+  const project = getProject(projectId);
+  const formats = Array.isArray(project?.reporting_formats) ? project.reporting_formats : ["daily_cards"];
+  return formats.filter((format) => reportingFormats[format]);
+}
+
+function getSelectedAdminFormats() {
+  return [
+    els.adminFormatDaily,
+    els.adminFormatGrid,
+    els.adminFormatLog,
+  ]
+    .filter((input) => input.checked)
+    .map((input) => input.value);
+}
+
+function formatLabel(format) {
+  return reportingFormats[format] || format;
 }
 
 function resolveTaskId(value, projectId) {

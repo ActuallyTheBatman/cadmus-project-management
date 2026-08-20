@@ -5,9 +5,13 @@ create table if not exists public.timesheet_projects (
   name text not null,
   code text unique,
   client text,
+  reporting_formats text[] not null default array['daily_cards'],
   active boolean not null default true,
   created_at timestamptz not null default now()
 );
+
+alter table public.timesheet_projects
+  add column if not exists reporting_formats text[] not null default array['daily_cards'];
 
 create unique index if not exists timesheet_projects_code_idx
   on public.timesheet_projects (code);
@@ -476,15 +480,16 @@ with check (
   )
 );
 
-insert into public.timesheet_projects (name, code, client)
+insert into public.timesheet_projects (name, code, client, reporting_formats)
 values
-  ('Project Management', 'PM', 'Cadmus'),
-  ('PMO Support', 'PMO', 'Cadmus'),
-  ('Project Controls', 'CTRL', 'Cadmus'),
-  ('Benefit Connect', 'BENCON', 'Cadmus')
+  ('Project Management', 'PM', 'Cadmus', array['daily_cards', 'weekly_grid', 'work_log']),
+  ('PMO Support', 'PMO', 'Cadmus', array['daily_cards', 'weekly_grid', 'work_log']),
+  ('Project Controls', 'CTRL', 'Cadmus', array['daily_cards', 'weekly_grid', 'work_log']),
+  ('Benefit Connect', 'BENCON', 'Cadmus', array['daily_cards', 'weekly_grid', 'work_log'])
 on conflict (code) do update set
   name = excluded.name,
   client = excluded.client,
+  reporting_formats = excluded.reporting_formats,
   active = true;
 
 insert into public.timesheet_project_managers (project_id, manager_name, manager_email)

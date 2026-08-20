@@ -158,10 +158,11 @@
           <section class="panel">
             <div class="panel-head">
               <div>
-                <h2>Daily Boxes</h2>
+                <h2 id="reportFormatTitle">Daily Boxes</h2>
                 <p class="helper">Use one box for each reporting day. Save drafts during the week and submit when complete.</p>
               </div>
               <div class="toolbar">
+                <select id="reportFormat" aria-label="Reporting format"></select>
                 <button id="saveWeek" class="button" type="button">Save Draft</button>
                 <button id="submitWeek" class="button primary" type="button">Submit Week</button>
                 <button id="exportCsv" class="button" type="button">Export CSV</button>
@@ -207,6 +208,11 @@
               <label class="field"><span>Project name</span><input id="adminProjectName" type="text" required></label>
               <label class="field"><span>Code</span><input id="adminProjectCode" type="text" required></label>
               <label class="field"><span>Client</span><input id="adminProjectClient" type="text" value="Cadmus"></label>
+              <div class="format-options" aria-label="Enabled reporting formats">
+                <label><input id="adminFormatDaily" type="checkbox" value="daily_cards" checked> Daily Cards</label>
+                <label><input id="adminFormatGrid" type="checkbox" value="weekly_grid"> Weekly Grid</label>
+                <label><input id="adminFormatLog" type="checkbox" value="work_log"> Work Log</label>
+              </div>
               <button class="button primary" type="submit">Add Project</button>
               <ul id="projectList" class="admin-list"></ul>
             </form>

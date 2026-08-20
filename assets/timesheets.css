@@ -414,6 +414,87 @@ select option { color: #111418; }
   padding: 13px;
 }
 
+.weekly-grid-table {
+  display: grid;
+  grid-template-columns: 120px minmax(220px, 1.2fr) 110px minmax(260px, 1.6fr);
+  gap: 1px;
+  min-width: 760px;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid rgba(245, 241, 232, 0.14);
+  border-radius: var(--radius);
+  background: rgba(245, 241, 232, 0.12);
+}
+
+.weekly-grid-head,
+.weekly-grid-day,
+.weekly-grid-table .field {
+  background: var(--ink-soft);
+  padding: 12px;
+}
+
+.weekly-grid-head {
+  color: rgba(245, 241, 232, 0.58);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.weekly-grid-day {
+  display: grid;
+  align-content: center;
+  gap: 3px;
+}
+
+.weekly-grid-day strong,
+.work-log-date strong {
+  font-size: 13px;
+  text-transform: uppercase;
+}
+
+.weekly-grid-day span,
+.work-log-date span {
+  color: var(--brass-soft);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.compact-field span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.work-log-list {
+  display: grid;
+  gap: 10px;
+  min-width: 760px;
+  width: 100%;
+}
+
+.work-log-row {
+  display: grid;
+  grid-template-columns: 110px minmax(170px, 1.2fr) 90px minmax(220px, 1.6fr) minmax(160px, 1fr) minmax(160px, 1fr);
+  gap: 10px;
+  align-items: end;
+  border: 1px solid rgba(245, 241, 232, 0.14);
+  border-radius: var(--radius);
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.028);
+}
+
+.work-log-date {
+  display: grid;
+  gap: 3px;
+  padding-bottom: 11px;
+}
+
+.hours-field {
+  min-width: 78px;
+}
+
 .status-pill {
   display: inline-flex;
   align-items: center;
@@ -458,6 +539,32 @@ select option { color: #111418; }
 .admin-card h3 {
   font-size: 16px;
   text-transform: uppercase;
+}
+
+.format-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.format-options label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 36px;
+  border: 1px solid rgba(245, 241, 232, 0.16);
+  border-radius: 999px;
+  padding: 0 11px;
+  color: rgba(245, 241, 232, 0.76);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.format-options input {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--brass);
 }
 
 .admin-list {
@@ -587,6 +694,13 @@ footer {
   .admin-grid,
   .review-meta,
   .review-days { grid-template-columns: 1fr; }
+
+  .weekly-grid-table,
+  .work-log-list { min-width: 680px; }
+
+  .work-log-row {
+    grid-template-columns: 100px minmax(160px, 1fr) 90px minmax(190px, 1.4fr) minmax(150px, 1fr) minmax(150px, 1fr);
+  }
 }
 
 @media (max-width: 560px) {
