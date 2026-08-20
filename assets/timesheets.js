@@ -62,6 +62,7 @@ const els = {
   branchForm: document.querySelector("#branchForm"),
   divisionForm: document.querySelector("#divisionForm"),
   taskForm: document.querySelector("#taskForm"),
+  adminExportForm: document.querySelector("#adminExportForm"),
   adminProjectName: document.querySelector("#adminProjectName"),
   adminProjectCode: document.querySelector("#adminProjectCode"),
   adminProjectClient: document.querySelector("#adminProjectClient"),
@@ -74,6 +75,10 @@ const els = {
   adminTaskProject: document.querySelector("#adminTaskProject"),
   adminTaskName: document.querySelector("#adminTaskName"),
   adminTaskCode: document.querySelector("#adminTaskCode"),
+  adminExportBranch: document.querySelector("#adminExportBranch"),
+  adminExportDivision: document.querySelector("#adminExportDivision"),
+  adminExportStart: document.querySelector("#adminExportStart"),
+  adminExportEnd: document.querySelector("#adminExportEnd"),
   projectList: document.querySelector("#projectList"),
   managerList: document.querySelector("#managerList"),
   branchList: document.querySelector("#branchList"),
@@ -200,6 +205,8 @@ function bindEvents() {
   els.branchForm.addEventListener("submit", addBranch);
   els.divisionForm.addEventListener("submit", addDivision);
   els.taskForm.addEventListener("submit", addTask);
+  els.adminExportForm.addEventListener("submit", exportAdminWork);
+  els.adminExportBranch.addEventListener("change", populateAdminExportDivisions);
 }
 
 async function signIn(event) {
@@ -313,6 +320,7 @@ async function renderForAuthState() {
   if (app.profile.role === "admin") {
     els.adminView.classList.remove("hidden");
     renderAdminConsole();
+    setDefaultAdminExportWindow();
   }
 }
 
@@ -521,12 +529,14 @@ function mergeDailyReports(days) {
 
 function renderDailyReports() {
   const locked = app.report && ["submitted", "approved"].includes(app.report.status);
-  const taskOptions = getTasksForProject(app.profile?.project_id)
-    .map((task) => `<option value="${escapeHtml(task.id)}">${escapeHtml(taskLabel(task))}</option>`)
+  const projectTasks = getTasksForProject(app.profile?.project_id);
+  const taskOptions = projectTasks
+    .map((task) => `<option value="${escapeHtml(taskLabel(task))}"></option>`)
     .join("");
-  els.dailyGrid.innerHTML = "";
+  els.dailyGrid.innerHTML = `<datalist id="taskOptions">${taskOptions}</datalist>`;
 
   for (const day of app.dailyReports) {
+    const selectedTask = getTask(day.task_id);
     const card = document.createElement("article");
     card.className = "day-card";
     card.dataset.dayIndex = String(day.day_index);
@@ -541,10 +551,7 @@ function renderDailyReports() {
       <div class="day-body">
         <label class="field">
           <span>Task</span>
-          <select data-field="task_id">
-            <option value="">Select task</option>
-            ${taskOptions}
-          </select>
+          <input data-field="task_search" type="search" list="taskOptions" value="${escapeHtml(taskLabel(selectedTask))}" placeholder="${projectTasks.length ? "Search task code or name" : "No tasks configured"}">
         </label>
         <label class="field">
           <span>Hours</span>
@@ -565,9 +572,7 @@ function renderDailyReports() {
       </div>
     `;
 
-    card.querySelector('[data-field="task_id"]').value = day.task_id || "";
-
-    for (const input of card.querySelectorAll("input, textarea, select")) {
+    for (const input of card.querySelectorAll("input, textarea")) {
       input.disabled = locked;
       input.addEventListener("input", updateTotalsFromDom);
     }
@@ -656,9 +661,15 @@ function collectDailyReports() {
   for (const card of els.dailyGrid.querySelectorAll(".day-card")) {
     const dayIndex = Number(card.dataset.dayIndex);
     const hours = Number(card.querySelector('[data-field="hours"]').value || 0);
+    const taskSearch = card.querySelector('[data-field="task_search"]').value.trim();
+    const taskId = resolveTaskId(taskSearch, app.profile.project_id);
 
     if (!Number.isFinite(hours) || hours < 0 || hours > 24) {
       return { error: "Hours must be between 0 and 24 for each day." };
+    }
+
+    if (taskSearch && !taskId) {
+      return { error: "Choose tasks from the task list. Admins can add missing tasks in Admin Setup." };
     }
 
     const existing = app.dailyReports.find((day) => day.day_index === dayIndex);
@@ -666,7 +677,7 @@ function collectDailyReports() {
       id: existing?.id || "",
       day_index: dayIndex,
       work_date: toDateInput(addDays(app.weekStart, dayIndex)),
-      task_id: card.querySelector('[data-field="task_id"]').value || null,
+      task_id: taskId || null,
       hours,
       accomplishments: card.querySelector('[data-field="accomplishments"]').value.trim(),
       blockers: card.querySelector('[data-field="blockers"]').value.trim(),
@@ -826,6 +837,23 @@ function populateAdminSelects() {
   for (const branch of app.branches) {
     els.adminDivisionBranch.append(new Option(branch.name, branch.id));
   }
+
+  els.adminExportBranch.innerHTML = "";
+  els.adminExportBranch.append(new Option("Select branch", ""));
+  for (const branch of app.branches) {
+    els.adminExportBranch.append(new Option(branch.name, branch.name));
+  }
+  populateAdminExportDivisions();
+}
+
+function populateAdminExportDivisions() {
+  const selectedBranch = app.branches.find((branch) => branch.name === els.adminExportBranch.value);
+  const divisions = app.divisions.filter((division) => division.branch_id === selectedBranch?.id);
+  els.adminExportDivision.innerHTML = "";
+  els.adminExportDivision.append(new Option("All divisions", "all"));
+  for (const division of divisions) {
+    els.adminExportDivision.append(new Option(division.name, division.name));
+  }
 }
 
 function renderAdminLists() {
@@ -982,6 +1010,146 @@ async function finishAdminSave(error, form, successMessage) {
   setMessage(els.adminMessage, successMessage);
 }
 
+function setDefaultAdminExportWindow() {
+  if (!els.adminExportStart.value) els.adminExportStart.value = toDateInput(app.weekStart);
+  if (!els.adminExportEnd.value) els.adminExportEnd.value = toDateInput(addDays(app.weekStart, 4));
+}
+
+async function exportAdminWork(event) {
+  event.preventDefault();
+  if (app.profile?.role !== "admin") return;
+
+  const branch = els.adminExportBranch.value;
+  const division = els.adminExportDivision.value;
+  const startDate = els.adminExportStart.value;
+  const endDate = els.adminExportEnd.value;
+
+  if (!branch || !startDate || !endDate) {
+    setMessage(els.adminMessage, "Choose a branch, start date, and end date before exporting.", true);
+    return;
+  }
+
+  if (startDate > endDate) {
+    setMessage(els.adminMessage, "End date must be after the start date.", true);
+    return;
+  }
+
+  setMessage(els.adminMessage, "Building export...");
+
+  let profileQuery = app.supabase
+    .from("timesheet_profiles")
+    .select("id, email, full_name, company, branch, division")
+    .eq("branch", branch);
+
+  if (division && division !== "all") {
+    profileQuery = profileQuery.eq("division", division);
+  }
+
+  const { data: profiles, error: profileError } = await profileQuery.order("full_name");
+  if (profileError) {
+    setMessage(els.adminMessage, `Profile lookup failed: ${profileError.message}`, true);
+    return;
+  }
+
+  if (!profiles?.length) {
+    setMessage(els.adminMessage, "No resources match that branch/division.", true);
+    return;
+  }
+
+  const userIds = profiles.map((profile) => profile.id);
+  const reportStart = toDateInput(startOfWeek(parseLocalDate(startDate)));
+  const reportEnd = toDateInput(startOfWeek(parseLocalDate(endDate)));
+  const { data: reports, error: reportError } = await app.supabase
+    .from("timesheet_weekly_reports")
+    .select("id, user_id, week_start, project_id, manager_id, status, submitted_at, reviewed_at")
+    .in("user_id", userIds)
+    .gte("week_start", reportStart)
+    .lte("week_start", reportEnd)
+    .order("week_start", { ascending: true });
+
+  if (reportError) {
+    setMessage(els.adminMessage, `Report lookup failed: ${reportError.message}`, true);
+    return;
+  }
+
+  if (!reports?.length) {
+    setMessage(els.adminMessage, "No reports exist in that window.", true);
+    return;
+  }
+
+  const reportIds = reports.map((report) => report.id);
+  const { data: days, error: dayError } = await app.supabase
+    .from("timesheet_daily_reports")
+    .select("weekly_report_id, day_index, work_date, task_id, hours, accomplishments, blockers, next_steps")
+    .in("weekly_report_id", reportIds)
+    .gte("work_date", startDate)
+    .lte("work_date", endDate)
+    .order("work_date", { ascending: true });
+
+  if (dayError) {
+    setMessage(els.adminMessage, `Work lookup failed: ${dayError.message}`, true);
+    return;
+  }
+
+  if (!days?.length) {
+    setMessage(els.adminMessage, "No daily work entries match that window.", true);
+    return;
+  }
+
+  downloadAdminWorkCsv({ profiles, reports, days, branch, division, startDate, endDate });
+  setMessage(els.adminMessage, `Exported ${days.length} work rows.`);
+}
+
+function downloadAdminWorkCsv({ profiles, reports, days, branch, division, startDate, endDate }) {
+  const profileMap = new Map(profiles.map((profile) => [profile.id, profile]));
+  const reportMap = new Map(reports.map((report) => [report.id, report]));
+  const rows = [[
+    "Resource",
+    "Email",
+    "Company",
+    "Branch",
+    "Division",
+    "Week",
+    "Date",
+    "Day",
+    "Project",
+    "Manager",
+    "Task",
+    "Hours",
+    "Work Performed",
+    "Blockers",
+    "Next Steps",
+    "Status",
+  ]];
+
+  for (const day of days) {
+    const report = reportMap.get(day.weekly_report_id);
+    const profile = profileMap.get(report?.user_id);
+    rows.push([
+      profile?.full_name || "",
+      profile?.email || "",
+      profile?.company || "",
+      profile?.branch || "",
+      profile?.division || "",
+      report?.week_start || "",
+      day.work_date,
+      weekdays[day.day_index] || "",
+      projectLabel(getProject(report?.project_id)),
+      getManager(report?.manager_id)?.manager_name || "",
+      taskLabel(getTask(day.task_id)),
+      String(day.hours || 0),
+      day.accomplishments || "",
+      day.blockers || "",
+      day.next_steps || "",
+      report?.status || "",
+    ]);
+  }
+
+  const csv = rows.map((row) => row.map(csvCell).join(",")).join("\n");
+  const scope = [branch, division && division !== "all" ? division : "all-divisions"].filter(Boolean).map(slugify).join("-");
+  downloadCsv(csv, `cadmus-work-export-${scope}-${startDate}-to-${endDate}.csv`);
+}
+
 function exportCsv() {
   const rows = [["Week", "Date", "Day", "Project", "Task", "Branch", "Division", "Manager", "Hours", "Work Performed", "Blockers", "Next Steps", "Status"]];
   const project = getProject(app.profile.project_id);
@@ -1006,11 +1174,15 @@ function exportCsv() {
   }
 
   const csv = rows.map((row) => row.map(csvCell).join(",")).join("\n");
+  downloadCsv(csv, `cadmus-weekly-report-${toDateInput(app.weekStart)}.csv`);
+}
+
+function downloadCsv(csv, filename) {
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `cadmus-weekly-report-${toDateInput(app.weekStart)}.csv`;
+  link.download = filename;
   link.click();
   URL.revokeObjectURL(url);
 }
@@ -1037,6 +1209,12 @@ function getTasksForProject(projectId) {
   return app.tasks.filter((task) => !task.project_id || task.project_id === projectId);
 }
 
+function resolveTaskId(value, projectId) {
+  const normalized = normalizeLookup(value);
+  const task = getTasksForProject(projectId).find((item) => normalizeLookup(taskLabel(item)) === normalized);
+  return task?.id || "";
+}
+
 function projectLabel(project) {
   if (!project) return "-";
   return [project.code, project.name].filter(Boolean).join(" - ");
@@ -1045,6 +1223,10 @@ function projectLabel(project) {
 function taskLabel(task) {
   if (!task) return "";
   return [task.code, task.name].filter(Boolean).join(" - ");
+}
+
+function normalizeLookup(value) {
+  return String(value || "").trim().toLowerCase();
 }
 
 function groupBy(items, key) {
@@ -1092,6 +1274,14 @@ function formatHours(value) {
 
 function csvCell(value) {
   return `"${String(value ?? "").replaceAll('"', '""')}"`;
+}
+
+function slugify(value) {
+  return String(value || "export")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }
 
 function escapeHtml(value) {

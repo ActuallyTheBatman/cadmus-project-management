@@ -219,6 +219,14 @@ for select
 to authenticated
 using (active = true);
 
+drop policy if exists "Admins can manage projects" on public.timesheet_projects;
+create policy "Admins can manage projects"
+on public.timesheet_projects
+for all
+to authenticated
+using (public.current_user_role() = 'admin')
+with check (public.current_user_role() = 'admin');
+
 drop policy if exists "Authenticated users can read active project managers" on public.timesheet_project_managers;
 create policy "Authenticated users can read active project managers"
 on public.timesheet_project_managers

@@ -243,6 +243,15 @@
               <button class="button primary" type="submit">Add Task</button>
               <ul id="taskList" class="admin-list"></ul>
             </form>
+
+            <form id="adminExportForm" class="admin-card">
+              <h3>Work Export</h3>
+              <label class="field"><span>Branch</span><select id="adminExportBranch" required></select></label>
+              <label class="field"><span>Division</span><select id="adminExportDivision" required></select></label>
+              <label class="field"><span>Start date</span><input id="adminExportStart" type="date" required></label>
+              <label class="field"><span>End date</span><input id="adminExportEnd" type="date" required></label>
+              <button class="button primary" type="submit">Export Work</button>
+            </form>
           </div>
           <div class="panel-body">
             <div id="adminMessage" class="message" role="status"></div>
