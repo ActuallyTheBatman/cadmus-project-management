@@ -166,7 +166,7 @@ async function handleAuthCallback() {
 
   if (error) {
     setMessage(els.authMessage, friendlyAuthError({ message: error.replaceAll("+", " ") }), true);
-    cleanAuthUrl();
+    cleanAuthUrl({ preserveInvite: true });
     return;
   }
 
@@ -179,7 +179,7 @@ async function handleAuthCallback() {
       setMessage(els.authMessage, friendlyAuthError(verifyError), true);
       return;
     }
-    cleanAuthUrl();
+    cleanAuthUrl({ preserveInvite: true });
     setMessage(els.authMessage, "Email confirmed. You are signed in.");
     return;
   }
@@ -192,13 +192,24 @@ async function handleAuthCallback() {
       setMessage(els.authMessage, friendlyAuthError(exchangeError), true);
       return;
     }
-    cleanAuthUrl();
+    cleanAuthUrl({ preserveInvite: true });
     setMessage(els.authMessage, "Email confirmed. You are signed in.");
   }
 }
 
-function cleanAuthUrl() {
-  window.history.replaceState({}, document.title, `${window.location.origin}/timesheets/`);
+function cleanAuthUrl({ preserveInvite = false } = {}) {
+  const inviteId = new URL(window.location.href).searchParams.get("invite");
+  const cleanUrl = preserveInvite && inviteId
+    ? `${window.location.origin}/timesheets/?invite=${encodeURIComponent(inviteId)}`
+    : `${window.location.origin}/timesheets/`;
+  window.history.replaceState({}, document.title, cleanUrl);
+}
+
+function authRedirectUrl() {
+  const inviteId = new URL(window.location.href).searchParams.get("invite");
+  return inviteId
+    ? `${window.location.origin}/timesheets/?invite=${encodeURIComponent(inviteId)}`
+    : `${window.location.origin}/timesheets/`;
 }
 
 function friendlyAuthError(error) {
@@ -266,7 +277,7 @@ async function signIn(event) {
   setMessage(els.authMessage, "Sending sign-in link...");
   setMagicLinkCooldown();
   const email = els.email.value.trim();
-  const redirectTo = `${window.location.origin}/timesheets/`;
+  const redirectTo = authRedirectUrl();
   const { error } = await app.supabase.auth.signInWithOtp({
     email,
     options: { emailRedirectTo: redirectTo },
@@ -312,7 +323,7 @@ async function signUpWithPassword() {
   const { error } = await app.supabase.auth.signUp({
     email,
     password,
-    options: { emailRedirectTo: `${window.location.origin}/timesheets/` },
+    options: { emailRedirectTo: authRedirectUrl() },
   });
 
   if (error) {
@@ -345,6 +356,9 @@ async function renderForAuthState() {
   if (!app.user) {
     els.authView.classList.remove("hidden");
     els.userEmail.textContent = "Not signed in";
+    if (new URL(window.location.href).searchParams.get("invite")) {
+      setMessage(els.authMessage, "Invitation link detected. Sign in or create an account with the invited email address to continue.");
+    }
     return;
   }
 
