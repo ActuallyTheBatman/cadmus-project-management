@@ -462,7 +462,7 @@ select option { color: #111418; }
 .weekly-grid-table {
   display: grid;
   grid-column: 1 / -1;
-  grid-template-columns: 120px minmax(220px, 1.2fr) 110px minmax(260px, 1.6fr);
+  grid-template-columns: 108px minmax(210px, 1.25fr) 84px minmax(260px, 1.65fr);
   gap: 1px;
   min-width: 760px;
   width: 100%;
@@ -476,12 +476,12 @@ select option { color: #111418; }
 .weekly-grid-day,
 .weekly-grid-table .field {
   background: var(--ink-soft);
-  padding: 12px;
+  padding: 8px 10px;
 }
 
 .weekly-grid-head {
   color: rgba(245, 241, 232, 0.58);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 900;
   text-transform: uppercase;
 }
@@ -494,15 +494,26 @@ select option { color: #111418; }
 
 .weekly-grid-day strong,
 .work-log-date strong {
-  font-size: 13px;
+  font-size: 12px;
   text-transform: uppercase;
 }
 
 .weekly-grid-day span,
 .work-log-date span {
   color: var(--brass-soft);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 900;
+}
+
+.weekly-grid-table input {
+  min-height: 38px;
+  border-radius: 7px;
+  padding: 7px 9px;
+  font-size: 14px;
+}
+
+.weekly-grid-table input[type="number"] {
+  text-align: right;
 }
 
 .compact-field span {
@@ -680,9 +691,32 @@ select option { color: #111418; }
 }
 
 .weekly-grid-day-title {
-  display: grid;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 8px;
-  align-items: start;
+}
+
+.weekly-grid-day-title > span,
+.weekly-grid-day-title > strong {
+  display: grid;
+  gap: 2px;
+}
+
+.weekly-grid-day-title .small-button {
+  min-height: 26px;
+  padding: 0 8px;
+  font-size: 9px;
+}
+
+.weekly-grid-table [data-add-task] {
+  min-height: 30px;
+  padding: 0 9px;
+  font-size: 10px;
+}
+
+.weekly-grid-table .muted-cell {
+  padding: 0;
 }
 
 .compact-options {
