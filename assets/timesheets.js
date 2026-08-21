@@ -804,7 +804,6 @@ function renderWeeklyGrid({ locked }) {
     <div class="weekly-grid-head">Task</div>
     <div class="weekly-grid-head">Hours</div>
     <div class="weekly-grid-head">Notes</div>
-    <div class="weekly-grid-head">Action</div>
   `;
 
   for (let dayIndex = 0; dayIndex < weekdays.length; dayIndex += 1) {
@@ -827,15 +826,13 @@ function renderWeeklyGrid({ locked }) {
           <span>Hours</span>
           <input data-day-index="${dayIndex}" data-line-key="${escapeHtml(lineKey)}" data-field="hours" type="number" min="0" max="24" step="0.25" value="${Number(day.hours || 0)}">
         </label>
-        <label class="field compact-field">
+        <div class="weekly-grid-notes compact-field">
           <span>Notes</span>
           <input data-day-index="${dayIndex}" data-line-key="${escapeHtml(lineKey)}" data-field="accomplishments" type="text" value="${escapeHtml(day.accomplishments || "")}">
-        </label>
-        <input data-day-index="${dayIndex}" data-line-key="${escapeHtml(lineKey)}" data-field="blockers" type="hidden" value="${escapeHtml(day.blockers || "")}">
-        <input data-day-index="${dayIndex}" data-line-key="${escapeHtml(lineKey)}" data-field="next_steps" type="hidden" value="${escapeHtml(day.next_steps || "")}">
-        <div class="weekly-grid-action">
           <button class="button danger small-button" type="button" data-remove-line="${escapeHtml(lineKey)}" ${locked ? "disabled" : ""}>Remove</button>
         </div>
+        <input data-day-index="${dayIndex}" data-line-key="${escapeHtml(lineKey)}" data-field="blockers" type="hidden" value="${escapeHtml(day.blockers || "")}">
+        <input data-day-index="${dayIndex}" data-line-key="${escapeHtml(lineKey)}" data-field="next_steps" type="hidden" value="${escapeHtml(day.next_steps || "")}">
       `);
       first = false;
     }
