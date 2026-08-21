@@ -26,7 +26,7 @@ const app = {
   adminProjectFocus: "all",
   report: null,
   dailyReports: [],
-  reportFormat: "daily_cards",
+  reportFormat: "weekly_grid",
   weekStart: startOfWeek(new Date()),
 };
 
@@ -48,6 +48,8 @@ const els = {
   rolePill: document.querySelector("#rolePill"),
   signOut: document.querySelector("#signOut"),
   profileForm: document.querySelector("#profileForm"),
+  profilePassword: document.querySelector("#profilePassword"),
+  profilePasswordConfirm: document.querySelector("#profilePasswordConfirm"),
   profileName: document.querySelector("#profileName"),
   profileCompany: document.querySelector("#profileCompany"),
   profileBranch: document.querySelector("#profileBranch"),
@@ -61,6 +63,7 @@ const els = {
   nextWeek: document.querySelector("#nextWeek"),
   saveWeek: document.querySelector("#saveWeek"),
   submitWeek: document.querySelector("#submitWeek"),
+  withdrawWeek: document.querySelector("#withdrawWeek"),
   exportCsv: document.querySelector("#exportCsv"),
   reportFormat: document.querySelector("#reportFormat"),
   reportFormatTitle: document.querySelector("#reportFormatTitle"),
@@ -248,6 +251,7 @@ function bindEvents() {
   els.nextWeek.addEventListener("click", () => moveWeek(7));
   els.saveWeek.addEventListener("click", () => saveWeek("draft"));
   els.submitWeek.addEventListener("click", () => saveWeek("submitted"));
+  els.withdrawWeek.addEventListener("click", withdrawWeek);
   els.exportCsv.addEventListener("click", exportCsv);
   els.reportFormat.addEventListener("change", () => {
     app.reportFormat = els.reportFormat.value;
@@ -522,6 +526,8 @@ function populateDivisionSelect(selectedValue = "") {
 async function saveProfile(event) {
   event.preventDefault();
   setMessage(els.profileMessage, "Saving profile...");
+  const password = els.profilePassword.value;
+  const passwordConfirm = els.profilePasswordConfirm.value;
 
   const payload = {
     id: app.user.id,
@@ -536,6 +542,22 @@ async function saveProfile(event) {
 
   if (!payload.full_name || !payload.company || !payload.branch || !payload.division || !payload.project_id || !payload.manager_id) {
     setMessage(els.profileMessage, "Complete every profile field before continuing.", true);
+    return;
+  }
+
+  if (password.length < 8) {
+    setMessage(els.profileMessage, "Create a password with at least 8 characters.", true);
+    return;
+  }
+
+  if (password !== passwordConfirm) {
+    setMessage(els.profileMessage, "Password and confirmation must match.", true);
+    return;
+  }
+
+  const { error: passwordError } = await app.supabase.auth.updateUser({ password });
+  if (passwordError) {
+    setMessage(els.profileMessage, `Password setup failed: ${friendlyAuthError(passwordError)}`, true);
     return;
   }
 
@@ -644,10 +666,9 @@ function mergeDailyReports(days) {
 
 function renderDailyReports() {
   const locked = app.report && ["submitted", "approved"].includes(app.report.status);
-  const enabledFormats = getEnabledFormatsForProject(app.profile?.project_id);
-  if (!enabledFormats.includes(app.reportFormat)) {
-    app.reportFormat = enabledFormats[0] || "daily_cards";
-  }
+  const canWithdraw = app.report?.status === "submitted";
+  const enabledFormats = ["weekly_grid"];
+  app.reportFormat = "weekly_grid";
   renderFormatSelector(enabledFormats);
 
   const projectTasks = getTasksForProject(app.profile?.project_id);
@@ -668,6 +689,8 @@ function renderDailyReports() {
   els.reportStatus.textContent = status[0].toUpperCase() + status.slice(1);
   els.saveWeek.disabled = locked;
   els.submitWeek.disabled = locked;
+  els.withdrawWeek.classList.toggle("hidden", !canWithdraw);
+  els.withdrawWeek.disabled = !canWithdraw;
   updateTotalsFromDom();
 }
 
@@ -727,7 +750,10 @@ function renderWeeklyGrid({ locked }) {
       const lineKey = lineKeyFor(day);
       table.insertAdjacentHTML("beforeend", `
         <div class="weekly-grid-day">
-          ${first ? `<strong>${weekdays[dayIndex]}</strong><span>${formatShortDate(day.work_date)}</span>` : `<span>Task ${Number(day.line_index || 0) + 1}</span>`}
+          <div class="weekly-grid-day-title">
+            ${first ? `<strong>${weekdays[dayIndex]}</strong><span>${formatShortDate(day.work_date)}</span>` : `<span>Task ${Number(day.line_index || 0) + 1}</span>`}
+            <button class="button danger small-button" type="button" data-remove-line="${escapeHtml(lineKey)}" ${locked ? "disabled" : ""}>Remove</button>
+          </div>
         </div>
         <label class="field compact-field task-line" data-day-index="${dayIndex}" data-line-key="${escapeHtml(lineKey)}" data-existing-id="${escapeHtml(day.id || "")}">
           <span>Task</span>
@@ -762,6 +788,9 @@ function renderWeeklyGrid({ locked }) {
   }
   for (const button of table.querySelectorAll("[data-add-task]")) {
     button.addEventListener("click", () => addTaskLine(Number(button.dataset.addTask)));
+  }
+  for (const button of table.querySelectorAll("[data-remove-line]")) {
+    button.addEventListener("click", () => removeTaskLine(button.dataset.removeLine));
   }
   els.dailyGrid.append(table);
 }
@@ -1000,6 +1029,29 @@ async function saveWeek(targetStatus) {
   }
 
   setMessage(els.appMessage, targetStatus === "submitted" ? "Week submitted." : "Draft saved.");
+  await loadWeek();
+  if (canReviewPortfolio()) await loadPortfolio();
+}
+
+async function withdrawWeek() {
+  if (!app.report || app.report.status !== "submitted") return;
+
+  setMessage(els.appMessage, "Withdrawing submission...");
+  const { data: report, error } = await app.supabase
+    .from("timesheet_weekly_reports")
+    .update({ status: "draft", submitted_at: null, reviewed_at: null })
+    .eq("id", app.report.id)
+    .eq("status", "submitted")
+    .select("id, user_id, week_start, project_id, manager_id, status, manager_notes, submitted_at, reviewed_at")
+    .single();
+
+  if (error) {
+    setMessage(els.appMessage, `Withdraw failed: ${error.message}`, true);
+    return;
+  }
+
+  app.report = report;
+  setMessage(els.appMessage, "Submission withdrawn. You can edit and resubmit this week.");
   await loadWeek();
   if (canReviewPortfolio()) await loadPortfolio();
 }
@@ -1585,8 +1637,8 @@ async function finishAdminSave(error, form, successMessage) {
 
   form.reset();
   if (form === els.projectForm) {
-    els.adminFormatDaily.checked = true;
-    els.adminFormatGrid.checked = false;
+    els.adminFormatDaily.checked = false;
+    els.adminFormatGrid.checked = true;
     els.adminFormatLog.checked = false;
   }
   await loadReferenceData();

@@ -670,6 +670,12 @@ select option { color: #111418; }
   font-size: 11px;
 }
 
+.weekly-grid-day-title {
+  display: grid;
+  gap: 8px;
+  align-items: start;
+}
+
 .compact-options {
   margin-top: 8px;
 }

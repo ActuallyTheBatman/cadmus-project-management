@@ -5,13 +5,13 @@ create table if not exists public.timesheet_projects (
   name text not null,
   code text unique,
   client text,
-  reporting_formats text[] not null default array['daily_cards'],
+  reporting_formats text[] not null default array['weekly_grid'],
   active boolean not null default true,
   created_at timestamptz not null default now()
 );
 
 alter table public.timesheet_projects
-  add column if not exists reporting_formats text[] not null default array['daily_cards'];
+  add column if not exists reporting_formats text[] not null default array['weekly_grid'];
 
 create unique index if not exists timesheet_projects_code_idx
   on public.timesheet_projects (code);

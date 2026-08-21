@@ -84,10 +84,18 @@
           <div class="panel-head">
             <div>
               <h2>Complete Profile</h2>
-              <p class="helper">Set your branch, division, project, and reporting manager before filing weekly updates.</p>
+              <p class="helper">Create your password and set your branch, division, project, and reporting manager before filing weekly updates.</p>
             </div>
           </div>
           <form id="profileForm" class="panel-body profile-grid">
+            <label class="field">
+              <span>Create password</span>
+              <input id="profilePassword" type="password" autocomplete="new-password" minlength="8" required>
+            </label>
+            <label class="field">
+              <span>Confirm password</span>
+              <input id="profilePasswordConfirm" type="password" autocomplete="new-password" minlength="8" required>
+            </label>
             <label class="field">
               <span>Full name</span>
               <input id="profileName" type="text" autocomplete="name" required>
@@ -158,13 +166,14 @@
           <section class="panel">
             <div class="panel-head">
               <div>
-                <h2 id="reportFormatTitle">Daily Boxes</h2>
-                <p class="helper">Use one box for each reporting day. Save drafts during the week and submit when complete.</p>
+                <h2 id="reportFormatTitle">Weekly Grid</h2>
+                <p class="helper">Use the weekly grid to add one or more task lines per day. Save drafts during the week and submit when complete.</p>
               </div>
               <div class="toolbar">
                 <select id="reportFormat" aria-label="Reporting format"></select>
                 <button id="saveWeek" class="button" type="button">Save Draft</button>
                 <button id="submitWeek" class="button primary" type="button">Submit Week</button>
+                <button id="withdrawWeek" class="button danger hidden" type="button">Withdraw</button>
                 <button id="exportCsv" class="button" type="button">Export CSV</button>
               </div>
             </div>
@@ -217,8 +226,8 @@
               <label class="field"><span>Code</span><input id="adminProjectCode" type="text" required></label>
               <label class="field"><span>Client</span><input id="adminProjectClient" type="text" value="Cadmus"></label>
               <div class="format-options" aria-label="Enabled reporting formats">
-                <label><input id="adminFormatDaily" type="checkbox" value="daily_cards" checked> Daily Cards</label>
-                <label><input id="adminFormatGrid" type="checkbox" value="weekly_grid"> Weekly Grid</label>
+                <label><input id="adminFormatDaily" type="checkbox" value="daily_cards"> Daily Cards</label>
+                <label><input id="adminFormatGrid" type="checkbox" value="weekly_grid" checked> Weekly Grid</label>
                 <label><input id="adminFormatLog" type="checkbox" value="work_log"> Work Log</label>
               </div>
               <button class="button primary" type="submit">Add Project</button>
