@@ -657,6 +657,15 @@ select option { color: #111418; }
   align-items: stretch;
 }
 
+.user-admin-list {
+  max-height: 520px;
+  overflow: auto;
+}
+
+.user-admin-item {
+  gap: 14px;
+}
+
 .admin-item-main {
   display: flex;
   align-items: center;
@@ -742,6 +751,34 @@ select option { color: #111418; }
   color: rgba(245, 241, 232, 0.68);
   font-size: 13px;
   line-height: 1.5;
+}
+
+.review-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.review-notes {
+  min-height: 72px;
+}
+
+.audit-list {
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.audit-list div {
+  display: grid;
+  gap: 3px;
+}
+
+.audit-list span,
+.audit-list p {
+  color: rgba(245, 241, 232, 0.62);
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .empty-state {

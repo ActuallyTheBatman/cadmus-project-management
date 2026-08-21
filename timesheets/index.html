@@ -75,6 +75,7 @@
               <button id="passwordSignIn" class="button primary" type="button">Sign In</button>
               <button id="passwordSignUp" class="button" type="button">Create Account</button>
               <button id="magicLink" class="button" type="submit">Email Link</button>
+              <button id="resetPassword" class="button" type="button">Reset Password</button>
             </div>
             <div id="authMessage" class="message" role="status"></div>
           </form>
@@ -159,6 +160,10 @@
                   <span>Project</span>
                   <strong id="projectCode">-</strong>
                 </div>
+                <div class="metric">
+                  <span>Due</span>
+                  <strong id="dueDate">-</strong>
+                </div>
               </div>
             </div>
           </aside>
@@ -197,11 +202,16 @@
               </label>
               <select id="portfolioStatus" aria-label="Filter reports by status">
                 <option value="submitted">Submitted</option>
+                <option value="missing">Missing</option>
                 <option value="draft">Draft</option>
                 <option value="approved">Approved</option>
                 <option value="rejected">Rejected</option>
                 <option value="all">All</option>
               </select>
+              <label class="field inline-filter">
+                <span>Week</span>
+                <input id="portfolioWeek" type="date">
+              </label>
               <button id="refreshPortfolio" class="button" type="button">Refresh</button>
             </div>
           </div>
@@ -274,6 +284,21 @@
               <label class="field"><span>Start date</span><input id="adminExportStart" type="date" required></label>
               <label class="field"><span>End date</span><input id="adminExportEnd" type="date" required></label>
               <button class="button primary" type="submit">Export Work</button>
+            </form>
+
+            <form id="userFilterForm" class="admin-card wide-card">
+              <h3>User Management</h3>
+              <div class="profile-grid tight-grid">
+                <label class="field"><span>Branch</span><select id="adminUserBranch"></select></label>
+                <label class="field"><span>Division</span><select id="adminUserDivision"></select></label>
+                <label class="field"><span>Project</span><select id="adminUserProject"></select></label>
+                <label class="field"><span>Status</span><select id="adminUserStatus">
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                  <option value="all">All</option>
+                </select></label>
+              </div>
+              <ul id="userList" class="admin-list user-admin-list"></ul>
             </form>
 
             <form id="inviteForm" class="admin-card wide-card">

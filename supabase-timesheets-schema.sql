@@ -84,9 +84,13 @@ create table if not exists public.timesheet_profiles (
   project_id uuid references public.timesheet_projects(id),
   manager_id uuid references public.timesheet_project_managers(id),
   role text not null default 'resource' check (role in ('resource', 'manager', 'admin')),
+  active boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.timesheet_profiles
+  add column if not exists active boolean not null default true;
 
 create table if not exists public.timesheet_entries (
   id uuid primary key default gen_random_uuid(),
@@ -133,6 +137,16 @@ create table if not exists public.timesheet_daily_reports (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (weekly_report_id, day_index, line_index)
+);
+
+create table if not exists public.timesheet_report_audit (
+  id uuid primary key default gen_random_uuid(),
+  weekly_report_id uuid not null references public.timesheet_weekly_reports(id) on delete cascade,
+  actor_id uuid references auth.users(id) on delete set null,
+  actor_email text,
+  action text not null check (action in ('draft_saved', 'submitted', 'withdrawn', 'approved', 'rejected')),
+  notes text,
+  created_at timestamptz not null default now()
 );
 
 alter table public.timesheet_daily_reports
@@ -182,6 +196,9 @@ create index if not exists timesheet_weekly_reports_user_week_idx
 create index if not exists timesheet_weekly_reports_manager_idx
   on public.timesheet_weekly_reports (manager_id, status, week_start);
 
+create index if not exists timesheet_report_audit_report_idx
+  on public.timesheet_report_audit (weekly_report_id, created_at desc);
+
 create or replace function public.set_timesheet_updated_at()
 returns trigger
 language plpgsql
@@ -201,7 +218,9 @@ as $$
 declare
   invited_role text;
 begin
-  if exists (select 1 from public.timesheet_admin_emails a where lower(a.email) = lower(new.email)) then
+  if tg_op = 'UPDATE' and public.current_user_role() = 'admin' and new.role is distinct from old.role then
+    new.role = new.role;
+  elsif exists (select 1 from public.timesheet_admin_emails a where lower(a.email) = lower(new.email)) then
     new.role = 'admin';
   elsif exists (select 1 from public.timesheet_project_managers m where lower(m.manager_email) = lower(new.email)) then
     new.role = 'manager';
@@ -269,6 +288,7 @@ alter table public.timesheet_profiles enable row level security;
 alter table public.timesheet_entries enable row level security;
 alter table public.timesheet_weekly_reports enable row level security;
 alter table public.timesheet_daily_reports enable row level security;
+alter table public.timesheet_report_audit enable row level security;
 
 drop policy if exists "Authenticated users can read active projects" on public.timesheet_projects;
 create policy "Authenticated users can read active projects"
@@ -474,7 +494,7 @@ on public.timesheet_weekly_reports
 for update
 to authenticated
 using (
-  (auth.uid() = user_id and status in ('draft', 'rejected'))
+  (auth.uid() = user_id and status in ('draft', 'rejected', 'submitted'))
   or public.current_user_role() = 'admin'
   or (
     public.current_user_role() = 'manager'
@@ -554,6 +574,74 @@ with check (
     where w.id = timesheet_daily_reports.weekly_report_id
       and w.user_id = auth.uid()
       and w.status in ('draft', 'rejected')
+  )
+);
+
+drop policy if exists "Users can delete their own editable daily reports" on public.timesheet_daily_reports;
+create policy "Users can delete their own editable daily reports"
+on public.timesheet_daily_reports
+for delete
+to authenticated
+using (
+  exists (
+    select 1
+    from public.timesheet_weekly_reports w
+    where w.id = timesheet_daily_reports.weekly_report_id
+      and w.user_id = auth.uid()
+      and w.status in ('draft', 'rejected')
+  )
+);
+
+drop policy if exists "Users and reviewers can read report audit" on public.timesheet_report_audit;
+create policy "Users and reviewers can read report audit"
+on public.timesheet_report_audit
+for select
+to authenticated
+using (
+  exists (
+    select 1
+    from public.timesheet_weekly_reports w
+    where w.id = timesheet_report_audit.weekly_report_id
+      and (
+        w.user_id = auth.uid()
+        or public.current_user_role() = 'admin'
+        or (
+          public.current_user_role() = 'manager'
+          and exists (
+            select 1
+            from public.timesheet_project_managers m
+            where m.id = w.manager_id
+              and lower(m.manager_email) = lower(public.current_user_email())
+          )
+        )
+      )
+  )
+);
+
+drop policy if exists "Users and reviewers can create report audit" on public.timesheet_report_audit;
+create policy "Users and reviewers can create report audit"
+on public.timesheet_report_audit
+for insert
+to authenticated
+with check (
+  auth.uid() = actor_id
+  and exists (
+    select 1
+    from public.timesheet_weekly_reports w
+    where w.id = timesheet_report_audit.weekly_report_id
+      and (
+        w.user_id = auth.uid()
+        or public.current_user_role() = 'admin'
+        or (
+          public.current_user_role() = 'manager'
+          and exists (
+            select 1
+            from public.timesheet_project_managers m
+            where m.id = w.manager_id
+              and lower(m.manager_email) = lower(public.current_user_email())
+          )
+        )
+      )
   )
 );
 

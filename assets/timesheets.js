@@ -22,8 +22,10 @@ const app = {
   branches: [],
   divisions: [],
   tasks: [],
+  adminProfiles: [],
   pendingInvite: null,
   adminProjectFocus: "all",
+  passwordRecovery: false,
   report: null,
   dailyReports: [],
   reportFormat: "weekly_grid",
@@ -43,6 +45,7 @@ const els = {
   passwordSignIn: document.querySelector("#passwordSignIn"),
   passwordSignUp: document.querySelector("#passwordSignUp"),
   magicLink: document.querySelector("#magicLink"),
+  resetPassword: document.querySelector("#resetPassword"),
   authMessage: document.querySelector("#authMessage"),
   userEmail: document.querySelector("#userEmail"),
   rolePill: document.querySelector("#rolePill"),
@@ -72,8 +75,10 @@ const els = {
   totalHours: document.querySelector("#totalHours"),
   reportStatus: document.querySelector("#reportStatus"),
   projectCode: document.querySelector("#projectCode"),
+  dueDate: document.querySelector("#dueDate"),
   portfolioStatus: document.querySelector("#portfolioStatus"),
   portfolioProject: document.querySelector("#portfolioProject"),
+  portfolioWeek: document.querySelector("#portfolioWeek"),
   refreshPortfolio: document.querySelector("#refreshPortfolio"),
   portfolioList: document.querySelector("#portfolioList"),
   projectForm: document.querySelector("#projectForm"),
@@ -103,6 +108,11 @@ const els = {
   adminExportDivision: document.querySelector("#adminExportDivision"),
   adminExportStart: document.querySelector("#adminExportStart"),
   adminExportEnd: document.querySelector("#adminExportEnd"),
+  userFilterForm: document.querySelector("#userFilterForm"),
+  adminUserBranch: document.querySelector("#adminUserBranch"),
+  adminUserDivision: document.querySelector("#adminUserDivision"),
+  adminUserProject: document.querySelector("#adminUserProject"),
+  adminUserStatus: document.querySelector("#adminUserStatus"),
   inviteEmails: document.querySelector("#inviteEmails"),
   inviteRole: document.querySelector("#inviteRole"),
   inviteProject: document.querySelector("#inviteProject"),
@@ -114,6 +124,7 @@ const els = {
   branchList: document.querySelector("#branchList"),
   divisionList: document.querySelector("#divisionList"),
   taskList: document.querySelector("#taskList"),
+  userList: document.querySelector("#userList"),
   adminMessage: document.querySelector("#adminMessage"),
 };
 
@@ -145,6 +156,7 @@ async function boot() {
 
   app.supabase.auth.onAuthStateChange(async (_event, session) => {
     app.user = session?.user || null;
+    if (_event === "PASSWORD_RECOVERY") app.passwordRecovery = true;
     await renderForAuthState();
   });
 }
@@ -156,7 +168,7 @@ function subscribeToProjectSettings() {
       if (!app.user) return;
       await loadReferenceData();
       if (app.profile) renderDailyReports();
-      if (app.profile?.role === "admin") renderAdminConsole();
+      if (app.profile?.role === "admin") await renderAdminConsole();
     })
     .subscribe();
 }
@@ -175,6 +187,7 @@ async function handleAuthCallback() {
 
   const tokenHash = search.get("token_hash") || hash.get("token_hash");
   const type = search.get("type") || hash.get("type");
+  if (type === "recovery") app.passwordRecovery = true;
   if (tokenHash && type) {
     setMessage(els.authMessage, "Confirming email...");
     const { error: verifyError } = await app.supabase.auth.verifyOtp({ token_hash: tokenHash, type });
@@ -238,6 +251,7 @@ function bindEvents() {
   els.authForm.addEventListener("submit", signIn);
   els.passwordSignIn.addEventListener("click", signInWithPassword);
   els.passwordSignUp.addEventListener("click", signUpWithPassword);
+  els.resetPassword.addEventListener("click", sendPasswordReset);
   els.profileForm.addEventListener("submit", saveProfile);
   els.profileProject.addEventListener("change", () => populateManagerSelect());
   els.profileBranch.addEventListener("change", () => populateDivisionSelect());
@@ -260,6 +274,10 @@ function bindEvents() {
   els.refreshPortfolio.addEventListener("click", loadPortfolio);
   els.portfolioStatus.addEventListener("change", loadPortfolio);
   els.portfolioProject.addEventListener("change", loadPortfolio);
+  els.portfolioWeek.addEventListener("change", () => {
+    els.portfolioWeek.value = toDateInput(startOfWeek(parseLocalDate(els.portfolioWeek.value)));
+    loadPortfolio();
+  });
   els.projectForm.addEventListener("submit", addProject);
   els.managerForm.addEventListener("submit", addManager);
   els.branchForm.addEventListener("submit", addBranch);
@@ -267,9 +285,17 @@ function bindEvents() {
   els.taskForm.addEventListener("submit", addTask);
   els.adminExportForm.addEventListener("submit", exportAdminWork);
   els.adminExportBranch.addEventListener("change", populateAdminExportDivisions);
-  els.adminProjectFocus.addEventListener("change", () => {
+  els.userFilterForm.addEventListener("submit", (event) => event.preventDefault());
+  els.adminUserBranch.addEventListener("change", () => {
+    populateAdminUserDivisions();
+    renderUserAdminList();
+  });
+  els.adminUserDivision.addEventListener("change", renderUserAdminList);
+  els.adminUserProject.addEventListener("change", renderUserAdminList);
+  els.adminUserStatus.addEventListener("change", renderUserAdminList);
+  els.adminProjectFocus.addEventListener("change", async () => {
     app.adminProjectFocus = els.adminProjectFocus.value;
-    renderAdminConsole();
+    await renderAdminConsole();
   });
   els.inviteForm.addEventListener("submit", sendBulkInvitations);
   els.inviteProject.addEventListener("change", populateInviteManagers);
@@ -338,6 +364,26 @@ async function signUpWithPassword() {
   setMessage(els.authMessage, "Account created. If confirmation is enabled, check your email once; otherwise sign in now.");
 }
 
+async function sendPasswordReset() {
+  const email = els.email.value.trim();
+  if (!email) {
+    setMessage(els.authMessage, "Enter your email first, then reset your password.", true);
+    return;
+  }
+
+  setMessage(els.authMessage, "Sending password reset...");
+  const { error } = await app.supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: authRedirectUrl(),
+  });
+
+  if (error) {
+    setMessage(els.authMessage, friendlyAuthError(error), true);
+    return;
+  }
+
+  setMessage(els.authMessage, "Check your email for the password reset link.");
+}
+
 function setMagicLinkCooldown() {
   let remaining = 60;
   els.magicLink.disabled = true;
@@ -371,9 +417,22 @@ async function renderForAuthState() {
   await loadPendingInvitation();
   await loadProfile();
 
+  if (app.profile?.active === false) {
+    els.authView.classList.remove("hidden");
+    setMessage(els.authMessage, "This timesheet account is inactive. Contact your Portfolio Manager for access.", true);
+    return;
+  }
+
   if (!app.profile) {
     renderProfileForm();
     els.profileView.classList.remove("hidden");
+    return;
+  }
+
+  if (app.passwordRecovery) {
+    renderProfileForm();
+    els.profileView.classList.remove("hidden");
+    setMessage(els.profileMessage, "Create a new password before continuing.");
     return;
   }
 
@@ -385,13 +444,14 @@ async function renderForAuthState() {
 
   if (canReviewPortfolio()) {
     els.portfolioView.classList.remove("hidden");
+    if (!els.portfolioWeek.value) els.portfolioWeek.value = toDateInput(app.weekStart);
     populatePortfolioProjectFilter();
     await loadPortfolio();
   }
 
   if (isPortfolioManager()) {
     els.adminView.classList.remove("hidden");
-    renderAdminConsole();
+    await renderAdminConsole();
     setDefaultAdminExportWindow();
   }
 }
@@ -435,7 +495,7 @@ async function loadReferenceData() {
 async function loadProfile() {
   const { data, error } = await app.supabase
     .from("timesheet_profiles")
-    .select("id, email, full_name, company, branch, division, project_id, manager_id, role")
+    .select("id, email, full_name, company, branch, division, project_id, manager_id, role, active")
     .eq("id", app.user.id)
     .maybeSingle();
 
@@ -577,6 +637,9 @@ async function saveProfile(event) {
   }
 
   setMessage(els.profileMessage, "Profile saved.");
+  app.passwordRecovery = false;
+  els.profilePassword.value = "";
+  els.profilePasswordConfirm.value = "";
   await renderForAuthState();
 }
 
@@ -584,6 +647,7 @@ function renderProfileSummary() {
   const project = getProject(app.profile.project_id);
   const manager = getManager(app.profile.manager_id);
   els.projectCode.textContent = project?.code || "-";
+  els.dueDate.textContent = formatShortDate(toDateInput(addDays(app.weekStart, 4)));
   els.profileSummary.innerHTML = [
     ["Company", app.profile.company],
     ["Branch", app.profile.branch],
@@ -958,7 +1022,7 @@ function lineKeyFor(line) {
 async function saveWeek(targetStatus) {
   if (!app.profile) return;
 
-  const dailyPayload = collectDailyReports();
+  const dailyPayload = collectDailyReports(targetStatus);
   if (dailyPayload.error) {
     setMessage(els.appMessage, dailyPayload.error, true);
     return;
@@ -1024,8 +1088,10 @@ async function saveWeek(targetStatus) {
     }
 
     app.report = submittedReport;
+    await logTimesheetAudit(report.id, "submitted");
   } else {
     app.report = report;
+    await logTimesheetAudit(report.id, "draft_saved");
   }
 
   setMessage(els.appMessage, targetStatus === "submitted" ? "Week submitted." : "Draft saved.");
@@ -1051,14 +1117,16 @@ async function withdrawWeek() {
   }
 
   app.report = report;
+  await logTimesheetAudit(report.id, "withdrawn");
   setMessage(els.appMessage, "Submission withdrawn. You can edit and resubmit this week.");
   await loadWeek();
   if (canReviewPortfolio()) await loadPortfolio();
 }
 
-function collectDailyReports() {
+function collectDailyReports(targetStatus = "draft") {
   const rows = [];
   const lineElements = [...els.dailyGrid.querySelectorAll(".task-line")];
+  const dayTotals = new Map();
   for (const line of lineElements) {
     const dayIndex = Number(line.dataset.dayIndex);
     const lineKey = line.dataset.lineKey;
@@ -1068,13 +1136,22 @@ function collectDailyReports() {
     const taskId = resolveTaskId(taskSearch, app.profile.project_id);
 
     if (!Number.isFinite(hours) || hours < 0 || hours > 24) {
-      return { error: "Hours must be between 0 and 24 for each day." };
+      return { error: "Hours must be between 0 and 24 for each task line." };
     }
 
     if (taskSearch && !taskId) {
       return { error: "Choose tasks from the task list. Admins can add missing tasks in Admin Setup." };
     }
 
+    if (hours > 0 && !taskId) {
+      return { error: "Choose a task for every row with hours." };
+    }
+
+    if (hours > 0 && !values.accomplishments.trim()) {
+      return { error: "Enter notes for every row with hours." };
+    }
+
+    dayTotals.set(dayIndex, (dayTotals.get(dayIndex) || 0) + hours);
     const existing = app.dailyReports.find((day) => lineKeyFor(day) === lineKey);
     rows.push({
       id: line.dataset.existingId || existing?.id || "",
@@ -1089,7 +1166,36 @@ function collectDailyReports() {
     });
   }
 
+  for (const [dayIndex, total] of dayTotals.entries()) {
+    if (total > 24) {
+      return { error: `${weekdays[dayIndex]} has more than 24 total hours. Adjust the task lines before saving.` };
+    }
+  }
+
+  if (targetStatus === "submitted") {
+    const weekStart = startOfWeek(parseLocalDate(els.weekStart.value));
+    if (weekStart > startOfWeek(new Date())) {
+      return { error: "Future weeks can be saved as drafts, but they cannot be submitted yet." };
+    }
+
+    const totalHours = [...dayTotals.values()].reduce((sum, total) => sum + total, 0);
+    if (totalHours <= 0) {
+      return { error: "Enter time before submitting the week." };
+    }
+  }
+
   return { rows };
+}
+
+async function logTimesheetAudit(reportId, action, notes = "") {
+  if (!reportId) return;
+  await app.supabase.from("timesheet_report_audit").insert({
+    weekly_report_id: reportId,
+    actor_id: app.user.id,
+    actor_email: app.user.email,
+    action,
+    notes: notes.trim() || null,
+  });
 }
 
 function getReportInputsForLine(line) {
@@ -1116,6 +1222,12 @@ async function loadPortfolio() {
   if (!app.profile || !canReviewPortfolio()) return;
 
   els.portfolioList.innerHTML = `<div class="empty-state"><p>Loading portfolio reports...</p></div>`;
+  if (els.portfolioStatus.value === "missing") {
+    await loadMissingTimesheets();
+    return;
+  }
+
+  const selectedWeek = els.portfolioWeek.value ? toDateInput(startOfWeek(parseLocalDate(els.portfolioWeek.value))) : "";
   let query = app.supabase
     .from("timesheet_weekly_reports")
     .select("id, user_id, week_start, project_id, manager_id, status, manager_notes, submitted_at, reviewed_at")
@@ -1128,6 +1240,10 @@ async function loadPortfolio() {
 
   if (els.portfolioProject.value && els.portfolioProject.value !== "all") {
     query = query.eq("project_id", els.portfolioProject.value);
+  }
+
+  if (selectedWeek) {
+    query = query.eq("week_start", selectedWeek);
   }
 
   const { data: reports, error } = await query;
@@ -1143,21 +1259,90 @@ async function loadPortfolio() {
 
   const reportIds = reports.map((report) => report.id);
   const userIds = [...new Set(reports.map((report) => report.user_id))];
-  const [{ data: profiles }, { data: days }] = await Promise.all([
-    app.supabase.from("timesheet_profiles").select("id, full_name, email, company, branch, division").in("id", userIds),
+  const [{ data: profiles }, { data: days }, { data: audits }] = await Promise.all([
+    app.supabase.from("timesheet_profiles").select("id, full_name, email, company, branch, division, active").in("id", userIds),
     app.supabase.from("timesheet_daily_reports").select("weekly_report_id, day_index, line_index, work_date, task_id, hours, accomplishments, blockers, next_steps").in("weekly_report_id", reportIds).order("day_index").order("line_index"),
+    app.supabase.from("timesheet_report_audit").select("weekly_report_id, actor_email, action, notes, created_at").in("weekly_report_id", reportIds).order("created_at", { ascending: false }),
   ]);
 
   const profileMap = new Map((profiles || []).map((profile) => [profile.id, profile]));
   const daysByReport = groupBy(days || [], "weekly_report_id");
+  const auditsByReport = groupBy(audits || [], "weekly_report_id");
   els.portfolioList.innerHTML = "";
 
   for (const report of reports) {
-    els.portfolioList.append(renderReviewCard(report, profileMap.get(report.user_id), daysByReport.get(report.id) || []));
+    els.portfolioList.append(renderReviewCard(report, profileMap.get(report.user_id), daysByReport.get(report.id) || [], auditsByReport.get(report.id) || []));
   }
 }
 
-function renderReviewCard(report, profile, days) {
+async function loadMissingTimesheets() {
+  const selectedWeek = els.portfolioWeek.value ? toDateInput(startOfWeek(parseLocalDate(els.portfolioWeek.value))) : toDateInput(app.weekStart);
+  let profileQuery = app.supabase
+    .from("timesheet_profiles")
+    .select("id, full_name, email, branch, division, project_id, manager_id, active")
+    .eq("active", true)
+    .order("full_name");
+
+  if (els.portfolioProject.value && els.portfolioProject.value !== "all") {
+    profileQuery = profileQuery.eq("project_id", els.portfolioProject.value);
+  }
+
+  const { data: profiles, error: profileError } = await profileQuery;
+  if (profileError) {
+    els.portfolioList.innerHTML = `<div class="empty-state"><p>${escapeHtml(profileError.message)}</p></div>`;
+    return;
+  }
+
+  const userIds = (profiles || []).map((profile) => profile.id);
+  if (!userIds.length) {
+    els.portfolioList.innerHTML = `<div class="empty-state"><p>No active resources match this view.</p></div>`;
+    return;
+  }
+
+  const { data: reports, error: reportError } = await app.supabase
+    .from("timesheet_weekly_reports")
+    .select("user_id, status")
+    .in("user_id", userIds)
+    .eq("week_start", selectedWeek);
+
+  if (reportError) {
+    els.portfolioList.innerHTML = `<div class="empty-state"><p>${escapeHtml(reportError.message)}</p></div>`;
+    return;
+  }
+
+  const submittedUserIds = new Set((reports || []).filter((report) => ["submitted", "approved"].includes(report.status)).map((report) => report.user_id));
+  const missing = (profiles || []).filter((profile) => !submittedUserIds.has(profile.id));
+
+  if (!missing.length) {
+    els.portfolioList.innerHTML = `<div class="empty-state"><p>Everyone in this view has submitted for ${escapeHtml(formatShortDate(selectedWeek))}.</p></div>`;
+    return;
+  }
+
+  els.portfolioList.innerHTML = "";
+  for (const profile of missing) {
+    const card = document.createElement("article");
+    card.className = "review-card";
+    card.innerHTML = `
+      <div class="review-head">
+        <div>
+          <h3>${escapeHtml(profile.full_name || "Unnamed resource")}</h3>
+          <p class="helper">${escapeHtml(profile.email || "")}</p>
+        </div>
+        <span class="status-pill rejected">missing</span>
+      </div>
+      <div class="review-meta">
+        ${reviewMeta("Week", formatShortDate(selectedWeek))}
+        ${reviewMeta("Project", projectLabel(getProject(profile.project_id)))}
+        ${reviewMeta("Branch", profile.branch || "-")}
+        ${reviewMeta("Division", profile.division || "-")}
+        ${reviewMeta("Manager", getManager(profile.manager_id)?.manager_name || "-")}
+      </div>
+    `;
+    els.portfolioList.append(card);
+  }
+}
+
+function renderReviewCard(report, profile, days, audits = []) {
   const project = getProject(report.project_id);
   const manager = getManager(report.manager_id);
   const total = days.reduce((sum, day) => sum + Number(day.hours || 0), 0);
@@ -1180,30 +1365,49 @@ function renderReviewCard(report, profile, days) {
       ${reviewMeta("Total hours", `${formatHours(total)}h`)}
       ${reviewMeta("Company", profile?.company || "-")}
       ${reviewMeta("Submitted", report.submitted_at ? formatShortDate(report.submitted_at) : "-")}
+      ${reviewMeta("Review notes", report.manager_notes || "-")}
     </div>
     <div class="review-days">
       ${days.map(renderReviewDay).join("")}
     </div>
+    ${audits.length ? `<div class="audit-list">${audits.slice(0, 5).map(renderAuditItem).join("")}</div>` : ""}
   `;
 
   if (["submitted", "rejected"].includes(report.status) && canReviewPortfolio()) {
     const actions = document.createElement("div");
-    actions.className = "toolbar";
+    actions.className = "review-actions";
+    const notes = document.createElement("textarea");
+    notes.className = "review-notes";
+    notes.placeholder = "Review comments";
+    notes.value = report.manager_notes || "";
     const approve = document.createElement("button");
     approve.className = "button primary";
     approve.type = "button";
     approve.textContent = "Approve";
-    approve.addEventListener("click", () => reviewReport(report.id, "approved"));
+    approve.addEventListener("click", () => reviewReport(report.id, "approved", notes.value));
     const reject = document.createElement("button");
     reject.className = "button danger";
     reject.type = "button";
-    reject.textContent = "Reject";
-    reject.addEventListener("click", () => reviewReport(report.id, "rejected"));
-    actions.append(approve, reject);
+    reject.textContent = "Send Back";
+    reject.addEventListener("click", () => reviewReport(report.id, "rejected", notes.value));
+    const buttons = document.createElement("div");
+    buttons.className = "toolbar";
+    buttons.append(approve, reject);
+    actions.append(notes, buttons);
     card.append(actions);
   }
 
   return card;
+}
+
+function renderAuditItem(audit) {
+  return `
+    <div>
+      <strong>${escapeHtml(formatAuditAction(audit.action))}</strong>
+      <span>${escapeHtml([audit.actor_email, formatShortDate(audit.created_at)].filter(Boolean).join(" - "))}</span>
+      ${audit.notes ? `<p>${escapeHtml(audit.notes)}</p>` : ""}
+    </div>
+  `;
 }
 
 function reviewMeta(label, value) {
@@ -1223,10 +1427,10 @@ function renderReviewDay(day) {
   `;
 }
 
-async function reviewReport(reportId, status) {
+async function reviewReport(reportId, status, notes = "") {
   const { error } = await app.supabase
     .from("timesheet_weekly_reports")
-    .update({ status, reviewed_at: new Date().toISOString() })
+    .update({ status, manager_notes: notes.trim() || null, reviewed_at: new Date().toISOString() })
     .eq("id", reportId);
 
   if (error) {
@@ -1234,12 +1438,34 @@ async function reviewReport(reportId, status) {
     return;
   }
 
+  await logTimesheetAudit(reportId, status === "approved" ? "approved" : "rejected", notes);
   await loadPortfolio();
 }
 
-function renderAdminConsole() {
+async function renderAdminConsole() {
+  await loadAdminProfiles();
   populateAdminSelects();
   renderAdminLists();
+}
+
+async function loadAdminProfiles() {
+  if (!isPortfolioManager()) {
+    app.adminProfiles = [];
+    return;
+  }
+
+  const { data, error } = await app.supabase
+    .from("timesheet_profiles")
+    .select("id, email, full_name, company, branch, division, project_id, manager_id, role, active, updated_at")
+    .order("full_name");
+
+  if (error) {
+    app.adminProfiles = [];
+    setMessage(els.adminMessage, `User load failed: ${error.message}`, true);
+    return;
+  }
+
+  app.adminProfiles = data || [];
 }
 
 function populateAdminSelects() {
@@ -1264,6 +1490,7 @@ function populateAdminSelects() {
     els.adminExportBranch.append(new Option(branch.name, branch.name));
   }
   populateAdminExportDivisions();
+  populateAdminUserFilters();
   populateInviteBranches();
   populateInviteManagers();
 }
@@ -1290,6 +1517,38 @@ function populateAdminExportDivisions() {
   for (const division of divisions) {
     els.adminExportDivision.append(new Option(division.name, division.name));
   }
+}
+
+function populateAdminUserFilters() {
+  const currentBranch = els.adminUserBranch.value || "all";
+  const currentProject = els.adminUserProject.value || "all";
+
+  els.adminUserBranch.innerHTML = "";
+  els.adminUserBranch.append(new Option("All branches", "all"));
+  for (const branch of app.branches) {
+    els.adminUserBranch.append(new Option(branch.name, branch.name));
+  }
+  els.adminUserBranch.value = app.branches.some((branch) => branch.name === currentBranch) ? currentBranch : "all";
+
+  populateAdminUserDivisions();
+
+  populateProjectSelectElement(els.adminUserProject, "All projects", "all");
+  els.adminUserProject.value = app.projects.some((project) => project.id === currentProject) ? currentProject : "all";
+}
+
+function populateAdminUserDivisions() {
+  const selectedBranch = app.branches.find((branch) => branch.name === els.adminUserBranch.value);
+  const current = els.adminUserDivision.value || "all";
+  const divisions = selectedBranch
+    ? app.divisions.filter((division) => division.branch_id === selectedBranch.id)
+    : app.divisions;
+
+  els.adminUserDivision.innerHTML = "";
+  els.adminUserDivision.append(new Option("All divisions", "all"));
+  for (const division of divisions) {
+    els.adminUserDivision.append(new Option(division.name, division.name));
+  }
+  els.adminUserDivision.value = divisions.some((division) => division.name === current) ? current : "all";
 }
 
 function populateInviteBranches() {
@@ -1359,6 +1618,7 @@ function renderAdminLists() {
     (task) => projectLabel(getProject(task.project_id)),
     (task) => deactivateAdminItem("timesheet_tasks", task.id, "Task removed."),
   );
+  renderUserAdminList();
 }
 
 function filterByFocusedProject(items) {
@@ -1422,6 +1682,124 @@ function renderAdminList(container, items, titleFor, detailFor, removeAction) {
   }
 }
 
+function renderUserAdminList() {
+  const branch = els.adminUserBranch.value || "all";
+  const division = els.adminUserDivision.value || "all";
+  const projectId = els.adminUserProject.value || "all";
+  const status = els.adminUserStatus.value || "active";
+  let users = [...app.adminProfiles];
+
+  if (branch !== "all") users = users.filter((user) => user.branch === branch);
+  if (division !== "all") users = users.filter((user) => user.division === division);
+  if (projectId !== "all") users = users.filter((user) => user.project_id === projectId);
+  if (status === "active") users = users.filter((user) => user.active !== false);
+  if (status === "inactive") users = users.filter((user) => user.active === false);
+
+  if (!users.length) {
+    els.userList.innerHTML = `<li class="admin-item"><span>No users match this view.</span></li>`;
+    return;
+  }
+
+  els.userList.innerHTML = "";
+  for (const user of users) {
+    const row = document.createElement("li");
+    row.className = "admin-item admin-item-stacked user-admin-item";
+    row.innerHTML = `
+      <div class="admin-item-main">
+        <div>
+          <strong>${escapeHtml(user.full_name || user.email)}</strong>
+          <span>${escapeHtml([user.email, roleLabel(user.role), user.active === false ? "Inactive" : "Active"].join(" - "))}</span>
+        </div>
+        <button class="button danger small-button" type="button" data-toggle-active>${user.active === false ? "Reactivate" : "Deactivate"}</button>
+      </div>
+      <div class="profile-grid tight-grid">
+        <label class="field"><span>Tier</span><select data-user-field="role">
+          <option value="resource">Resource</option>
+          <option value="manager">Project Manager</option>
+          <option value="admin">Portfolio Manager</option>
+        </select></label>
+        <label class="field"><span>Project</span><select data-user-field="project_id"></select></label>
+        <label class="field"><span>Manager</span><select data-user-field="manager_id"></select></label>
+        <label class="field"><span>Branch</span><select data-user-field="branch"></select></label>
+        <label class="field"><span>Division</span><select data-user-field="division"></select></label>
+      </div>
+    `;
+
+    const roleSelect = row.querySelector('[data-user-field="role"]');
+    roleSelect.value = user.role || "resource";
+
+    const projectSelect = row.querySelector('[data-user-field="project_id"]');
+    populateProjectSelectElement(projectSelect, "Select project", "");
+    projectSelect.value = user.project_id || "";
+
+    const managerSelect = row.querySelector('[data-user-field="manager_id"]');
+    populateManagerOptionsForProject(managerSelect, projectSelect.value, user.manager_id);
+
+    const branchSelect = row.querySelector('[data-user-field="branch"]');
+    branchSelect.append(new Option("Select branch", ""));
+    for (const branchItem of app.branches) branchSelect.append(new Option(branchItem.name, branchItem.name));
+    branchSelect.value = user.branch || "";
+
+    const divisionSelect = row.querySelector('[data-user-field="division"]');
+    populateDivisionOptionsForBranch(divisionSelect, branchSelect.value, user.division);
+
+    roleSelect.addEventListener("change", () => updateManagedUser(user.id, { role: roleSelect.value }));
+    projectSelect.addEventListener("change", () => {
+      populateManagerOptionsForProject(managerSelect, projectSelect.value, "");
+      updateManagedUser(user.id, { project_id: projectSelect.value || null, manager_id: managerSelect.value || null });
+    });
+    managerSelect.addEventListener("change", () => updateManagedUser(user.id, { manager_id: managerSelect.value || null }));
+    branchSelect.addEventListener("change", () => {
+      populateDivisionOptionsForBranch(divisionSelect, branchSelect.value, "");
+      updateManagedUser(user.id, { branch: branchSelect.value, division: divisionSelect.value });
+    });
+    divisionSelect.addEventListener("change", () => updateManagedUser(user.id, { division: divisionSelect.value }));
+    row.querySelector("[data-toggle-active]").addEventListener("click", () => updateManagedUser(user.id, { active: user.active === false }));
+
+    els.userList.append(row);
+  }
+}
+
+function populateManagerOptionsForProject(select, projectId, selectedId = "") {
+  select.innerHTML = "";
+  const managers = app.managers.filter((manager) => manager.project_id === projectId);
+  select.append(new Option(managers.length ? "Select manager" : "No managers configured", ""));
+  for (const manager of managers) {
+    select.append(new Option(`${manager.manager_name} - ${manager.manager_email}`, manager.id));
+  }
+  select.value = selectedId && managers.some((manager) => manager.id === selectedId) ? selectedId : "";
+}
+
+function populateDivisionOptionsForBranch(select, branchName, selectedValue = "") {
+  const branch = app.branches.find((item) => item.name === branchName);
+  const divisions = app.divisions.filter((division) => !division.branch_id || division.branch_id === branch?.id);
+  select.innerHTML = "";
+  select.append(new Option(divisions.length ? "Select division" : "No divisions configured", ""));
+  for (const division of divisions) {
+    select.append(new Option(division.name, division.name));
+  }
+  select.value = selectedValue && divisions.some((division) => division.name === selectedValue) ? selectedValue : "";
+}
+
+async function updateManagedUser(userId, patch) {
+  setMessage(els.adminMessage, "Updating user...");
+  const { error } = await app.supabase
+    .from("timesheet_profiles")
+    .update(patch)
+    .eq("id", userId);
+
+  if (error) {
+    setMessage(els.adminMessage, `User update failed: ${error.message}`, true);
+    await renderAdminConsole();
+    return;
+  }
+
+  const user = app.adminProfiles.find((profile) => profile.id === userId);
+  if (user) Object.assign(user, patch);
+  setMessage(els.adminMessage, "User updated.");
+  renderUserAdminList();
+}
+
 async function addProject(event) {
   event.preventDefault();
   setMessage(els.adminMessage, "Adding project...");
@@ -1446,7 +1824,7 @@ async function updateProjectFormats(projectId, row) {
   const selected = [...row.querySelectorAll('.format-options input[type="checkbox"]:checked')].map((input) => input.value);
   if (selected.length === 0) {
     setMessage(els.adminMessage, "Each active project needs at least one reporting format.", true);
-    renderAdminConsole();
+    await renderAdminConsole();
     return;
   }
 
@@ -1458,7 +1836,7 @@ async function updateProjectFormats(projectId, row) {
 
   if (error) {
     setMessage(els.adminMessage, error.message, true);
-    renderAdminConsole();
+    await renderAdminConsole();
     return;
   }
 
@@ -1478,7 +1856,7 @@ async function deactivateAdminItem(table, id, successMessage) {
   }
 
   await loadReferenceData();
-  if (app.profile?.role === "admin") renderAdminConsole();
+  if (app.profile?.role === "admin") await renderAdminConsole();
   if (app.profile) renderProfileSummary();
   if (app.profile) renderDailyReports();
   setMessage(els.adminMessage, successMessage);
@@ -1642,7 +2020,7 @@ async function finishAdminSave(error, form, successMessage) {
     els.adminFormatLog.checked = false;
   }
   await loadReferenceData();
-  renderAdminConsole();
+  await renderAdminConsole();
   renderDailyReports();
   setMessage(els.adminMessage, successMessage);
 }
@@ -1857,6 +2235,16 @@ function isPortfolioManager() {
 
 function roleLabel(role) {
   return ppmRoles[role] || role || "Resource";
+}
+
+function formatAuditAction(action) {
+  return {
+    draft_saved: "Draft saved",
+    submitted: "Submitted",
+    withdrawn: "Withdrawn",
+    approved: "Approved",
+    rejected: "Sent back",
+  }[action] || action || "Updated";
 }
 
 function getEnabledFormatsForProject(projectId) {
