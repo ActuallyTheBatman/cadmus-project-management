@@ -804,6 +804,7 @@ function renderWeeklyGrid({ locked }) {
     <div class="weekly-grid-head">Task</div>
     <div class="weekly-grid-head">Hours</div>
     <div class="weekly-grid-head">Notes</div>
+    <div class="weekly-grid-head">Action</div>
   `;
 
   for (let dayIndex = 0; dayIndex < weekdays.length; dayIndex += 1) {
@@ -816,7 +817,6 @@ function renderWeeklyGrid({ locked }) {
         <div class="weekly-grid-day">
           <div class="weekly-grid-day-title">
             ${first ? `<strong>${weekdays[dayIndex]}</strong><span>${formatShortDate(day.work_date)}</span>` : `<span>Task ${Number(day.line_index || 0) + 1}</span>`}
-            <button class="button danger small-button" type="button" data-remove-line="${escapeHtml(lineKey)}" ${locked ? "disabled" : ""}>Remove</button>
           </div>
         </div>
         <label class="field compact-field task-line" data-day-index="${dayIndex}" data-line-key="${escapeHtml(lineKey)}" data-existing-id="${escapeHtml(day.id || "")}">
@@ -833,16 +833,16 @@ function renderWeeklyGrid({ locked }) {
         </label>
         <input data-day-index="${dayIndex}" data-line-key="${escapeHtml(lineKey)}" data-field="blockers" type="hidden" value="${escapeHtml(day.blockers || "")}">
         <input data-day-index="${dayIndex}" data-line-key="${escapeHtml(lineKey)}" data-field="next_steps" type="hidden" value="${escapeHtml(day.next_steps || "")}">
+        <div class="weekly-grid-action">
+          <button class="button danger small-button" type="button" data-remove-line="${escapeHtml(lineKey)}" ${locked ? "disabled" : ""}>Remove</button>
+        </div>
       `);
       first = false;
     }
     table.insertAdjacentHTML("beforeend", `
-      <div class="weekly-grid-day">
-        <button class="button small-button" type="button" data-add-task="${dayIndex}" ${locked ? "disabled" : ""}>Add Task</button>
+      <div class="weekly-grid-add-row">
+        <button class="button small-button" type="button" data-add-task="${dayIndex}" ${locked ? "disabled" : ""}>Add ${weekdays[dayIndex]} Task</button>
       </div>
-      <div class="weekly-grid-day muted-cell"></div>
-      <div class="weekly-grid-day muted-cell"></div>
-      <div class="weekly-grid-day muted-cell"></div>
     `);
   }
 

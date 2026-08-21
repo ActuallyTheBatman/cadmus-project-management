@@ -462,9 +462,9 @@ select option { color: #111418; }
 .weekly-grid-table {
   display: grid;
   grid-column: 1 / -1;
-  grid-template-columns: 108px minmax(210px, 1.25fr) 84px minmax(260px, 1.65fr);
+  grid-template-columns: 112px minmax(220px, 1.2fr) 76px minmax(260px, 1.6fr) 86px;
   gap: 1px;
-  min-width: 760px;
+  min-width: 860px;
   width: 100%;
   overflow: hidden;
   border: 1px solid rgba(245, 241, 232, 0.14);
@@ -474,6 +474,8 @@ select option { color: #111418; }
 
 .weekly-grid-head,
 .weekly-grid-day,
+.weekly-grid-action,
+.weekly-grid-add-row,
 .weekly-grid-table .field {
   background: var(--ink-soft);
   padding: 8px 10px;
@@ -490,6 +492,20 @@ select option { color: #111418; }
   display: grid;
   align-content: center;
   gap: 3px;
+}
+
+.weekly-grid-action {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+}
+
+.weekly-grid-add-row {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-start;
+  padding: 7px 10px;
+  background: rgba(255, 255, 255, 0.028);
 }
 
 .weekly-grid-day strong,
@@ -691,10 +707,8 @@ select option { color: #111418; }
 }
 
 .weekly-grid-day-title {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  display: grid;
+  gap: 2px;
 }
 
 .weekly-grid-day-title > span,
@@ -703,20 +717,17 @@ select option { color: #111418; }
   gap: 2px;
 }
 
-.weekly-grid-day-title .small-button {
+.weekly-grid-action .small-button {
   min-height: 26px;
-  padding: 0 8px;
+  width: 100%;
+  padding: 0 7px;
   font-size: 9px;
 }
 
-.weekly-grid-table [data-add-task] {
+.weekly-grid-add-row [data-add-task] {
   min-height: 30px;
   padding: 0 9px;
   font-size: 10px;
-}
-
-.weekly-grid-table .muted-cell {
-  padding: 0;
 }
 
 .compact-options {
@@ -862,7 +873,7 @@ footer {
   .review-days { grid-template-columns: 1fr; }
 
   .weekly-grid-table,
-  .work-log-list { min-width: 680px; }
+  .work-log-list { min-width: 820px; }
 
   .work-log-row {
     grid-template-columns: 100px minmax(160px, 1fr) 90px minmax(190px, 1.4fr) minmax(150px, 1fr) minmax(150px, 1fr) auto;
