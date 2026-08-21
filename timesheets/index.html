@@ -13,9 +13,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Libre+Baskerville:wght@700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/timesheets.css?v=20260820-quiet-no-action-column">
-  <script src="/assets/timesheets-config.js?v=20260820-quiet-no-action-column"></script>
-  <script type="module" src="/assets/timesheets.js?v=20260820-quiet-no-action-column"></script>
+  <link rel="stylesheet" href="/assets/timesheets.css?v=20260820-workspace-redesign">
+  <script src="/assets/timesheets-config.js?v=20260820-workspace-redesign"></script>
+  <script type="module" src="/assets/timesheets.js?v=20260820-workspace-redesign"></script>
 </head>
 <body>
   <nav class="nav" aria-label="Primary navigation">
@@ -129,11 +129,14 @@
         </section>
 
         <section id="appView" class="workspace hidden">
-          <aside class="panel">
+          <aside class="panel context-panel">
             <div class="panel-head">
-              <h2>Week</h2>
+              <div>
+                <h2>Timesheet</h2>
+                <p class="helper">Review the week, update task lines, then save or submit.</p>
+              </div>
             </div>
-            <div class="panel-body">
+            <div class="panel-body context-body">
               <div class="week-controls">
                 <label class="field">
                   <span>Week starting</span>
