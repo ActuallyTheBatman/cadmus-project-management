@@ -320,14 +320,38 @@ select option { color: #111418; }
 .toolbar.compact { justify-content: flex-start; }
 
 .context-panel .panel-head {
-  padding-block: 14px;
+  padding: 16px 18px;
 }
 
 .context-body {
   display: grid;
-  grid-template-columns: minmax(250px, 0.8fr) minmax(280px, 1.35fr) minmax(360px, 1.2fr);
-  gap: 18px;
-  align-items: start;
+  grid-template-columns: minmax(220px, 0.58fr) minmax(0, 1.42fr);
+  gap: 14px;
+  align-items: stretch;
+}
+
+.week-controls {
+  align-content: start;
+  border-right: 1px solid var(--line);
+  padding-right: 14px;
+}
+
+.week-controls .field {
+  max-width: 270px;
+}
+
+.week-controls .field input {
+  min-height: 50px;
+  font-size: 22px;
+}
+
+.week-controls .toolbar {
+  gap: 8px;
+}
+
+.week-controls .button {
+  min-height: 44px;
+  padding: 10px 14px;
 }
 
 .inline-filter {
@@ -340,8 +364,8 @@ select option { color: #111418; }
 
 .profile-summary {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(5, minmax(130px, 1fr));
+  gap: 10px;
   margin-top: 0;
   border-top: 0;
   padding-top: 0;
@@ -349,36 +373,45 @@ select option { color: #111418; }
 
 .profile-summary div {
   display: grid;
-  gap: 3px;
-  min-height: 54px;
-  border-left: 1px solid var(--line);
-  padding-left: 10px;
+  align-content: start;
+  gap: 5px;
+  min-height: 74px;
+  border: 1px solid rgba(245, 241, 232, 0.11);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.025);
+  padding: 12px;
 }
 
 .profile-summary span {
   color: rgba(245, 241, 232, 0.54);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 900;
   text-transform: uppercase;
 }
 
 .profile-summary strong {
   color: rgba(245, 241, 232, 0.86);
-  font-size: 13px;
+  font-size: clamp(14px, 1.05vw, 17px);
+  line-height: 1.22;
+  overflow-wrap: anywhere;
 }
 
 .summary-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(4, minmax(120px, 1fr));
+  gap: 10px;
   margin-top: 0;
 }
 
 .metric {
   display: grid;
-  gap: 4px;
-  border-left: 1px solid var(--line);
-  padding-left: 10px;
+  align-content: start;
+  gap: 5px;
+  border: 1px solid rgba(245, 241, 232, 0.11);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.018);
+  padding: 12px;
 }
 
 .metric span {
@@ -392,7 +425,8 @@ select option { color: #111418; }
   max-width: 100%;
   overflow-wrap: anywhere;
   text-align: left;
-  font-size: 20px;
+  font-size: clamp(20px, 1.7vw, 30px);
+  line-height: 1.05;
 }
 
 .daily-grid {
@@ -875,6 +909,13 @@ footer {
 
   .context-body {
     grid-template-columns: 1fr;
+  }
+
+  .week-controls {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    padding-right: 0;
+    padding-bottom: 14px;
   }
 
   .profile-summary,

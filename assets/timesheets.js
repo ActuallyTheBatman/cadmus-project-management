@@ -646,10 +646,11 @@ async function saveProfile(event) {
 function renderProfileSummary() {
   const project = getProject(app.profile.project_id);
   const manager = getManager(app.profile.manager_id);
+  const company = app.profile.company === "Cadmus Project Management" ? "Cadmus PM" : app.profile.company;
   els.projectCode.textContent = project?.code || "-";
   els.dueDate.textContent = formatShortDate(toDateInput(addDays(app.weekStart, 4)));
   els.profileSummary.innerHTML = [
-    ["Company", app.profile.company],
+    ["Company", company],
     ["Branch", app.profile.branch],
     ["Division", app.profile.division],
     ["Project", projectLabel(project)],
