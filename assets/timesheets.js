@@ -1873,22 +1873,54 @@ function renderPortfolioDashboard({ selectedWeek, selectedProjectId, profiles, r
   const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
   const statusCounts = countBy(reports, "status");
   const totalHours = days.reduce((sum, day) => sum + Number(day.hours || 0), 0);
-  const pendingApproval = statusCounts.submitted || 0;
+  const pendingApproval = (statusCounts.submitted || 0) + (statusCounts.pending_final || 0);
   const approved = statusCounts.approved || 0;
   const submitted = pendingApproval + approved;
+  const capacityHours = profiles.length * 40;
   const submissionRate = profiles.length ? Math.round((submitted / profiles.length) * 100) : 0;
+  const utilizationRate = capacityHours ? Math.round((totalHours / capacityHours) * 100) : 0;
   const overdueCount = isPortfolioWeekPastDue(selectedWeek) ? missingProfiles.length : 0;
   const reportHours = new Map(reports.map((report) => [
     report.id,
     (daysByReport.get(report.id) || []).reduce((sum, day) => sum + Number(day.hours || 0), 0),
   ]));
+  const backlogReports = reports.filter((report) => ["submitted", "pending_final"].includes(report.status));
+  const lateSubmissions = reports.filter((report) => isLateSubmission(report)).length;
+  const oldestBacklogDays = Math.max(0, ...backlogReports.map((report) => daysSince(report.submitted_at || report.reviewed_at || selectedWeek)));
   const projectBreakdown = summarizeByProject(reports, reportHours);
   const branchBreakdown = summarizeByBranch(profiles, reports, reportHours);
+  const divisionBreakdown = summarizeByDivision(profiles, reports, reportHours);
+  const managerBreakdown = summarizeByManager(reports, reportHours);
+  const taskBreakdown = summarizeByTask(days);
   const projectLabelText = selectedProjectId === "all" ? "All projects" : projectLabel(getProject(selectedProjectId));
+  app.portfolioReportSummary = {
+    selectedWeek,
+    selectedProjectId,
+    projectLabelText,
+    metrics: {
+      activeResources: profiles.length,
+      submitted,
+      pendingApproval,
+      approved,
+      missing: missingProfiles.length,
+      overdue: overdueCount,
+      lateSubmissions,
+      totalHours,
+      capacityHours,
+      submissionRate,
+      utilizationRate,
+      oldestBacklogDays,
+    },
+    projectBreakdown,
+    branchBreakdown,
+    divisionBreakdown,
+    managerBreakdown,
+    taskBreakdown,
+  };
   app.portfolioReminderTargets = {
     missing: missingProfiles.map((profile) => buildMissingReminderTarget(profile, reportByUser.get(profile.id), selectedWeek)),
     approvals: reports
-      .filter((report) => report.status === "submitted")
+      .filter((report) => ["submitted", "pending_final"].includes(report.status))
       .map((report) => buildApprovalReminderTarget(report, profileById.get(report.user_id), reportHours.get(report.id) || 0)),
   };
 
@@ -1900,24 +1932,29 @@ function renderPortfolioDashboard({ selectedWeek, selectedProjectId, profiles, r
       </div>
       <div class="ops-actions">
         <span class="status-pill ${overdueCount ? "rejected" : "approved"}">${overdueCount ? `${overdueCount} late` : "on track"}</span>
+        <button class="button small-button" type="button" data-export-ops-summary>Export Summary</button>
         <button class="button small-button" type="button" data-export-reminders="missing" ${app.portfolioReminderTargets.missing.length ? "" : "disabled"}>Export Missing</button>
         <button class="button small-button" type="button" data-export-reminders="approvals" ${app.portfolioReminderTargets.approvals.length ? "" : "disabled"}>Export Approvals</button>
       </div>
     </div>
     <div class="ops-metric-grid">
       ${opsMetric("Submission Rate", `${submissionRate}%`, `${submitted} of ${profiles.length} submitted or approved`)}
-      ${opsMetric("Pending Approval", pendingApproval, "Reports awaiting manager action")}
+      ${opsMetric("Utilization", `${utilizationRate}%`, `${formatHours(totalHours)}h of ${formatHours(capacityHours)}h capacity`)}
+      ${opsMetric("Approval Backlog", pendingApproval, `${oldestBacklogDays}d oldest waiting report`)}
       ${opsMetric("Missing / Draft", missingProfiles.length, "Not submitted or sent back")}
-      ${opsMetric("Approved", approved, "Reports locked for the week")}
-      ${opsMetric("Total Hours", `${formatHours(totalHours)}h`, "Approved, submitted, draft, and rejected")}
+      ${opsMetric("Late Submissions", lateSubmissions, "Submitted after the Friday due date")}
       ${opsMetric("Active Resources", profiles.length, "In the selected project scope")}
     </div>
     <div class="ops-breakdown-grid">
       ${opsBreakdown("Project Load", projectBreakdown, "No reported hours yet.")}
       ${opsBreakdown("Branch Coverage", branchBreakdown, "No branch activity yet.")}
+      ${opsBreakdown("Division Coverage", divisionBreakdown, "No division activity yet.")}
+      ${opsBreakdown("Manager Load", managerBreakdown, "No manager-owned hours yet.")}
+      ${opsBreakdown("Task Load", taskBreakdown, "No task activity yet.")}
     </div>
   `;
 
+  els.portfolioDashboard.querySelector("[data-export-ops-summary]")?.addEventListener("click", exportOperationsSummary);
   for (const button of els.portfolioDashboard.querySelectorAll("[data-export-reminders]")) {
     button.addEventListener("click", () => exportReminderTargets(button.dataset.exportReminders));
   }
@@ -1994,6 +2031,47 @@ function exportReminderTargets(type) {
   downloadCsv(csv, `cadmus-${type}-reminders-${portfolioSelectedWeek()}.csv`);
 }
 
+function exportOperationsSummary() {
+  const summary = app.portfolioReportSummary;
+  if (!summary) return;
+
+  const metricRows = [
+    ["Metric", "Value", "Scope", "Week"],
+    ["Submission Rate", `${summary.metrics.submissionRate}%`, summary.projectLabelText, summary.selectedWeek],
+    ["Utilization", `${summary.metrics.utilizationRate}%`, summary.projectLabelText, summary.selectedWeek],
+    ["Total Hours", formatHours(summary.metrics.totalHours), summary.projectLabelText, summary.selectedWeek],
+    ["Capacity Hours", formatHours(summary.metrics.capacityHours), summary.projectLabelText, summary.selectedWeek],
+    ["Approval Backlog", summary.metrics.pendingApproval, summary.projectLabelText, summary.selectedWeek],
+    ["Oldest Backlog Days", summary.metrics.oldestBacklogDays, summary.projectLabelText, summary.selectedWeek],
+    ["Missing / Draft", summary.metrics.missing, summary.projectLabelText, summary.selectedWeek],
+    ["Late Submissions", summary.metrics.lateSubmissions, summary.projectLabelText, summary.selectedWeek],
+    ["Approved", summary.metrics.approved, summary.projectLabelText, summary.selectedWeek],
+    ["Active Resources", summary.metrics.activeResources, summary.projectLabelText, summary.selectedWeek],
+  ];
+
+  const breakdownRows = [["Category", "Name", "Hours", "Count"]];
+  appendSummaryBreakdown(breakdownRows, "Project", summary.projectBreakdown);
+  appendSummaryBreakdown(breakdownRows, "Branch", summary.branchBreakdown);
+  appendSummaryBreakdown(breakdownRows, "Division", summary.divisionBreakdown);
+  appendSummaryBreakdown(breakdownRows, "Manager", summary.managerBreakdown);
+  appendSummaryBreakdown(breakdownRows, "Task", summary.taskBreakdown);
+
+  const csv = [
+    ...metricRows,
+    [],
+    ...breakdownRows,
+  ].map((row) => row.map(csvCell).join(",")).join("\n");
+
+  const scope = [summary.projectLabelText, summary.selectedWeek].map(slugify).join("-");
+  downloadCsv(csv, `cadmus-operations-summary-${scope}.csv`);
+}
+
+function appendSummaryBreakdown(rows, category, breakdown) {
+  for (const row of breakdown) {
+    rows.push([category, row.label, formatHours(row.hours), row.count ?? ""]);
+  }
+}
+
 function missingReminderMessage(target) {
   const statusText = target.status === "missing" ? "has not been submitted" : `is currently ${target.status}`;
   return `Please submit your Cadmus timesheet for the week of ${formatShortDate(target.week)}. The current status ${statusText}. Project: ${target.project}.`;
@@ -2061,12 +2139,69 @@ function summarizeByBranch(profiles, reports, reportHours) {
     .sort((a, b) => b.hours - a.hours || a.label.localeCompare(b.label));
 }
 
+function summarizeByDivision(profiles, reports, reportHours) {
+  const profileMap = new Map(profiles.map((profile) => [profile.id, profile]));
+  const totals = new Map();
+  for (const report of reports) {
+    const division = profileMap.get(report.user_id)?.division || "Unassigned";
+    totals.set(division, (totals.get(division) || 0) + Number(reportHours.get(report.id) || 0));
+  }
+  return [...totals.entries()]
+    .map(([label, hours]) => ({ label, hours }))
+    .sort((a, b) => b.hours - a.hours || a.label.localeCompare(b.label));
+}
+
+function summarizeByManager(reports, reportHours) {
+  const totals = new Map();
+  for (const report of reports) {
+    const manager = getManager(report.manager_id);
+    const label = manager?.manager_name || manager?.manager_email || "Unassigned";
+    totals.set(label, (totals.get(label) || 0) + Number(reportHours.get(report.id) || 0));
+  }
+  return [...totals.entries()]
+    .map(([label, hours]) => ({ label, hours }))
+    .sort((a, b) => b.hours - a.hours || a.label.localeCompare(b.label));
+}
+
+function summarizeByTask(days) {
+  const totals = new Map();
+  for (const day of days) {
+    const task = getTask(day.task_id);
+    const label = task ? taskLabel(task) : "Unassigned";
+    const current = totals.get(label) || { hours: 0, count: 0 };
+    current.hours += Number(day.hours || 0);
+    current.count += Number(day.hours || 0) > 0 ? 1 : 0;
+    totals.set(label, current);
+  }
+  return [...totals.entries()]
+    .map(([label, value]) => ({ label, hours: value.hours, count: value.count }))
+    .sort((a, b) => b.hours - a.hours || a.label.localeCompare(b.label));
+}
+
 function portfolioSelectedWeek() {
   return els.portfolioWeek.value ? toDateInput(startOfWeek(parseLocalDate(els.portfolioWeek.value))) : toDateInput(app.weekStart);
 }
 
 function isPortfolioWeekPastDue(weekStart) {
   return new Date() > addDays(parseLocalDate(weekStart), 4);
+}
+
+function isLateSubmission(report) {
+  if (!report.submitted_at) return false;
+  return new Date(report.submitted_at) > endOfPortfolioDueDate(report.week_start);
+}
+
+function endOfPortfolioDueDate(weekStart) {
+  const dueDate = addDays(parseLocalDate(weekStart), 4);
+  dueDate.setHours(23, 59, 59, 999);
+  return dueDate;
+}
+
+function daysSince(value) {
+  if (!value) return 0;
+  const then = typeof value === "string" ? new Date(value) : value;
+  if (Number.isNaN(then.getTime())) return 0;
+  return Math.max(0, Math.floor((Date.now() - then.getTime()) / 86400000));
 }
 
 async function loadMissingTimesheets() {
