@@ -13,8 +13,7 @@ create table if not exists public.timesheet_projects (
 alter table public.timesheet_projects
   add column if not exists reporting_formats text[] not null default array['weekly_grid'];
 
-create unique index if not exists timesheet_projects_code_idx
-  on public.timesheet_projects (code);
+drop index if exists public.timesheet_projects_code_idx;
 
 create table if not exists public.timesheet_project_managers (
   id uuid primary key default gen_random_uuid(),
@@ -204,12 +203,43 @@ create index if not exists timesheet_weekly_reports_user_week_idx
 create index if not exists timesheet_weekly_reports_manager_idx
   on public.timesheet_weekly_reports (manager_id, status, week_start);
 
+create index if not exists timesheet_weekly_reports_project_id_idx
+  on public.timesheet_weekly_reports (project_id);
+
+create index if not exists timesheet_weekly_reports_reviewed_by_idx
+  on public.timesheet_weekly_reports (reviewed_by);
+
 create index if not exists timesheet_report_audit_report_idx
   on public.timesheet_report_audit (weekly_report_id, created_at desc);
+
+create index if not exists timesheet_report_audit_actor_id_idx
+  on public.timesheet_report_audit (actor_id);
+
+create index if not exists timesheet_daily_reports_task_id_idx
+  on public.timesheet_daily_reports (task_id);
+
+create index if not exists timesheet_entries_project_id_idx
+  on public.timesheet_entries (project_id);
+
+create index if not exists timesheet_invitations_project_id_idx
+  on public.timesheet_invitations (project_id);
+
+create index if not exists timesheet_invitations_manager_id_idx
+  on public.timesheet_invitations (manager_id);
+
+create index if not exists timesheet_invitations_invited_by_idx
+  on public.timesheet_invitations (invited_by);
+
+create index if not exists timesheet_profiles_project_id_idx
+  on public.timesheet_profiles (project_id);
+
+create index if not exists timesheet_profiles_manager_id_idx
+  on public.timesheet_profiles (manager_id);
 
 create or replace function public.set_timesheet_updated_at()
 returns trigger
 language plpgsql
+set search_path = public
 as $$
 begin
   new.updated_at = now();
@@ -284,6 +314,9 @@ create trigger set_timesheet_daily_reports_updated_at
 before update on public.timesheet_daily_reports
 for each row
 execute function public.set_timesheet_updated_at();
+
+revoke execute on function public.set_timesheet_updated_at() from public, anon, authenticated;
+revoke execute on function public.set_timesheet_profile_role() from public, anon, authenticated;
 
 alter table public.timesheet_projects enable row level security;
 alter table public.timesheet_project_managers enable row level security;
