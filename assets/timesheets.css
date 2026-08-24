@@ -487,6 +487,20 @@ select option { color: #111418; }
   overflow-wrap: anywhere;
 }
 
+body.light-mode .profile-summary div {
+  border-color: rgba(21, 24, 29, 0.12);
+  background: rgba(21, 24, 29, 0.035);
+}
+
+body.light-mode .profile-summary span {
+  color: rgba(21, 24, 29, 0.58);
+}
+
+body.light-mode .profile-summary strong,
+body.light-mode .user-chip {
+  color: var(--paper);
+}
+
 .summary-grid {
   display: grid;
   grid-column: 1 / -1;
