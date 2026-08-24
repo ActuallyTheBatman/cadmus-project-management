@@ -43,6 +43,10 @@ const app = {
     missing: [],
     approvals: [],
   },
+  reviewQueue: {
+    reports: [],
+    daysByReport: new Map(),
+  },
   report: null,
   reportAudits: [],
   dailyReports: [],
@@ -1338,6 +1342,7 @@ async function loadPortfolio() {
   els.portfolioList.innerHTML = `<div class="empty-state"><p>Loading portfolio reports...</p></div>`;
   await loadPortfolioDashboard();
   if (els.portfolioStatus.value === "missing") {
+    app.reviewQueue = { reports: [], daysByReport: new Map() };
     els.reviewQueueSummary.innerHTML = "";
     await loadMissingTimesheets();
     return;
@@ -1364,12 +1369,14 @@ async function loadPortfolio() {
 
   const { data: reports, error } = await query;
   if (error) {
+    app.reviewQueue = { reports: [], daysByReport: new Map() };
     els.reviewQueueSummary.innerHTML = "";
     els.portfolioList.innerHTML = `<div class="empty-state"><p>${escapeHtml(error.message)}</p></div>`;
     return;
   }
 
   if (!reports || reports.length === 0) {
+    app.reviewQueue = { reports: [], daysByReport: new Map() };
     els.reviewQueueSummary.innerHTML = "";
     els.portfolioList.innerHTML = `<div class="empty-state"><p>No reports match this view.</p></div>`;
     return;
@@ -1386,6 +1393,7 @@ async function loadPortfolio() {
   const profileMap = new Map((profiles || []).map((profile) => [profile.id, profile]));
   const daysByReport = groupBy(days || [], "weekly_report_id");
   const auditsByReport = groupBy(audits || [], "weekly_report_id");
+  app.reviewQueue = { reports, daysByReport };
   renderReviewQueueSummary(reports, daysByReport);
   els.portfolioList.innerHTML = "";
 
@@ -1398,14 +1406,11 @@ function renderReviewQueueSummary(reports, daysByReport) {
   const statusCounts = countBy(reports, "status");
   const submitted = reports.filter((report) => report.status === "submitted");
   const stale = submitted.filter(isStaleSubmittedReport);
+  const clean = submitted.filter((report) => isCleanSubmittedReport(report, daysByReport.get(report.id) || []));
   const totalHours = reports.reduce((sum, report) => {
     const days = daysByReport.get(report.id) || [];
     return sum + days.reduce((daySum, day) => daySum + Number(day.hours || 0), 0);
   }, 0);
-  const oldest = submitted
-    .map((report) => report.submitted_at)
-    .filter(Boolean)
-    .sort()[0];
 
   els.reviewQueueSummary.innerHTML = `
     <div class="queue-head">
@@ -1413,17 +1418,22 @@ function renderReviewQueueSummary(reports, daysByReport) {
         <h3>Review Queue</h3>
         <p>${escapeHtml(reviewQueueScopeLabel())}</p>
       </div>
-      <span class="status-pill ${stale.length ? "rejected" : "approved"}">${stale.length ? `${stale.length} stale` : "current"}</span>
+      <div class="ops-actions">
+        <button class="button small-button" type="button" data-approve-clean ${clean.length ? "" : "disabled"}>Approve Clean</button>
+        <span class="status-pill ${stale.length ? "rejected" : "approved"}">${stale.length ? `${stale.length} stale` : "current"}</span>
+      </div>
     </div>
     <div class="queue-metric-grid">
       ${queueMetric("Loaded", reports.length, "Reports in this view")}
       ${queueMetric("Submitted", statusCounts.submitted || 0, "Awaiting manager action")}
+      ${queueMetric("Clean", clean.length, "Eligible for guarded approval")}
       ${queueMetric("Stale", stale.length, "Submitted 3+ days ago")}
       ${queueMetric("Approved", statusCounts.approved || 0, "Locked reports")}
       ${queueMetric("Hours", `${formatHours(totalHours)}h`, "Total loaded report hours")}
-      ${queueMetric("Oldest", oldest ? formatShortDate(oldest) : "-", "Oldest pending submission")}
     </div>
   `;
+
+  els.reviewQueueSummary.querySelector("[data-approve-clean]")?.addEventListener("click", approveCleanSubmittedReports);
 }
 
 function reviewQueueScopeLabel() {
@@ -1441,6 +1451,13 @@ function queueMetric(label, value, helper) {
       <p>${escapeHtml(helper)}</p>
     </div>
   `;
+}
+
+function isCleanSubmittedReport(report, days) {
+  if (report.status !== "submitted" || isStaleSubmittedReport(report)) return false;
+  const totalHours = days.reduce((sum, day) => sum + Number(day.hours || 0), 0);
+  const hasBlockers = days.some((day) => String(day.blockers || "").trim());
+  return totalHours > 0 && !hasBlockers;
 }
 
 async function exportAuditHistory() {
@@ -2050,6 +2067,52 @@ async function reviewReport(reportId, status, notes = "") {
 
   await logTimesheetAudit(reportId, status === "approved" ? "approved" : "rejected", trimmedNotes);
   await loadPortfolio();
+}
+
+async function approveCleanSubmittedReports() {
+  const { reports, daysByReport } = app.reviewQueue;
+  const cleanReports = reports.filter((report) => isCleanSubmittedReport(report, daysByReport.get(report.id) || []));
+  if (!cleanReports.length) {
+    showPortfolioNotice("No clean submitted reports are eligible for bulk approval.");
+    return;
+  }
+
+  const confirmed = window.confirm(`Approve ${cleanReports.length} clean submitted report${cleanReports.length === 1 ? "" : "s"} in the current queue? Stale reports, reports with blockers, and zero-hour reports will be skipped.`);
+  if (!confirmed) return;
+
+  let approved = 0;
+  const failed = [];
+  for (const report of cleanReports) {
+    const { data, error } = await app.supabase
+      .from("timesheet_weekly_reports")
+      .update({
+        status: "approved",
+        manager_notes: report.manager_notes || null,
+        reviewed_by: app.user.id,
+        reviewer_email: app.user.email,
+        reviewed_at: new Date().toISOString(),
+      })
+      .eq("id", report.id)
+      .eq("status", "submitted")
+      .select("id")
+      .maybeSingle();
+
+    if (error || !data) {
+      failed.push(error?.message || "Report was no longer submitted.");
+      continue;
+    }
+
+    await logTimesheetAudit(report.id, "approved", "Bulk approved: clean submitted report.");
+    approved += 1;
+  }
+
+  await loadPortfolio();
+  if (failed.length) {
+    showPortfolioNotice(`Approved ${approved}; ${failed.length} failed. ${failed.slice(0, 2).join(" | ")}`, true);
+    return;
+  }
+
+  showPortfolioNotice(`Approved ${approved} clean submitted report${approved === 1 ? "" : "s"}.`);
 }
 
 async function renderAdminConsole() {
