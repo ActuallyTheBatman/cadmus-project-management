@@ -177,7 +177,12 @@ exception
 end;
 $$;
 
-create or replace function public.current_user_role()
+create schema if not exists timesheet_private;
+revoke all on schema timesheet_private from public;
+revoke all on schema timesheet_private from anon;
+grant usage on schema timesheet_private to authenticated;
+
+create or replace function timesheet_private.current_user_role()
 returns text
 language sql
 stable
@@ -187,7 +192,7 @@ as $$
   select coalesce((select role from public.timesheet_profiles where id = auth.uid()), 'resource')
 $$;
 
-create or replace function public.current_user_email()
+create or replace function timesheet_private.current_user_email()
 returns text
 language sql
 stable
@@ -196,6 +201,11 @@ set search_path = public
 as $$
   select coalesce((select email from public.timesheet_profiles where id = auth.uid()), auth.email())
 $$;
+
+revoke execute on function timesheet_private.current_user_role() from public, anon;
+revoke execute on function timesheet_private.current_user_email() from public, anon;
+grant execute on function timesheet_private.current_user_role() to authenticated;
+grant execute on function timesheet_private.current_user_email() to authenticated;
 
 create index if not exists timesheet_weekly_reports_user_week_idx
   on public.timesheet_weekly_reports (user_id, week_start);
@@ -251,12 +261,12 @@ create or replace function public.set_timesheet_profile_role()
 returns trigger
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, timesheet_private
 as $$
 declare
   invited_role text;
 begin
-  if tg_op = 'UPDATE' and public.current_user_role() = 'admin' and new.role is distinct from old.role then
+  if tg_op = 'UPDATE' and timesheet_private.current_user_role() = 'admin' and new.role is distinct from old.role then
     new.role = new.role;
   elsif exists (select 1 from public.timesheet_admin_emails a where lower(a.email) = lower(new.email)) then
     new.role = 'admin';
@@ -343,8 +353,8 @@ create policy "Admins can manage projects"
 on public.timesheet_projects
 for all
 to authenticated
-using (public.current_user_role() = 'admin')
-with check (public.current_user_role() = 'admin');
+using (timesheet_private.current_user_role() = 'admin')
+with check (timesheet_private.current_user_role() = 'admin');
 
 drop policy if exists "Authenticated users can read active project managers" on public.timesheet_project_managers;
 create policy "Authenticated users can read active project managers"
@@ -358,24 +368,24 @@ create policy "Admins can manage project managers"
 on public.timesheet_project_managers
 for all
 to authenticated
-using (public.current_user_role() = 'admin')
-with check (public.current_user_role() = 'admin');
+using (timesheet_private.current_user_role() = 'admin')
+with check (timesheet_private.current_user_role() = 'admin');
 
 drop policy if exists "Admins can manage admin emails" on public.timesheet_admin_emails;
 create policy "Admins can manage admin emails"
 on public.timesheet_admin_emails
 for all
 to authenticated
-using (public.current_user_role() = 'admin')
-with check (public.current_user_role() = 'admin');
+using (timesheet_private.current_user_role() = 'admin')
+with check (timesheet_private.current_user_role() = 'admin');
 
 drop policy if exists "Admins can manage invitations" on public.timesheet_invitations;
 create policy "Admins can manage invitations"
 on public.timesheet_invitations
 for all
 to authenticated
-using (public.current_user_role() = 'admin')
-with check (public.current_user_role() = 'admin');
+using (timesheet_private.current_user_role() = 'admin')
+with check (timesheet_private.current_user_role() = 'admin');
 
 drop policy if exists "Invited users can read their own invitations" on public.timesheet_invitations;
 create policy "Invited users can read their own invitations"
@@ -404,8 +414,8 @@ create policy "Admins can manage branches"
 on public.timesheet_branches
 for all
 to authenticated
-using (public.current_user_role() = 'admin')
-with check (public.current_user_role() = 'admin');
+using (timesheet_private.current_user_role() = 'admin')
+with check (timesheet_private.current_user_role() = 'admin');
 
 drop policy if exists "Authenticated users can read active divisions" on public.timesheet_divisions;
 create policy "Authenticated users can read active divisions"
@@ -419,8 +429,8 @@ create policy "Admins can manage divisions"
 on public.timesheet_divisions
 for all
 to authenticated
-using (public.current_user_role() = 'admin')
-with check (public.current_user_role() = 'admin');
+using (timesheet_private.current_user_role() = 'admin')
+with check (timesheet_private.current_user_role() = 'admin');
 
 drop policy if exists "Authenticated users can read active tasks" on public.timesheet_tasks;
 create policy "Authenticated users can read active tasks"
@@ -434,8 +444,8 @@ create policy "Admins can manage tasks"
 on public.timesheet_tasks
 for all
 to authenticated
-using (public.current_user_role() = 'admin')
-with check (public.current_user_role() = 'admin');
+using (timesheet_private.current_user_role() = 'admin')
+with check (timesheet_private.current_user_role() = 'admin');
 
 drop policy if exists "Users can insert their own profile" on public.timesheet_profiles;
 create policy "Users can insert their own profile"
@@ -451,14 +461,14 @@ for select
 to authenticated
 using (
   auth.uid() = id
-  or public.current_user_role() = 'admin'
+  or timesheet_private.current_user_role() = 'admin'
   or (
-    public.current_user_role() = 'manager'
+    timesheet_private.current_user_role() = 'manager'
     and exists (
       select 1
       from public.timesheet_project_managers m
       where m.id = timesheet_profiles.manager_id
-        and lower(m.manager_email) = lower(public.current_user_email())
+        and lower(m.manager_email) = lower(timesheet_private.current_user_email())
     )
   )
 );
@@ -468,9 +478,9 @@ create policy "Users can update their own profile"
 on public.timesheet_profiles
 for update
 to authenticated
-using (auth.uid() = id or public.current_user_role() = 'admin')
+using (auth.uid() = id or timesheet_private.current_user_role() = 'admin')
 with check (
-  public.current_user_role() = 'admin'
+  timesheet_private.current_user_role() = 'admin'
   or auth.uid() = id
 );
 
@@ -510,14 +520,14 @@ for select
 to authenticated
 using (
   auth.uid() = user_id
-  or public.current_user_role() = 'admin'
+  or timesheet_private.current_user_role() = 'admin'
   or (
-    public.current_user_role() = 'manager'
+    timesheet_private.current_user_role() = 'manager'
     and exists (
       select 1
       from public.timesheet_project_managers m
       where m.id = timesheet_weekly_reports.manager_id
-        and lower(m.manager_email) = lower(public.current_user_email())
+        and lower(m.manager_email) = lower(timesheet_private.current_user_email())
     )
   )
 );
@@ -550,22 +560,22 @@ on public.timesheet_weekly_reports
 for update
 to authenticated
 using (
-  public.current_user_role() = 'admin'
+  timesheet_private.current_user_role() = 'admin'
   or (
-    public.current_user_role() = 'manager'
+    timesheet_private.current_user_role() = 'manager'
     and exists (
       select 1
       from public.timesheet_project_managers m
       where m.id = timesheet_weekly_reports.manager_id
-        and lower(m.manager_email) = lower(public.current_user_email())
+        and lower(m.manager_email) = lower(timesheet_private.current_user_email())
     )
   )
 )
 with check (
   status in ('approved', 'rejected', 'submitted')
   and (
-    public.current_user_role() = 'admin'
-    or public.current_user_role() = 'manager'
+    timesheet_private.current_user_role() = 'admin'
+    or timesheet_private.current_user_role() = 'manager'
   )
 );
 
@@ -581,14 +591,14 @@ using (
     where w.id = timesheet_daily_reports.weekly_report_id
       and (
         w.user_id = auth.uid()
-        or public.current_user_role() = 'admin'
+        or timesheet_private.current_user_role() = 'admin'
         or (
-          public.current_user_role() = 'manager'
+          timesheet_private.current_user_role() = 'manager'
           and exists (
             select 1
             from public.timesheet_project_managers m
             where m.id = w.manager_id
-              and lower(m.manager_email) = lower(public.current_user_email())
+              and lower(m.manager_email) = lower(timesheet_private.current_user_email())
           )
         )
       )
@@ -661,14 +671,14 @@ using (
     where w.id = timesheet_report_audit.weekly_report_id
       and (
         w.user_id = auth.uid()
-        or public.current_user_role() = 'admin'
+        or timesheet_private.current_user_role() = 'admin'
         or (
-          public.current_user_role() = 'manager'
+          timesheet_private.current_user_role() = 'manager'
           and exists (
             select 1
             from public.timesheet_project_managers m
             where m.id = w.manager_id
-              and lower(m.manager_email) = lower(public.current_user_email())
+              and lower(m.manager_email) = lower(timesheet_private.current_user_email())
           )
         )
       )
@@ -688,19 +698,22 @@ with check (
     where w.id = timesheet_report_audit.weekly_report_id
       and (
         w.user_id = auth.uid()
-        or public.current_user_role() = 'admin'
+        or timesheet_private.current_user_role() = 'admin'
         or (
-          public.current_user_role() = 'manager'
+          timesheet_private.current_user_role() = 'manager'
           and exists (
             select 1
             from public.timesheet_project_managers m
             where m.id = w.manager_id
-              and lower(m.manager_email) = lower(public.current_user_email())
+              and lower(m.manager_email) = lower(timesheet_private.current_user_email())
           )
         )
       )
   )
 );
+
+drop function if exists public.current_user_role();
+drop function if exists public.current_user_email();
 
 insert into public.timesheet_projects (name, code, client, reporting_formats)
 values
