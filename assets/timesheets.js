@@ -93,6 +93,7 @@ const els = {
   reportFormat: document.querySelector("#reportFormat"),
   reportFormatTitle: document.querySelector("#reportFormatTitle"),
   dailyGrid: document.querySelector("#dailyGrid"),
+  qualityPanel: document.querySelector("#qualityPanel"),
   appMessage: document.querySelector("#appMessage"),
   totalHours: document.querySelector("#totalHours"),
   reportStatus: document.querySelector("#reportStatus"),
@@ -305,6 +306,7 @@ function bindEvents() {
     app.reportFormat = els.reportFormat.value;
     renderDailyReports();
   });
+  els.dailyGrid.addEventListener("input", renderQualityPanel);
   els.refreshPortfolio.addEventListener("click", loadPortfolio);
   els.exportAudit.addEventListener("click", exportAuditHistory);
   els.portfolioStatus.addEventListener("change", loadPortfolio);
@@ -851,6 +853,7 @@ function renderDailyReports() {
   els.withdrawWeek.classList.toggle("hidden", !canWithdraw);
   els.withdrawWeek.disabled = !canWithdraw;
   updateTotalsFromDom();
+  renderQualityPanel();
 }
 
 function renderReportLifecycle({ locked }) {
@@ -1146,6 +1149,16 @@ async function saveWeek(targetStatus) {
     return;
   }
 
+  if (targetStatus === "submitted") {
+    const quality = buildQualityChecks(dailyPayload.rows);
+    renderQualityPanel(quality);
+    const blockers = quality.items.filter((item) => item.level === "error");
+    if (blockers.length) {
+      setMessage(els.appMessage, "Resolve the quality checks before submitting.", true);
+      return;
+    }
+  }
+
   setMessage(els.appMessage, targetStatus === "submitted" ? "Submitting week..." : "Saving draft...");
   const reportPayload = {
     id: app.report?.id || crypto.randomUUID(),
@@ -1303,6 +1316,92 @@ function collectDailyReports(targetStatus = "draft") {
   }
 
   return { rows };
+}
+
+function renderQualityPanel(existingQuality = null) {
+  if (!els.qualityPanel || !app.profile) return;
+  const locked = app.report && ["submitted", "approved"].includes(app.report.status);
+  if (locked) {
+    els.qualityPanel.innerHTML = "";
+    return;
+  }
+
+  const dailyPayload = collectDailyReports("draft");
+  if (dailyPayload.error) {
+    els.qualityPanel.innerHTML = qualityPanelHtml({
+      score: "Needs attention",
+      tone: "error",
+      items: [{ level: "error", title: dailyPayload.error, detail: "Fix this before saving or submitting." }],
+    });
+    return;
+  }
+
+  const quality = existingQuality || buildQualityChecks(dailyPayload.rows);
+  els.qualityPanel.innerHTML = qualityPanelHtml(quality);
+}
+
+function buildQualityChecks(rows) {
+  const items = [];
+  const activeRows = rows.filter((row) => Number(row.hours || 0) > 0);
+  const totalHours = activeRows.reduce((sum, row) => sum + Number(row.hours || 0), 0);
+  const dayTotals = new Map();
+  for (const row of rows) {
+    dayTotals.set(row.day_index, (dayTotals.get(row.day_index) || 0) + Number(row.hours || 0));
+  }
+
+  if (totalHours <= 0) {
+    items.push({ level: "error", title: "No hours entered", detail: "Enter time before submitting the week." });
+  }
+
+  for (const row of activeRows) {
+    const day = weekdays[row.day_index] || "Day";
+    if (!row.task_id) {
+      items.push({ level: "error", title: `${day}: missing task code`, detail: "Choose a configured task for every row with hours." });
+    }
+    if (!row.accomplishments || row.accomplishments.length < 12) {
+      items.push({ level: "warning", title: `${day}: thin accomplishment note`, detail: "Add enough context for a manager or auditor to understand the work." });
+    }
+    if (row.blockers && !row.next_steps) {
+      items.push({ level: "warning", title: `${day}: blocker needs next step`, detail: "Add what happens next so managers can act on the blocker." });
+    }
+  }
+
+  for (const [dayIndex, total] of dayTotals.entries()) {
+    if (total > 12) {
+      items.push({ level: "warning", title: `${weekdays[dayIndex]} has ${formatHours(total)} hours`, detail: "High day totals are allowed, but should be intentional." });
+    }
+  }
+
+  if (app.report?.status === "rejected" && app.report.manager_notes) {
+    items.push({ level: "warning", title: "Previously sent back", detail: app.report.manager_notes });
+  }
+
+  const errors = items.filter((item) => item.level === "error").length;
+  const warnings = items.filter((item) => item.level === "warning").length;
+  return {
+    score: errors ? "Needs attention" : warnings ? "Review suggested" : "Ready to submit",
+    tone: errors ? "error" : warnings ? "warning" : "ok",
+    items,
+  };
+}
+
+function qualityPanelHtml(quality) {
+  const statusClass = quality.tone === "error" ? "rejected" : quality.tone === "warning" ? "submitted" : "approved";
+  return `
+    <div class="quality-head ${escapeHtml(quality.tone)}">
+      <div>
+        <h3>Pre-submit Checks</h3>
+        <p>${escapeHtml(quality.score)}</p>
+      </div>
+      <span class="status-pill ${statusClass}">${quality.items.length ? `${quality.items.length} item${quality.items.length === 1 ? "" : "s"}` : "clear"}</span>
+    </div>
+    ${quality.items.length ? `<ul class="quality-list">${quality.items.map((item) => `
+      <li class="${escapeHtml(item.level)}">
+        <strong>${escapeHtml(item.title)}</strong>
+        <span>${escapeHtml(item.detail)}</span>
+      </li>
+    `).join("")}</ul>` : ""}
+  `;
 }
 
 async function logTimesheetAudit(reportId, action, notes = "") {

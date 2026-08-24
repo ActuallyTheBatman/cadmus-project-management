@@ -824,6 +824,76 @@ select option { color: #111418; }
   padding: 18px;
 }
 
+.quality-panel {
+  display: grid;
+  gap: 10px;
+  padding: 0 18px 18px;
+}
+
+.quality-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  border: 1px solid rgba(143, 227, 193, 0.22);
+  border-radius: var(--radius);
+  padding: 14px;
+  background: rgba(143, 227, 193, 0.045);
+}
+
+.quality-head.warning {
+  border-color: rgba(242, 217, 138, 0.32);
+  background: rgba(242, 217, 138, 0.045);
+}
+
+.quality-head.error {
+  border-color: rgba(255, 113, 95, 0.36);
+  background: rgba(255, 113, 95, 0.05);
+}
+
+.quality-head h3 {
+  font-size: 14px;
+  text-transform: uppercase;
+}
+
+.quality-head p {
+  margin-top: 4px;
+  color: rgba(245, 241, 232, 0.66);
+  font-size: 13px;
+}
+
+.quality-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.quality-list li {
+  display: grid;
+  gap: 3px;
+  border-left: 3px solid rgba(242, 217, 138, 0.7);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.024);
+}
+
+.quality-list li.error {
+  border-left-color: var(--signal);
+}
+
+.quality-list strong {
+  color: var(--paper);
+  font-size: 13px;
+}
+
+.quality-list span {
+  color: rgba(245, 241, 232, 0.64);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .admin-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1295,7 +1365,8 @@ footer {
   .review-head,
   .lifecycle-head,
   .ops-summary-head,
-  .queue-head {
+  .queue-head,
+  .quality-head {
     align-items: flex-start;
     flex-direction: column;
   }
