@@ -26,6 +26,10 @@ const app = {
   pendingInvite: null,
   adminProjectFocus: "all",
   passwordRecovery: false,
+  portfolioReminderTargets: {
+    missing: [],
+    approvals: [],
+  },
   report: null,
   reportAudits: [],
   dailyReports: [],
@@ -1405,6 +1409,7 @@ function renderPortfolioDashboard({ selectedWeek, selectedProjectId, profiles, r
   const reportByUser = new Map(reports.map((report) => [report.user_id, report]));
   const daysByReport = groupBy(days, "weekly_report_id");
   const missingProfiles = profiles.filter((profile) => !reportByUser.has(profile.id) || ["draft", "rejected"].includes(reportByUser.get(profile.id)?.status));
+  const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
   const statusCounts = countBy(reports, "status");
   const totalHours = days.reduce((sum, day) => sum + Number(day.hours || 0), 0);
   const pendingApproval = statusCounts.submitted || 0;
@@ -1419,6 +1424,12 @@ function renderPortfolioDashboard({ selectedWeek, selectedProjectId, profiles, r
   const projectBreakdown = summarizeByProject(reports, reportHours);
   const branchBreakdown = summarizeByBranch(profiles, reports, reportHours);
   const projectLabelText = selectedProjectId === "all" ? "All projects" : projectLabel(getProject(selectedProjectId));
+  app.portfolioReminderTargets = {
+    missing: missingProfiles.map((profile) => buildMissingReminderTarget(profile, reportByUser.get(profile.id), selectedWeek)),
+    approvals: reports
+      .filter((report) => report.status === "submitted")
+      .map((report) => buildApprovalReminderTarget(report, profileById.get(report.user_id), reportHours.get(report.id) || 0)),
+  };
 
   els.portfolioDashboard.innerHTML = `
     <div class="ops-summary-head">
@@ -1426,7 +1437,11 @@ function renderPortfolioDashboard({ selectedWeek, selectedProjectId, profiles, r
         <h3>Operations Summary</h3>
         <p>${escapeHtml(projectLabelText)} - week of ${escapeHtml(formatShortDate(selectedWeek))}</p>
       </div>
-      <span class="status-pill ${overdueCount ? "rejected" : "approved"}">${overdueCount ? `${overdueCount} late` : "on track"}</span>
+      <div class="ops-actions">
+        <span class="status-pill ${overdueCount ? "rejected" : "approved"}">${overdueCount ? `${overdueCount} late` : "on track"}</span>
+        <button class="button small-button" type="button" data-export-reminders="missing" ${app.portfolioReminderTargets.missing.length ? "" : "disabled"}>Export Missing</button>
+        <button class="button small-button" type="button" data-export-reminders="approvals" ${app.portfolioReminderTargets.approvals.length ? "" : "disabled"}>Export Approvals</button>
+      </div>
     </div>
     <div class="ops-metric-grid">
       ${opsMetric("Submission Rate", `${submissionRate}%`, `${submitted} of ${profiles.length} submitted or approved`)}
@@ -1441,6 +1456,101 @@ function renderPortfolioDashboard({ selectedWeek, selectedProjectId, profiles, r
       ${opsBreakdown("Branch Coverage", branchBreakdown, "No branch activity yet.")}
     </div>
   `;
+
+  for (const button of els.portfolioDashboard.querySelectorAll("[data-export-reminders]")) {
+    button.addEventListener("click", () => exportReminderTargets(button.dataset.exportReminders));
+  }
+}
+
+function buildMissingReminderTarget(profile, report, selectedWeek) {
+  return {
+    name: profile.full_name || "Unnamed resource",
+    email: profile.email || "",
+    status: report?.status || "missing",
+    week: selectedWeek,
+    project: projectLabel(getProject(profile.project_id)),
+    manager: getManager(profile.manager_id)?.manager_name || "",
+    manager_email: getManager(profile.manager_id)?.manager_email || "",
+    branch: profile.branch || "",
+    division: profile.division || "",
+  };
+}
+
+function buildApprovalReminderTarget(report, profile, hours) {
+  const manager = getManager(report.manager_id);
+  return {
+    name: manager?.manager_name || "Project Manager",
+    email: manager?.manager_email || "",
+    status: "pending approval",
+    week: report.week_start,
+    project: projectLabel(getProject(report.project_id)),
+    resource: profile?.full_name || profile?.email || "Unknown resource",
+    resource_email: profile?.email || "",
+    hours,
+    submitted_at: report.submitted_at || "",
+  };
+}
+
+function exportReminderTargets(type) {
+  const targets = app.portfolioReminderTargets[type] || [];
+  if (!targets.length) return;
+
+  const rows = type === "approvals"
+    ? [["Manager", "Manager Email", "Resource", "Resource Email", "Week", "Project", "Hours", "Status", "Submitted", "Suggested Message"]]
+    : [["Resource", "Email", "Week", "Project", "Manager", "Manager Email", "Branch", "Division", "Status", "Suggested Message"]];
+
+  for (const target of targets) {
+    if (type === "approvals") {
+      rows.push([
+        target.name,
+        target.email,
+        target.resource,
+        target.resource_email,
+        target.week,
+        target.project,
+        formatHours(target.hours),
+        target.status,
+        target.submitted_at,
+        approvalReminderMessage(target),
+      ]);
+    } else {
+      rows.push([
+        target.name,
+        target.email,
+        target.week,
+        target.project,
+        target.manager,
+        target.manager_email,
+        target.branch,
+        target.division,
+        target.status,
+        missingReminderMessage(target),
+      ]);
+    }
+  }
+
+  const csv = rows.map((row) => row.map(csvCell).join(",")).join("\n");
+  downloadCsv(csv, `cadmus-${type}-reminders-${portfolioSelectedWeek()}.csv`);
+}
+
+function missingReminderMessage(target) {
+  const statusText = target.status === "missing" ? "has not been submitted" : `is currently ${target.status}`;
+  return `Please submit your Cadmus timesheet for the week of ${formatShortDate(target.week)}. The current status ${statusText}. Project: ${target.project}.`;
+}
+
+function approvalReminderMessage(target) {
+  return `Please review ${target.resource}'s Cadmus timesheet for the week of ${formatShortDate(target.week)}. It is pending approval for ${target.project} with ${formatHours(target.hours)} reported hours.`;
+}
+
+function openMissingReminder(profile, report, selectedWeek) {
+  const target = buildMissingReminderTarget(profile, report, selectedWeek);
+  if (!target.email) return;
+  const subject = `Cadmus timesheet reminder - week of ${formatShortDate(selectedWeek)}`;
+  window.location.href = mailtoUrl(target.email, subject, missingReminderMessage(target));
+}
+
+function mailtoUrl(email, subject, body) {
+  return `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
 function opsMetric(label, value, helper) {
@@ -1538,6 +1648,7 @@ async function loadMissingTimesheets() {
   }
 
   const submittedUserIds = new Set((reports || []).filter((report) => ["submitted", "approved"].includes(report.status)).map((report) => report.user_id));
+  const reportByUser = new Map((reports || []).map((report) => [report.user_id, report]));
   const missing = (profiles || []).filter((profile) => !submittedUserIds.has(profile.id));
 
   if (!missing.length) {
@@ -1565,6 +1676,19 @@ async function loadMissingTimesheets() {
         ${reviewMeta("Manager", getManager(profile.manager_id)?.manager_name || "-")}
       </div>
     `;
+    const actions = document.createElement("div");
+    actions.className = "review-actions";
+    const buttons = document.createElement("div");
+    buttons.className = "toolbar";
+    const remind = document.createElement("button");
+    remind.className = "button small-button";
+    remind.type = "button";
+    remind.textContent = "Email Reminder";
+    remind.disabled = !profile.email;
+    remind.addEventListener("click", () => openMissingReminder(profile, reportByUser.get(profile.id), selectedWeek));
+    buttons.append(remind);
+    actions.append(buttons);
+    card.append(actions);
     els.portfolioList.append(card);
   }
 }

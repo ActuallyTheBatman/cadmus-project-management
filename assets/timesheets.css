@@ -671,6 +671,14 @@ select option { color: #111418; }
   line-height: 1.45;
 }
 
+.ops-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .ops-metric-grid {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
@@ -1090,6 +1098,7 @@ footer {
   }
 
   .nav-links,
+  .ops-actions,
   .toolbar { justify-content: flex-start; }
   .profile-grid,
   .admin-grid,
