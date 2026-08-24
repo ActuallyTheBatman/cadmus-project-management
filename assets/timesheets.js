@@ -2529,13 +2529,7 @@ function renderAdminLists() {
   renderDomainAdminList();
   const managers = filterByFocusedProject(app.managers);
   const tasks = filterByFocusedProject(app.tasks);
-  renderAdminList(
-    els.managerList,
-    managers,
-    (manager) => manager.manager_name,
-    (manager) => `${projectLabel(getProject(manager.project_id))} - ${manager.manager_email}`,
-    (manager) => deactivateAdminItem("timesheet_project_managers", manager.id, "Resource manager removed."),
-  );
+  renderManagerAdminList(managers);
   renderAdminList(
     els.branchList,
     app.branches,
@@ -2650,6 +2644,45 @@ async function renderAdminExceptions() {
   for (const group of groups) {
     els.adminExceptions.append(renderExceptionGroup(group));
   }
+}
+
+function renderManagerAdminList(managers) {
+  if (!managers.length) {
+    els.managerList.innerHTML = `<li class="admin-item"><span>No resource managers configured.</span></li>`;
+    return;
+  }
+
+  els.managerList.innerHTML = "";
+  for (const manager of managers) {
+    const profile = app.adminProfiles.find((user) => user.email.toLowerCase() === manager.manager_email.toLowerCase());
+    const hasAdminCapability = profile?.role === "admin";
+    const row = document.createElement("li");
+    row.className = "admin-item admin-item-stacked";
+    row.innerHTML = `
+      <div class="admin-item-main">
+        <div>
+          <strong>${escapeHtml(manager.manager_name)}</strong>
+          <span>${escapeHtml(`${projectLabel(getProject(manager.project_id))} - ${manager.manager_email}`)}</span>
+          <span class="admin-row-status" data-manager-capability-status>${escapeHtml(managerCapabilityLabel(profile))}</span>
+        </div>
+        <div class="toolbar compact">
+          ${profile ? `<button class="button small-button" type="button" data-toggle-admin>${hasAdminCapability ? "Remove Admin" : "Grant Admin"}</button>` : ""}
+          <button class="button danger small-button" type="button" data-remove-manager>Remove</button>
+        </div>
+      </div>
+    `;
+
+    const statusNode = row.querySelector("[data-manager-capability-status]");
+    row.querySelector("[data-remove-manager]").addEventListener("click", () => deactivateAdminItem("timesheet_project_managers", manager.id, "Resource manager removed."));
+    row.querySelector("[data-toggle-admin]")?.addEventListener("click", () => toggleManagerAdminCapability(manager, profile, statusNode));
+    els.managerList.append(row);
+  }
+}
+
+function managerCapabilityLabel(profile) {
+  if (!profile) return "No user profile yet - invite or first sign-in required";
+  if (profile.active === false) return `${roleLabel(profile.role)} - inactive account`;
+  return profile.role === "admin" ? "Portfolio Manager access enabled" : `${roleLabel(profile.role)} access`;
 }
 
 async function loadCurrentWeekMissingProfiles(activeProfiles) {
@@ -3089,6 +3122,41 @@ function populateDivisionOptionsForBranch(select, branchName, selectedValue = ""
     select.append(new Option(division.name, division.name));
   }
   select.value = selectedValue && divisions.some((division) => division.name === selectedValue) ? selectedValue : "";
+}
+
+async function toggleManagerAdminCapability(manager, profile, statusNode = null) {
+  if (!profile) return;
+  const nextRole = profile.role === "admin" ? "manager" : "admin";
+  if (!confirmManagedUserChange(profile, { role: nextRole })) return;
+
+  const actionLabel = nextRole === "admin" ? "Granting Portfolio Manager access..." : "Removing Portfolio Manager access...";
+  setMessage(els.adminMessage, actionLabel);
+  setRowStatus(statusNode, "Saving...");
+
+  const { error } = await app.supabase
+    .from("timesheet_profiles")
+    .update({ role: nextRole })
+    .eq("id", profile.id);
+
+  if (error) {
+    setRowStatus(statusNode, "Update failed", true);
+    setMessage(els.adminMessage, `Manager capability update failed: ${error.message}`, true);
+    return;
+  }
+
+  profile.role = nextRole;
+  await logAdminChange("updated", "user", profile.id, profile.full_name || profile.email, {
+    role: nextRole,
+    source: "resource_manager_admin_capability",
+    manager_id: manager.id,
+    manager_email: manager.manager_email,
+    project: projectLabel(getProject(manager.project_id)),
+  });
+  setRowStatus(statusNode, nextRole === "admin" ? "Portfolio Manager access enabled" : "Project Manager access");
+  setMessage(els.adminMessage, nextRole === "admin" ? "Portfolio Manager access granted." : "Portfolio Manager access removed.");
+  await loadAdminProfiles();
+  renderAdminLists();
+  await loadAndRenderAdminAudit();
 }
 
 async function updateManagedUser(userId, patch, statusNode = null) {
