@@ -13,9 +13,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Libre+Baskerville:wght@700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/timesheets.css?v=20260824-admin-audit">
-  <script src="/assets/timesheets-config.js?v=20260824-admin-audit"></script>
-  <script type="module" src="/assets/timesheets.js?v=20260824-admin-audit"></script>
+  <link rel="stylesheet" href="/assets/timesheets.css?v=20260824-invite-import">
+  <script src="/assets/timesheets-config.js?v=20260824-invite-import"></script>
+  <script type="module" src="/assets/timesheets.js?v=20260824-invite-import"></script>
 </head>
 <body>
   <nav class="nav" aria-label="Primary navigation">
@@ -336,19 +336,24 @@
 
             <form id="inviteForm" class="admin-card wide-card">
               <h3>Bulk Invitations</h3>
-              <label class="field"><span>Email list</span><textarea id="inviteEmails" placeholder="one.email@example.com&#10;two.email@example.com" required></textarea></label>
+              <label class="field"><span>Email list</span><textarea id="inviteEmails" placeholder="one.email@example.com&#10;two.email@example.com"></textarea></label>
+              <label class="field"><span>CSV import</span><textarea id="inviteCsv" placeholder="email,full_name,role,project,manager,branch,division&#10;ada@example.com,Ada Lovelace,resource,BENCON,Alex Morgan,Northern California,Project Controls"></textarea></label>
               <div class="profile-grid tight-grid">
                 <label class="field"><span>Tier</span><select id="inviteRole">
                   <option value="resource">Resource</option>
                   <option value="manager">Project Manager</option>
                   <option value="admin">Portfolio Manager</option>
                 </select></label>
-                <label class="field"><span>Project</span><select id="inviteProject" required></select></label>
+                <label class="field"><span>Project</span><select id="inviteProject"></select></label>
                 <label class="field"><span>Project Manager</span><select id="inviteManager"></select></label>
                 <label class="field"><span>Branch</span><select id="inviteBranch"></select></label>
                 <label class="field"><span>Division</span><select id="inviteDivision"></select></label>
               </div>
-              <button class="button primary" type="submit">Send Invitations</button>
+              <div id="inviteImportPreview" class="import-preview"></div>
+              <div class="toolbar">
+                <button id="validateInviteImport" class="button" type="button">Validate CSV</button>
+                <button class="button primary" type="submit">Send Invitations</button>
+              </div>
             </form>
           </div>
           <div class="panel-body">

@@ -140,6 +140,9 @@ const els = {
   adminUserProject: document.querySelector("#adminUserProject"),
   adminUserStatus: document.querySelector("#adminUserStatus"),
   inviteEmails: document.querySelector("#inviteEmails"),
+  inviteCsv: document.querySelector("#inviteCsv"),
+  validateInviteImport: document.querySelector("#validateInviteImport"),
+  inviteImportPreview: document.querySelector("#inviteImportPreview"),
   inviteRole: document.querySelector("#inviteRole"),
   inviteProject: document.querySelector("#inviteProject"),
   inviteManager: document.querySelector("#inviteManager"),
@@ -329,6 +332,7 @@ function bindEvents() {
     await renderAdminConsole();
   });
   els.inviteForm.addEventListener("submit", sendBulkInvitations);
+  els.validateInviteImport.addEventListener("click", validateInviteImport);
   els.inviteProject.addEventListener("change", populateInviteManagers);
   els.inviteBranch.addEventListener("change", populateInviteDivisions);
 }
@@ -549,7 +553,7 @@ async function loadPendingInvitation() {
   const inviteId = new URL(window.location.href).searchParams.get("invite");
   let query = app.supabase
     .from("timesheet_invitations")
-    .select("id, email, role, project_id, manager_id, branch, division, accepted_at")
+    .select("id, email, full_name, role, project_id, manager_id, branch, division, accepted_at")
     .eq("active", true)
     .is("accepted_at", null)
     .order("created_at", { ascending: false })
@@ -574,7 +578,7 @@ function renderProfileForm() {
   populateProjectSelect();
   populateBranchSelect();
   const invite = app.pendingInvite || {};
-  els.profileName.value = app.profile?.full_name || app.user.user_metadata?.full_name || "";
+  els.profileName.value = app.profile?.full_name || invite.full_name || app.user.user_metadata?.full_name || "";
   els.profileCompany.value = app.profile?.company || "Cadmus Project Management";
   els.profileBranch.value = app.profile?.branch || invite.branch || app.branches[0]?.name || "";
   populateDivisionSelect(app.profile?.division || invite.division || "");
@@ -2822,44 +2826,48 @@ async function sendBulkInvitations(event) {
   event.preventDefault();
   if (!isPortfolioManager()) return;
 
-  const emails = parseEmailList(els.inviteEmails.value);
-  const payloadBase = {
-    role: els.inviteRole.value,
-    project_id: els.inviteProject.value || null,
-    manager_id: els.inviteManager.value || null,
-    branch: els.inviteBranch.value || null,
-    division: els.inviteDivision.value || null,
-    invited_by: app.user.id,
-    active: true,
-  };
-
-  if (!emails.length || !payloadBase.project_id) {
-    setMessage(els.adminMessage, "Add at least one email and choose a project.", true);
+  const importResult = buildInvitationImportRows();
+  renderInviteImportPreview(importResult);
+  if (importResult.errors.length) {
+    setMessage(els.adminMessage, "Fix the import errors before sending invitations.", true);
     return;
   }
 
-  setMessage(els.adminMessage, `Sending ${emails.length} invitations...`);
+  const invitationsToSend = importResult.rows;
+  if (!invitationsToSend.length) {
+    setMessage(els.adminMessage, "Add at least one email or CSV row before sending invitations.", true);
+    return;
+  }
+
+  setMessage(els.adminMessage, `Sending ${invitationsToSend.length} invitations...`);
   let sent = 0;
   let linkOnly = 0;
   const failed = [];
   const inviteLinks = [];
 
-  for (const email of emails) {
+  for (const row of invitationsToSend) {
     const invitation = {
       id: crypto.randomUUID(),
-      email,
-      ...payloadBase,
+      email: row.email,
+      full_name: row.full_name || null,
+      role: row.role,
+      project_id: row.project_id,
+      manager_id: row.manager_id,
+      branch: row.branch,
+      division: row.division,
+      invited_by: app.user.id,
+      active: true,
     };
     const { error: inviteError } = await app.supabase.from("timesheet_invitations").insert(invitation);
     if (inviteError) {
-      failed.push(`${email}: ${inviteError.message}`);
+      failed.push(`${row.email}: ${inviteError.message}`);
       continue;
     }
 
     const redirectTo = `${window.location.origin}/timesheets/?invite=${invitation.id}`;
-    inviteLinks.push({ email, role: payloadBase.role, link: redirectTo });
+    inviteLinks.push({ email: row.email, role: row.role, link: redirectTo });
     const { error: emailError } = await app.supabase.auth.signInWithOtp({
-      email,
+      email: row.email,
       options: { emailRedirectTo: redirectTo, shouldCreateUser: true },
     });
 
@@ -2867,7 +2875,7 @@ async function sendBulkInvitations(event) {
       if (isEmailThrottleError(emailError)) {
         linkOnly += 1;
       } else {
-        failed.push(`${email}: ${friendlyAuthError(emailError)}`);
+        failed.push(`${row.email}: ${friendlyAuthError(emailError)}`);
         await app.supabase.from("timesheet_invitations").update({ active: false }).eq("id", invitation.id);
       }
     } else {
@@ -2888,17 +2896,149 @@ async function sendBulkInvitations(event) {
     count: inviteLinks.length,
     sent,
     linkOnly,
-    role: payloadBase.role,
-    project: projectLabel(getProject(payloadBase.project_id)),
-    manager: getManager(payloadBase.manager_id)?.manager_name || "",
-    branch: payloadBase.branch,
-    division: payloadBase.division,
+    importMode: importResult.mode,
+    projects: [...new Set(invitationsToSend.map((row) => projectLabel(getProject(row.project_id))))],
+    roles: [...new Set(invitationsToSend.map((row) => row.role))],
   });
   els.inviteForm.reset();
+  els.inviteImportPreview.innerHTML = "";
   populateInviteBranches();
   populateInviteManagers();
   await loadAndRenderAdminAudit();
   setMessage(els.adminMessage, linkOnly ? `Sent ${sent}. Supabase throttled ${linkOnly}; manual invite links were downloaded.` : `Sent ${sent} invitations.`);
+}
+
+function validateInviteImport() {
+  const result = buildInvitationImportRows();
+  renderInviteImportPreview(result);
+  setMessage(
+    els.adminMessage,
+    result.errors.length ? `${result.errors.length} import issue${result.errors.length === 1 ? "" : "s"} found.` : `${result.rows.length} invitation row${result.rows.length === 1 ? "" : "s"} ready.`,
+    Boolean(result.errors.length),
+  );
+}
+
+function buildInvitationImportRows() {
+  const csvText = els.inviteCsv.value.trim();
+  if (csvText) return parseInvitationCsv(csvText);
+  return buildDefaultInvitationRows();
+}
+
+function buildDefaultInvitationRows() {
+  const emails = parseEmailList(els.inviteEmails.value);
+  const errors = [];
+  const rows = [];
+  if (!emails.length) errors.push({ row: "-", message: "Add at least one email address." });
+  if (!els.inviteProject.value) errors.push({ row: "-", message: "Choose a project." });
+
+  for (const email of emails) {
+    rows.push({
+      rowNumber: "-",
+      email,
+      role: els.inviteRole.value,
+      project_id: els.inviteProject.value || null,
+      manager_id: els.inviteManager.value || null,
+      branch: els.inviteBranch.value || null,
+      division: els.inviteDivision.value || null,
+      source: "default",
+    });
+  }
+
+  return { mode: "default", rows, errors };
+}
+
+function parseInvitationCsv(csvText) {
+  const records = parseCsvRecords(csvText);
+  const errors = [];
+  const rows = [];
+  if (!records.length) return { mode: "csv", rows, errors: [{ row: "-", message: "Paste CSV rows before validating." }] };
+
+  const header = records[0].map((value) => normalizeLookup(value).replaceAll(" ", "_"));
+  const requiredHeaders = ["email"];
+  for (const required of requiredHeaders) {
+    if (!header.includes(required)) errors.push({ row: 1, message: `Missing ${required} column.` });
+  }
+  if (errors.length) return { mode: "csv", rows, errors };
+
+  const seen = new Set();
+  for (let index = 1; index < records.length; index += 1) {
+    const values = records[index];
+    if (!values.some((value) => String(value || "").trim())) continue;
+    const record = Object.fromEntries(header.map((name, columnIndex) => [name, values[columnIndex]?.trim() || ""]));
+    const rowNumber = index + 1;
+    const rowErrors = validateInvitationRecord(record, rowNumber, seen);
+    errors.push(...rowErrors);
+    if (rowErrors.length) continue;
+
+    rows.push(resolveInvitationRecord(record, rowNumber));
+  }
+
+  return { mode: "csv", rows, errors };
+}
+
+function validateInvitationRecord(record, rowNumber, seen) {
+  const errors = [];
+  const email = record.email?.toLowerCase();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.push({ row: rowNumber, message: "Valid email is required." });
+  if (seen.has(email)) errors.push({ row: rowNumber, message: "Duplicate email in import." });
+  seen.add(email);
+
+  const role = normalizeRole(record.role || els.inviteRole.value);
+  if (!ppmRoles[role]) errors.push({ row: rowNumber, message: "Role must be resource, manager, or admin." });
+
+  if (!resolveProject(record.project || record.project_code || record.project_name || els.inviteProject.value)) {
+    errors.push({ row: rowNumber, message: "Project does not match an active project." });
+  }
+
+  const project = resolveProject(record.project || record.project_code || record.project_name || els.inviteProject.value);
+  const managerValue = record.manager || record.manager_email;
+  if (managerValue && !resolveManager(managerValue, project?.id)) {
+    errors.push({ row: rowNumber, message: "Manager does not match the selected project." });
+  }
+
+  if (record.branch && !app.branches.some((branch) => normalizeLookup(branch.name) === normalizeLookup(record.branch))) {
+    errors.push({ row: rowNumber, message: "Branch does not match an active branch." });
+  }
+
+  if (record.division && !resolveDivision(record.division, record.branch || els.inviteBranch.value)) {
+    errors.push({ row: rowNumber, message: "Division does not match the selected branch." });
+  }
+
+  return errors;
+}
+
+function resolveInvitationRecord(record, rowNumber) {
+  const project = resolveProject(record.project || record.project_code || record.project_name || els.inviteProject.value);
+  const manager = resolveManager(record.manager || record.manager_email || els.inviteManager.value, project?.id);
+  const branch = record.branch || els.inviteBranch.value || "";
+  const division = record.division || els.inviteDivision.value || "";
+  return {
+    rowNumber,
+    email: record.email.toLowerCase(),
+    full_name: record.full_name || record.name || "",
+    role: normalizeRole(record.role || els.inviteRole.value),
+    project_id: project?.id || null,
+    manager_id: manager?.id || null,
+    branch: branch || null,
+    division: division || null,
+    source: "csv",
+  };
+}
+
+function renderInviteImportPreview(result) {
+  if (!result.rows.length && !result.errors.length) {
+    els.inviteImportPreview.innerHTML = "";
+    return;
+  }
+
+  els.inviteImportPreview.innerHTML = `
+    <div class="import-summary ${result.errors.length ? "has-errors" : ""}">
+      <strong>${result.errors.length ? `${result.errors.length} issue${result.errors.length === 1 ? "" : "s"}` : `${result.rows.length} ready`}</strong>
+      <span>${result.mode === "csv" ? "CSV import" : "Email list"}</span>
+    </div>
+    ${result.errors.length ? `<ul>${result.errors.slice(0, 8).map((error) => `<li>Row ${escapeHtml(error.row)}: ${escapeHtml(error.message)}</li>`).join("")}</ul>` : ""}
+    ${result.rows.length ? `<ul>${result.rows.slice(0, 8).map((row) => `<li>${escapeHtml(row.email)} - ${escapeHtml(roleLabel(row.role))} - ${escapeHtml(projectLabel(getProject(row.project_id)))}</li>`).join("")}</ul>` : ""}
+  `;
 }
 
 async function finishAdminSave(error, form, successMessage, auditEvent = null) {
@@ -3367,6 +3507,81 @@ function parseEmailList(value) {
       seen.add(email);
       return true;
     });
+}
+
+function parseCsvRecords(value) {
+  const rows = [];
+  let row = [];
+  let cell = "";
+  let quoted = false;
+  const text = String(value || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    const next = text[index + 1];
+    if (char === '"' && quoted && next === '"') {
+      cell += '"';
+      index += 1;
+    } else if (char === '"') {
+      quoted = !quoted;
+    } else if (char === "," && !quoted) {
+      row.push(cell);
+      cell = "";
+    } else if (char === "\n" && !quoted) {
+      row.push(cell);
+      rows.push(row);
+      row = [];
+      cell = "";
+    } else {
+      cell += char;
+    }
+  }
+
+  row.push(cell);
+  rows.push(row);
+  return rows.filter((record) => record.some((field) => String(field || "").trim()));
+}
+
+function normalizeRole(value) {
+  const normalized = normalizeLookup(value);
+  if (["project manager", "manager", "pm"].includes(normalized)) return "manager";
+  if (["portfolio manager", "admin", "administrator"].includes(normalized)) return "admin";
+  return normalized || "resource";
+}
+
+function resolveProject(value) {
+  const normalized = normalizeLookup(value);
+  if (!normalized) return null;
+  return app.projects.find((project) =>
+    normalizeLookup(project.id) === normalized
+    || normalizeLookup(project.code) === normalized
+    || normalizeLookup(project.name) === normalized
+    || normalizeLookup(projectLabel(project)) === normalized
+  ) || null;
+}
+
+function resolveManager(value, projectId = "") {
+  const normalized = normalizeLookup(value);
+  if (!normalized) return null;
+  return app.managers.find((manager) =>
+    (!projectId || manager.project_id === projectId)
+    && (
+      normalizeLookup(manager.id) === normalized
+      || normalizeLookup(manager.manager_name) === normalized
+      || normalizeLookup(manager.manager_email) === normalized
+      || normalizeLookup(`${manager.manager_name} - ${manager.manager_email}`) === normalized
+    )
+  ) || null;
+}
+
+function resolveDivision(value, branchName = "") {
+  const normalized = normalizeLookup(value);
+  if (!normalized) return null;
+  const branch = app.branches.find((item) => normalizeLookup(item.name) === normalizeLookup(branchName));
+  return app.divisions.find((division) =>
+    normalizeLookup(division.name) === normalized
+    && (!branch || !division.branch_id || division.branch_id === branch.id)
+  ) || null;
 }
 
 function isEmailThrottleError(error) {

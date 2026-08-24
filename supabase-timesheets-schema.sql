@@ -33,6 +33,7 @@ create table if not exists public.timesheet_admin_emails (
 create table if not exists public.timesheet_invitations (
   id uuid primary key default gen_random_uuid(),
   email text not null,
+  full_name text,
   role text not null default 'resource' check (role in ('resource', 'manager', 'admin')),
   project_id uuid references public.timesheet_projects(id),
   manager_id uuid references public.timesheet_project_managers(id),
@@ -43,6 +44,9 @@ create table if not exists public.timesheet_invitations (
   accepted_at timestamptz,
   created_at timestamptz not null default now()
 );
+
+alter table public.timesheet_invitations
+  add column if not exists full_name text;
 
 create index if not exists timesheet_invitations_email_idx
   on public.timesheet_invitations ((lower(email)), active, created_at desc);

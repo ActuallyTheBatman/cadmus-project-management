@@ -932,6 +932,45 @@ select option { color: #111418; }
   color: var(--signal);
 }
 
+.import-preview {
+  display: grid;
+  gap: 8px;
+}
+
+.import-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid rgba(143, 227, 193, 0.24);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  background: rgba(143, 227, 193, 0.045);
+}
+
+.import-summary.has-errors {
+  border-color: rgba(255, 113, 95, 0.34);
+  background: rgba(255, 113, 95, 0.05);
+}
+
+.import-summary strong {
+  color: var(--paper);
+}
+
+.import-summary span,
+.import-preview li {
+  color: rgba(245, 241, 232, 0.66);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.import-preview ul {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding-left: 18px;
+}
+
 .admin-item-stacked {
   display: grid;
   align-items: stretch;
