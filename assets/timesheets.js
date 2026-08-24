@@ -107,6 +107,8 @@ const els = {
   taskForm: document.querySelector("#taskForm"),
   adminExportForm: document.querySelector("#adminExportForm"),
   inviteForm: document.querySelector("#inviteForm"),
+  refreshExceptions: document.querySelector("#refreshExceptions"),
+  adminExceptions: document.querySelector("#adminExceptions"),
   adminProjectFocus: document.querySelector("#adminProjectFocus"),
   adminProjectName: document.querySelector("#adminProjectName"),
   adminProjectCode: document.querySelector("#adminProjectCode"),
@@ -304,6 +306,7 @@ function bindEvents() {
   els.divisionForm.addEventListener("submit", addDivision);
   els.taskForm.addEventListener("submit", addTask);
   els.adminExportForm.addEventListener("submit", exportAdminWork);
+  els.refreshExceptions.addEventListener("click", renderAdminExceptions);
   els.adminExportBranch.addEventListener("change", populateAdminExportDivisions);
   els.userFilterForm.addEventListener("submit", (event) => event.preventDefault());
   els.adminUserBranch.addEventListener("change", () => {
@@ -1971,6 +1974,7 @@ async function renderAdminConsole() {
   await loadAdminProfiles();
   populateAdminSelects();
   renderAdminLists();
+  await renderAdminExceptions();
 }
 
 async function loadAdminProfiles() {
@@ -2144,6 +2148,162 @@ function renderAdminLists() {
     (task) => deactivateAdminItem("timesheet_tasks", task.id, "Task removed."),
   );
   renderUserAdminList();
+}
+
+async function renderAdminExceptions() {
+  if (!isPortfolioManager()) return;
+  els.adminExceptions.innerHTML = `<div class="empty-state"><p>Checking portfolio exceptions...</p></div>`;
+
+  const activeProfiles = app.adminProfiles.filter((profile) => profile.active !== false);
+  const inactiveAssigned = app.adminProfiles.filter((profile) => profile.active === false && profile.project_id);
+  const profilesMissingSetup = activeProfiles.filter((profile) => !profile.project_id || !profile.manager_id || !profile.branch || !profile.division);
+  const managersWithoutProfiles = app.managers.filter((manager) => !activeProfiles.some((profile) => profile.manager_id === manager.id));
+  const projectsMissingManagers = app.projects.filter((project) => !app.managers.some((manager) => manager.project_id === project.id));
+  const projectsMissingTasks = app.projects.filter((project) => !app.tasks.some((task) => task.project_id === project.id));
+  const missingSubmissions = await loadCurrentWeekMissingProfiles(activeProfiles);
+
+  const groups = [
+    {
+      title: "Missing This Week",
+      tone: missingSubmissions.length ? "rejected" : "approved",
+      count: missingSubmissions.length,
+      detail: `Week of ${formatShortDate(toDateInput(app.weekStart))}`,
+      items: missingSubmissions.map((profile) => ({
+        title: profile.full_name || profile.email,
+        meta: [profile.email, projectLabel(getProject(profile.project_id)), getManager(profile.manager_id)?.manager_name].filter(Boolean).join(" - "),
+      })),
+      action: missingSubmissions.length ? () => focusPortfolioMissing() : null,
+      actionLabel: "Open Missing",
+    },
+    {
+      title: "Profile Setup Gaps",
+      tone: profilesMissingSetup.length ? "rejected" : "approved",
+      count: profilesMissingSetup.length,
+      detail: "Active users missing project, manager, branch, or division",
+      items: profilesMissingSetup.map((profile) => ({
+        title: profile.full_name || profile.email,
+        meta: missingProfileFields(profile).join(", "),
+      })),
+      action: profilesMissingSetup.length ? () => focusUserExceptions("active") : null,
+      actionLabel: "Filter Users",
+    },
+    {
+      title: "Inactive Assigned",
+      tone: inactiveAssigned.length ? "submitted" : "approved",
+      count: inactiveAssigned.length,
+      detail: "Inactive users still mapped to active work",
+      items: inactiveAssigned.map((profile) => ({
+        title: profile.full_name || profile.email,
+        meta: [projectLabel(getProject(profile.project_id)), profile.branch, profile.division].filter(Boolean).join(" - "),
+      })),
+      action: inactiveAssigned.length ? () => focusUserExceptions("inactive") : null,
+      actionLabel: "Filter Users",
+    },
+    {
+      title: "Project Configuration",
+      tone: projectsMissingManagers.length || projectsMissingTasks.length ? "rejected" : "approved",
+      count: projectsMissingManagers.length + projectsMissingTasks.length,
+      detail: "Projects missing managers or task codes",
+      items: [
+        ...projectsMissingManagers.map((project) => ({ title: projectLabel(project), meta: "No resource manager configured" })),
+        ...projectsMissingTasks.map((project) => ({ title: projectLabel(project), meta: "No task codes configured" })),
+      ],
+      action: null,
+    },
+    {
+      title: "Unused Managers",
+      tone: managersWithoutProfiles.length ? "submitted" : "approved",
+      count: managersWithoutProfiles.length,
+      detail: "Managers with no active resources assigned",
+      items: managersWithoutProfiles.map((manager) => ({
+        title: manager.manager_name,
+        meta: [manager.manager_email, projectLabel(getProject(manager.project_id))].filter(Boolean).join(" - "),
+      })),
+      action: null,
+    },
+  ];
+
+  els.adminExceptions.innerHTML = "";
+  for (const group of groups) {
+    els.adminExceptions.append(renderExceptionGroup(group));
+  }
+}
+
+async function loadCurrentWeekMissingProfiles(activeProfiles) {
+  const userIds = activeProfiles.map((profile) => profile.id);
+  if (!userIds.length) return [];
+
+  const { data, error } = await app.supabase
+    .from("timesheet_weekly_reports")
+    .select("user_id, status")
+    .in("user_id", userIds)
+    .eq("week_start", toDateInput(app.weekStart));
+
+  if (error) {
+    setMessage(els.adminMessage, `Exception check failed: ${error.message}`, true);
+    return [];
+  }
+
+  const submittedUserIds = new Set((data || [])
+    .filter((report) => ["submitted", "approved"].includes(report.status))
+    .map((report) => report.user_id));
+  return activeProfiles.filter((profile) => !submittedUserIds.has(profile.id));
+}
+
+function renderExceptionGroup(group) {
+  const card = document.createElement("article");
+  card.className = "exception-group";
+  card.innerHTML = `
+    <div class="exception-head">
+      <div>
+        <h4>${escapeHtml(group.title)}</h4>
+        <p>${escapeHtml(group.detail)}</p>
+      </div>
+      <span class="status-pill ${escapeHtml(group.tone)}">${group.count}</span>
+    </div>
+    <ul class="exception-list">
+      ${group.items.length
+        ? group.items.slice(0, 6).map((item) => `<li><strong>${escapeHtml(item.title || "-")}</strong><span>${escapeHtml(item.meta || "-")}</span></li>`).join("")
+        : `<li><strong>Clear</strong><span>No exceptions found.</span></li>`}
+      ${group.items.length > 6 ? `<li><strong>+${group.items.length - 6} more</strong><span>Use the related admin filters to review the remaining items.</span></li>` : ""}
+    </ul>
+  `;
+
+  if (group.action) {
+    const button = document.createElement("button");
+    button.className = "button small-button";
+    button.type = "button";
+    button.textContent = group.actionLabel;
+    button.addEventListener("click", group.action);
+    card.append(button);
+  }
+
+  return card;
+}
+
+function missingProfileFields(profile) {
+  const missing = [];
+  if (!profile.project_id) missing.push("project");
+  if (!profile.manager_id) missing.push("manager");
+  if (!profile.branch) missing.push("branch");
+  if (!profile.division) missing.push("division");
+  return missing;
+}
+
+function focusPortfolioMissing() {
+  els.portfolioStatus.value = "missing";
+  els.portfolioWeek.value = toDateInput(app.weekStart);
+  loadPortfolio();
+  els.portfolioView.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function focusUserExceptions(status = "active") {
+  els.adminUserStatus.value = status;
+  els.adminUserBranch.value = "all";
+  populateAdminUserDivisions();
+  els.adminUserProject.value = "all";
+  renderUserAdminList();
+  els.userFilterForm.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function filterByFocusedProject(items) {

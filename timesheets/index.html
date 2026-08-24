@@ -13,9 +13,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Libre+Baskerville:wght@700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/timesheets.css?v=20260824-auth-hardening">
-  <script src="/assets/timesheets-config.js?v=20260824-auth-hardening"></script>
-  <script type="module" src="/assets/timesheets.js?v=20260824-auth-hardening"></script>
+  <link rel="stylesheet" href="/assets/timesheets.css?v=20260824-exceptions">
+  <script src="/assets/timesheets-config.js?v=20260824-exceptions"></script>
+  <script type="module" src="/assets/timesheets.js?v=20260824-exceptions"></script>
 </head>
 <body>
   <nav class="nav" aria-label="Primary navigation">
@@ -235,6 +235,17 @@
             </label>
           </div>
           <div class="admin-grid">
+            <section class="admin-card wide-card exceptions-card">
+              <div class="admin-card-head">
+                <div>
+                  <h3>Portfolio Exceptions</h3>
+                  <p class="helper">Current setup and submission items that need administrator attention.</p>
+                </div>
+                <button id="refreshExceptions" class="button small-button" type="button">Refresh</button>
+              </div>
+              <div id="adminExceptions" class="exceptions-grid"></div>
+            </section>
+
             <form id="projectForm" class="admin-card">
               <h3>Projects</h3>
               <label class="field"><span>Project name</span><input id="adminProjectName" type="text" required></label>
