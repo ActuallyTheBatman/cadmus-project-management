@@ -35,6 +35,7 @@ const app = {
   branches: [],
   divisions: [],
   tasks: [],
+  approvalChains: [],
   adminProfiles: [],
   adminAudit: [],
   pendingInvite: null,
@@ -111,6 +112,7 @@ const els = {
   portfolioList: document.querySelector("#portfolioList"),
   projectForm: document.querySelector("#projectForm"),
   managerForm: document.querySelector("#managerForm"),
+  approvalChainForm: document.querySelector("#approvalChainForm"),
   branchForm: document.querySelector("#branchForm"),
   divisionForm: document.querySelector("#divisionForm"),
   taskForm: document.querySelector("#taskForm"),
@@ -131,6 +133,14 @@ const els = {
   adminManagerProject: document.querySelector("#adminManagerProject"),
   adminManagerName: document.querySelector("#adminManagerName"),
   adminManagerEmail: document.querySelector("#adminManagerEmail"),
+  approvalChainName: document.querySelector("#approvalChainName"),
+  approvalChainProject: document.querySelector("#approvalChainProject"),
+  approvalChainBranch: document.querySelector("#approvalChainBranch"),
+  approvalChainDivision: document.querySelector("#approvalChainDivision"),
+  approvalChainPrimary: document.querySelector("#approvalChainPrimary"),
+  approvalChainBackup: document.querySelector("#approvalChainBackup"),
+  approvalChainFinal: document.querySelector("#approvalChainFinal"),
+  approvalChainRequireFinal: document.querySelector("#approvalChainRequireFinal"),
   adminBranchName: document.querySelector("#adminBranchName"),
   adminDivisionBranch: document.querySelector("#adminDivisionBranch"),
   adminDivisionName: document.querySelector("#adminDivisionName"),
@@ -158,6 +168,7 @@ const els = {
   inviteDivision: document.querySelector("#inviteDivision"),
   projectList: document.querySelector("#projectList"),
   managerList: document.querySelector("#managerList"),
+  approvalChainList: document.querySelector("#approvalChainList"),
   branchList: document.querySelector("#branchList"),
   divisionList: document.querySelector("#divisionList"),
   taskList: document.querySelector("#taskList"),
@@ -357,6 +368,9 @@ function bindEvents() {
   });
   els.projectForm.addEventListener("submit", addProject);
   els.managerForm.addEventListener("submit", addManager);
+  els.approvalChainForm.addEventListener("submit", addApprovalChain);
+  els.approvalChainProject.addEventListener("change", populateApprovalChainApprovers);
+  els.approvalChainBranch.addEventListener("change", populateApprovalChainDivisions);
   els.branchForm.addEventListener("submit", addBranch);
   els.divisionForm.addEventListener("submit", addDivision);
   els.taskForm.addEventListener("submit", addTask);
@@ -559,12 +573,14 @@ async function loadReferenceData() {
     { data: branches, error: branchError },
     { data: divisions, error: divisionError },
     { data: tasks, error: taskError },
+    { data: approvalChains, error: approvalChainError },
   ] = await Promise.all([
     app.supabase.from("timesheet_projects").select("id, name, code, client, reporting_formats").eq("active", true).order("name"),
     app.supabase.from("timesheet_project_managers").select("id, project_id, manager_name, manager_email").eq("active", true).order("manager_name"),
     app.supabase.from("timesheet_branches").select("id, name").eq("active", true).order("name"),
     app.supabase.from("timesheet_divisions").select("id, branch_id, name").eq("active", true).order("name"),
     app.supabase.from("timesheet_tasks").select("id, project_id, name, code").eq("active", true).order("name"),
+    app.supabase.from("timesheet_approval_chains").select("id, name, project_id, branch, division, primary_manager_id, backup_manager_id, final_approver_id, require_final_approval, active").eq("active", true).order("name"),
   ]);
 
   if (projectError) setMessage(els.profileMessage, `Project load failed: ${projectError.message}`, true);
@@ -572,12 +588,14 @@ async function loadReferenceData() {
   if (branchError) setMessage(els.profileMessage, `Branch load failed: ${branchError.message}`, true);
   if (divisionError) setMessage(els.profileMessage, `Division load failed: ${divisionError.message}`, true);
   if (taskError) setMessage(els.profileMessage, `Task load failed: ${taskError.message}`, true);
+  if (approvalChainError) setMessage(els.profileMessage, `Approval chain load failed: ${approvalChainError.message}`, true);
 
   app.projects = projects || [];
   app.managers = managers || [];
   app.branches = branches || [];
   app.divisions = divisions || [];
   app.tasks = tasks || [];
+  app.approvalChains = approvalChains || [];
 }
 
 async function loadProfile() {
@@ -762,7 +780,7 @@ function validatePassword(password, email = "") {
 
 function renderProfileSummary() {
   const project = getProject(app.profile.project_id);
-  const manager = getManager(app.profile.manager_id);
+  const approvalRoute = resolveApprovalRoute(app.profile);
   const company = app.profile.company === "Cadmus Project Management" ? "Cadmus PM" : app.profile.company;
   els.projectCode.textContent = project?.code || "-";
   els.dueDate.textContent = formatShortDate(toDateInput(addDays(app.weekStart, 4)));
@@ -771,7 +789,7 @@ function renderProfileSummary() {
     ["Branch", app.profile.branch],
     ["Division", app.profile.division],
     ["Project", projectLabel(project)],
-    ["Manager", manager ? manager.manager_name : "-"],
+    ["Approval Route", approvalRouteSummary(approvalRoute)],
   ]
     .map(([label, value]) => `<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value || "-")}</strong></div>`)
     .join("");
@@ -781,7 +799,7 @@ async function loadWeek() {
   setMessage(els.appMessage, "Loading week...");
   const { data: report, error: reportError } = await app.supabase
     .from("timesheet_weekly_reports")
-    .select("id, user_id, week_start, project_id, manager_id, status, manager_notes, submitted_at, reviewed_at")
+    .select("id, user_id, week_start, project_id, manager_id, approval_chain_id, approval_chain_snapshot, status, manager_notes, submitted_at, reviewed_at")
     .eq("user_id", app.user.id)
     .eq("week_start", toDateInput(app.weekStart))
     .maybeSingle();
@@ -864,7 +882,7 @@ function mergeDailyReports(days) {
 }
 
 function renderDailyReports() {
-  const locked = app.report && ["submitted", "approved"].includes(app.report.status);
+  const locked = app.report && ["submitted", "pending_final", "approved"].includes(app.report.status);
   const canWithdraw = app.report?.status === "submitted";
   const enabledFormats = ["weekly_grid"];
   app.reportFormat = "weekly_grid";
@@ -887,7 +905,7 @@ function renderDailyReports() {
   renderReportLifecycle({ locked });
 
   const status = app.report?.status || "draft";
-  els.reportStatus.textContent = status[0].toUpperCase() + status.slice(1);
+  els.reportStatus.textContent = formatReportStatus(status);
   els.saveWeek.disabled = locked;
   els.submitWeek.disabled = locked;
   els.withdrawWeek.classList.toggle("hidden", !canWithdraw);
@@ -906,6 +924,8 @@ function renderReportLifecycle({ locked }) {
   const status = app.report?.status || "draft";
   const lockText = status === "approved"
     ? "Approved weeks are locked. Contact a Portfolio Manager if an adjustment is required."
+    : status === "pending_final"
+      ? "This week has primary approval and is waiting for final approval."
     : "Submitted weeks are locked while they are waiting for review. Withdraw to make changes before approval.";
 
   panel.innerHTML = `
@@ -914,7 +934,7 @@ function renderReportLifecycle({ locked }) {
         <h3>Report History</h3>
         <p>${escapeHtml(locked ? lockText : "This week is editable until it is submitted for manager review.")}</p>
       </div>
-      <span class="status-pill ${escapeHtml(status)}">${escapeHtml(status)}</span>
+      <span class="status-pill ${escapeHtml(status)}">${escapeHtml(formatReportStatus(status))}</span>
     </div>
     ${app.report?.manager_notes ? `<div class="review-note"><span>Latest review comment</span><p>${escapeHtml(app.report.manager_notes)}</p></div>` : ""}
     ${app.reportAudits.length ? `<div class="audit-list">${app.reportAudits.slice(0, 6).map(renderAuditItem).join("")}</div>` : ""}
@@ -1200,12 +1220,15 @@ async function saveWeek(targetStatus) {
   }
 
   setMessage(els.appMessage, targetStatus === "submitted" ? "Submitting week..." : "Saving draft...");
+  const approvalRoute = resolveApprovalRoute(app.profile);
   const reportPayload = {
     id: app.report?.id || crypto.randomUUID(),
     user_id: app.user.id,
     week_start: toDateInput(app.weekStart),
     project_id: app.profile.project_id,
-    manager_id: app.profile.manager_id,
+    manager_id: approvalRoute.primaryManagerId,
+    approval_chain_id: approvalRoute.chain?.id || null,
+    approval_chain_snapshot: approvalChainSnapshot(approvalRoute),
     status: "draft",
     submitted_at: app.report?.submitted_at || null,
   };
@@ -1213,7 +1236,7 @@ async function saveWeek(targetStatus) {
   const { data: report, error: reportError } = await app.supabase
     .from("timesheet_weekly_reports")
     .upsert(reportPayload, { onConflict: "user_id,week_start" })
-    .select("id, user_id, week_start, project_id, manager_id, status, manager_notes, submitted_at, reviewed_at")
+    .select("id, user_id, week_start, project_id, manager_id, approval_chain_id, approval_chain_snapshot, status, manager_notes, submitted_at, reviewed_at")
     .single();
 
   if (reportError) {
@@ -1250,7 +1273,7 @@ async function saveWeek(targetStatus) {
       .from("timesheet_weekly_reports")
       .update({ status: "submitted", submitted_at: new Date().toISOString() })
       .eq("id", report.id)
-      .select("id, user_id, week_start, project_id, manager_id, status, manager_notes, submitted_at, reviewed_at")
+      .select("id, user_id, week_start, project_id, manager_id, approval_chain_id, approval_chain_snapshot, status, manager_notes, submitted_at, reviewed_at")
       .single();
 
     if (submitError) {
@@ -1279,7 +1302,7 @@ async function withdrawWeek() {
     .update({ status: "draft", submitted_at: null, reviewed_at: null, reviewed_by: null, reviewer_email: null })
     .eq("id", app.report.id)
     .eq("status", "submitted")
-    .select("id, user_id, week_start, project_id, manager_id, status, manager_notes, submitted_at, reviewed_at")
+    .select("id, user_id, week_start, project_id, manager_id, approval_chain_id, approval_chain_snapshot, status, manager_notes, submitted_at, reviewed_at")
     .single();
 
   if (error) {
@@ -1360,7 +1383,7 @@ function collectDailyReports(targetStatus = "draft") {
 
 function renderQualityPanel(existingQuality = null) {
   if (!els.qualityPanel || !app.profile) return;
-  const locked = app.report && ["submitted", "approved"].includes(app.report.status);
+  const locked = app.report && ["submitted", "pending_final", "approved"].includes(app.report.status);
   if (locked) {
     els.qualityPanel.innerHTML = "";
     return;
@@ -1490,7 +1513,7 @@ async function loadPortfolio() {
   const selectedWeek = els.portfolioWeek.value ? toDateInput(startOfWeek(parseLocalDate(els.portfolioWeek.value))) : "";
   let query = app.supabase
     .from("timesheet_weekly_reports")
-    .select("id, user_id, week_start, project_id, manager_id, status, manager_notes, submitted_at, reviewed_at")
+    .select("id, user_id, week_start, project_id, manager_id, approval_chain_id, approval_chain_snapshot, status, manager_notes, submitted_at, reviewed_at")
     .order("week_start", { ascending: false })
     .limit(30);
 
@@ -2034,7 +2057,7 @@ async function loadMissingTimesheets() {
     return;
   }
 
-  const submittedUserIds = new Set((reports || []).filter((report) => ["submitted", "approved"].includes(report.status)).map((report) => report.user_id));
+  const submittedUserIds = new Set((reports || []).filter((report) => ["submitted", "pending_final", "approved"].includes(report.status)).map((report) => report.user_id));
   const reportByUser = new Map((reports || []).map((report) => [report.user_id, report]));
   const missing = (profiles || []).filter((profile) => !submittedUserIds.has(profile.id));
 
@@ -2082,7 +2105,7 @@ async function loadMissingTimesheets() {
 
 function renderReviewCard(report, profile, days, audits = []) {
   const project = getProject(report.project_id);
-  const manager = getManager(report.manager_id);
+  const approvalRoute = approvalRouteFromReport(report, profile);
   const total = days.reduce((sum, day) => sum + Number(day.hours || 0), 0);
   const stale = isStaleSubmittedReport(report);
   const card = document.createElement("article");
@@ -2095,7 +2118,7 @@ function renderReviewCard(report, profile, days, audits = []) {
       </div>
       <div class="review-status-stack">
         ${stale ? `<span class="status-pill rejected">${submittedAgeInDays(report)} days waiting</span>` : ""}
-        <span class="status-pill ${escapeHtml(report.status)}">${escapeHtml(report.status)}</span>
+        <span class="status-pill ${escapeHtml(report.status)}">${escapeHtml(formatReportStatus(report.status))}</span>
       </div>
     </div>
     <div class="review-meta">
@@ -2103,7 +2126,7 @@ function renderReviewCard(report, profile, days, audits = []) {
       ${reviewMeta("Project", projectLabel(project))}
       ${reviewMeta("Branch", profile?.branch || "-")}
       ${reviewMeta("Division", profile?.division || "-")}
-      ${reviewMeta("Manager", manager?.manager_name || "-")}
+      ${reviewMeta("Approval Route", approvalRouteSummary(approvalRoute))}
       ${reviewMeta("Total hours", `${formatHours(total)}h`)}
       ${reviewMeta("Company", profile?.company || "-")}
       ${reviewMeta("Submitted", report.submitted_at ? formatShortDate(report.submitted_at) : "-")}
@@ -2116,7 +2139,7 @@ function renderReviewCard(report, profile, days, audits = []) {
     ${audits.length ? `<div class="audit-list">${audits.slice(0, 5).map(renderAuditItem).join("")}</div>` : ""}
   `;
 
-  if (["submitted", "rejected"].includes(report.status) && canReviewPortfolio()) {
+  if (["submitted", "pending_final", "rejected"].includes(report.status) && canReviewPortfolio()) {
     const actions = document.createElement("div");
     actions.className = "review-actions";
     const notes = document.createElement("textarea");
@@ -2126,7 +2149,8 @@ function renderReviewCard(report, profile, days, audits = []) {
     const approve = document.createElement("button");
     approve.className = "button primary";
     approve.type = "button";
-    approve.textContent = "Approve";
+    approve.textContent = report.status === "pending_final" ? "Final Approve" : "Approve";
+    approve.disabled = report.status === "pending_final" && !canCurrentUserFinalApprove(approvalRoute);
     approve.addEventListener("click", () => reviewReport(report.id, "approved", notes.value));
     const reject = document.createElement("button");
     reject.className = "button danger";
@@ -2188,11 +2212,22 @@ async function reviewReport(reportId, status, notes = "") {
     return;
   }
 
+  const report = app.reviewQueue.reports.find((item) => item.id === reportId);
+  const profile = app.adminProfiles.find((item) => item.id === report?.user_id);
+  const approvalRoute = approvalRouteFromReport(report, profile);
+  const finalRequired = status === "approved" && approvalRoute.requireFinal;
+  const finalApproverEmail = approvalRoute.final?.email || approvalRoute.final?.manager_email || "";
+  const currentUserIsFinal = finalApproverEmail && finalApproverEmail.toLowerCase() === app.user.email.toLowerCase();
+  const nextStatus = finalRequired && !currentUserIsFinal && !isPortfolioManager() ? "pending_final" : status;
+  const reviewNotes = nextStatus === "pending_final"
+    ? [trimmedNotes, "Primary approval complete; waiting for final approval."].filter(Boolean).join(" ")
+    : trimmedNotes;
+
   const { error } = await app.supabase
     .from("timesheet_weekly_reports")
     .update({
-      status,
-      manager_notes: trimmedNotes || null,
+      status: nextStatus,
+      manager_notes: reviewNotes || null,
       reviewed_by: app.user.id,
       reviewer_email: app.user.email,
       reviewed_at: new Date().toISOString(),
@@ -2204,7 +2239,7 @@ async function reviewReport(reportId, status, notes = "") {
     return;
   }
 
-  await logTimesheetAudit(reportId, status === "approved" ? "approved" : "rejected", trimmedNotes);
+  await logTimesheetAudit(reportId, nextStatus === "pending_final" ? "final_requested" : status === "approved" ? "approved" : "rejected", reviewNotes);
   await loadPortfolio();
 }
 
@@ -2222,10 +2257,19 @@ async function approveCleanSubmittedReports() {
   let approved = 0;
   const failed = [];
   for (const report of cleanReports) {
+    const profile = app.adminProfiles.find((item) => item.id === report.user_id);
+    const approvalRoute = approvalRouteFromReport(report, profile);
+    const finalApproverEmail = approvalRoute.final?.email || approvalRoute.final?.manager_email || "";
+    const currentUserIsFinal = finalApproverEmail && finalApproverEmail.toLowerCase() === app.user.email.toLowerCase();
+    const nextStatus = approvalRoute.requireFinal && !currentUserIsFinal && !isPortfolioManager() ? "pending_final" : "approved";
+    const auditAction = nextStatus === "pending_final" ? "final_requested" : "approved";
+    const auditNotes = nextStatus === "pending_final"
+      ? "Bulk primary approval: waiting for final approval."
+      : "Bulk approved: clean submitted report.";
     const { data, error } = await app.supabase
       .from("timesheet_weekly_reports")
       .update({
-        status: "approved",
+        status: nextStatus,
         manager_notes: report.manager_notes || null,
         reviewed_by: app.user.id,
         reviewer_email: app.user.email,
@@ -2241,7 +2285,7 @@ async function approveCleanSubmittedReports() {
       continue;
     }
 
-    await logTimesheetAudit(report.id, "approved", "Bulk approved: clean submitted report.");
+    await logTimesheetAudit(report.id, auditAction, auditNotes);
     approved += 1;
   }
 
@@ -2286,9 +2330,9 @@ function populateAdminSelects() {
   populateProjectSelectElement(els.adminProjectFocus, "All active projects", "all");
   els.adminProjectFocus.value = app.adminProjectFocus;
 
-  const projectSelects = [els.adminManagerProject, els.adminTaskProject, els.inviteProject];
+  const projectSelects = [els.adminManagerProject, els.adminTaskProject, els.inviteProject, els.approvalChainProject];
   for (const select of projectSelects) {
-    populateProjectSelectElement(select, "Select project", "");
+    populateProjectSelectElement(select, select === els.approvalChainProject ? "Any project" : "Select project", "");
     if (app.adminProjectFocus !== "all") select.value = app.adminProjectFocus;
   }
 
@@ -2307,6 +2351,8 @@ function populateAdminSelects() {
   populateAdminUserFilters();
   populateInviteBranches();
   populateInviteManagers();
+  populateApprovalChainBranches();
+  populateApprovalChainApprovers();
 }
 
 function populatePortfolioProjectFilter() {
@@ -2400,8 +2446,60 @@ function populateInviteManagers() {
   els.inviteManager.value = managers.some((manager) => manager.id === current) ? current : "";
 }
 
+function populateApprovalChainBranches() {
+  const current = els.approvalChainBranch.value || "";
+  els.approvalChainBranch.innerHTML = "";
+  els.approvalChainBranch.append(new Option("Any branch", ""));
+  for (const branch of app.branches) {
+    els.approvalChainBranch.append(new Option(branch.name, branch.name));
+  }
+  els.approvalChainBranch.value = app.branches.some((branch) => branch.name === current) ? current : "";
+  populateApprovalChainDivisions();
+}
+
+function populateApprovalChainDivisions() {
+  const selectedBranch = app.branches.find((branch) => branch.name === els.approvalChainBranch.value);
+  const divisions = selectedBranch
+    ? app.divisions.filter((division) => division.branch_id === selectedBranch.id)
+    : app.divisions;
+  const current = els.approvalChainDivision.value || "";
+  els.approvalChainDivision.innerHTML = "";
+  els.approvalChainDivision.append(new Option("Any division", ""));
+  for (const division of divisions) {
+    els.approvalChainDivision.append(new Option(division.name, division.name));
+  }
+  els.approvalChainDivision.value = divisions.some((division) => division.name === current) ? current : "";
+}
+
+function populateApprovalChainApprovers() {
+  const projectId = els.approvalChainProject.value;
+  const managers = app.managers.filter((manager) => !projectId || manager.project_id === projectId);
+  const current = {
+    primary: els.approvalChainPrimary.value,
+    backup: els.approvalChainBackup.value,
+    final: els.approvalChainFinal.value,
+  };
+
+  populateManagerSelectElement(els.approvalChainPrimary, managers, managers.length ? "Select primary" : "No managers configured", "");
+  populateManagerSelectElement(els.approvalChainBackup, managers, "No backup", "");
+  populateManagerSelectElement(els.approvalChainFinal, managers, "No final approver", "");
+
+  els.approvalChainPrimary.value = managers.some((manager) => manager.id === current.primary) ? current.primary : "";
+  els.approvalChainBackup.value = managers.some((manager) => manager.id === current.backup) ? current.backup : "";
+  els.approvalChainFinal.value = managers.some((manager) => manager.id === current.final) ? current.final : "";
+}
+
+function populateManagerSelectElement(select, managers, placeholder, placeholderValue) {
+  select.innerHTML = "";
+  select.append(new Option(placeholder, placeholderValue));
+  for (const manager of managers) {
+    select.append(new Option(`${manager.manager_name} - ${manager.manager_email}`, manager.id));
+  }
+}
+
 function renderAdminLists() {
   renderProjectAdminList();
+  renderApprovalChainAdminList();
   const managers = filterByFocusedProject(app.managers);
   const tasks = filterByFocusedProject(app.tasks);
   renderAdminList(
@@ -2530,7 +2628,7 @@ async function loadCurrentWeekMissingProfiles(activeProfiles) {
   }
 
   const submittedUserIds = new Set((data || [])
-    .filter((report) => ["submitted", "approved"].includes(report.status))
+    .filter((report) => ["submitted", "pending_final", "approved"].includes(report.status))
     .map((report) => report.user_id));
   return activeProfiles.filter((profile) => !submittedUserIds.has(profile.id));
 }
@@ -2693,6 +2791,7 @@ function formatAdminAuditAction(action) {
 
 function formatEntityType(entityType) {
   return {
+    approval_chain: "Approval Chain",
     project: "Project",
     project_manager: "Resource Manager",
     branch: "Branch",
@@ -2740,6 +2839,35 @@ function renderProjectAdminList() {
     }
     els.projectList.append(item);
   }
+}
+
+function renderApprovalChainAdminList() {
+  const chains = filterApprovalChainsByFocusedProject(app.approvalChains);
+  if (!chains.length) {
+    els.approvalChainList.innerHTML = `<li class="admin-item"><span>No approval chains configured.</span></li>`;
+    return;
+  }
+
+  els.approvalChainList.innerHTML = "";
+  for (const chain of chains) {
+    const row = document.createElement("li");
+    row.className = "admin-item";
+    row.innerHTML = `
+      <div>
+        <strong>${escapeHtml(chain.name)}</strong>
+        <span>${escapeHtml(approvalChainDetail(chain))}</span>
+        <span>${escapeHtml(approvalRouteLabel(chain))}</span>
+      </div>
+      <button class="button danger small-button" type="button">Remove</button>
+    `;
+    row.querySelector("button").addEventListener("click", () => deactivateAdminItem("timesheet_approval_chains", chain.id, "Approval chain removed."));
+    els.approvalChainList.append(row);
+  }
+}
+
+function filterApprovalChainsByFocusedProject(chains) {
+  if (app.adminProjectFocus === "all") return chains;
+  return chains.filter((chain) => !chain.project_id || chain.project_id === app.adminProjectFocus);
 }
 
 function renderAdminList(container, items, titleFor, detailFor, removeAction) {
@@ -3022,6 +3150,44 @@ async function addManager(event) {
     entityType: "project_manager",
     entityLabel: `${payload.manager_name} - ${payload.manager_email}`,
     details: { ...payload, project: projectLabel(getProject(payload.project_id)) },
+  });
+}
+
+async function addApprovalChain(event) {
+  event.preventDefault();
+  setMessage(els.adminMessage, "Adding approval chain...");
+  const payload = {
+    name: els.approvalChainName.value.trim(),
+    project_id: els.approvalChainProject.value || null,
+    branch: els.approvalChainBranch.value || null,
+    division: els.approvalChainDivision.value || null,
+    primary_manager_id: els.approvalChainPrimary.value,
+    backup_manager_id: els.approvalChainBackup.value || null,
+    final_approver_id: els.approvalChainFinal.value || null,
+    require_final_approval: els.approvalChainRequireFinal.checked,
+    active: true,
+  };
+
+  if (!payload.name || !payload.primary_manager_id) {
+    setMessage(els.adminMessage, "Chain name and primary approver are required.", true);
+    return;
+  }
+
+  if (payload.require_final_approval && !payload.final_approver_id) {
+    setMessage(els.adminMessage, "Choose a final approver or turn off final approval.", true);
+    return;
+  }
+
+  const { error } = await app.supabase.from("timesheet_approval_chains").insert(payload);
+  await finishAdminSave(error, els.approvalChainForm, "Approval chain saved.", {
+    action: "created",
+    entityType: "approval_chain",
+    entityLabel: payload.name,
+    details: {
+      ...payload,
+      project: projectLabel(getProject(payload.project_id)),
+      route: approvalRouteLabel(payload),
+    },
   });
 }
 
@@ -3329,6 +3495,11 @@ async function finishAdminSave(error, form, successMessage, auditEvent = null) {
     els.adminFormatGrid.checked = true;
     els.adminFormatLog.checked = false;
   }
+  if (form === els.approvalChainForm) {
+    if (app.adminProjectFocus !== "all") els.approvalChainProject.value = app.adminProjectFocus;
+    populateApprovalChainBranches();
+    populateApprovalChainApprovers();
+  }
   await loadReferenceData();
   await renderAdminConsole();
   renderDailyReports();
@@ -3337,6 +3508,11 @@ async function finishAdminSave(error, form, successMessage, auditEvent = null) {
 
 function adminAuditTargetForTable(table, id) {
   const targets = {
+    timesheet_approval_chains: {
+      entityType: "approval_chain",
+      item: app.approvalChains.find((chain) => chain.id === id),
+      labelFor: (item) => item?.name || "",
+    },
     timesheet_projects: {
       entityType: "project",
       item: app.projects.find((project) => project.id === id),
@@ -3445,7 +3621,7 @@ async function loadAdminExportData({ status = "" } = {}) {
   const reportEnd = toDateInput(startOfWeek(parseLocalDate(endDate)));
   let reportQuery = app.supabase
     .from("timesheet_weekly_reports")
-    .select("id, user_id, week_start, project_id, manager_id, status, submitted_at, reviewed_at, reviewer_email")
+    .select("id, user_id, week_start, project_id, manager_id, approval_chain_id, approval_chain_snapshot, status, submitted_at, reviewed_at, reviewer_email")
     .in("user_id", userIds)
     .gte("week_start", reportStart)
     .lte("week_start", reportEnd)
@@ -3524,7 +3700,7 @@ function downloadAdminWorkCsv({ profiles, reports, days, branch, division, start
       day.work_date,
       weekdays[day.day_index] || "",
       projectLabel(getProject(report?.project_id)),
-      getManager(report?.manager_id)?.manager_name || "",
+      approvalRouteSummary(approvalRouteFromReport(report, profile)),
       taskLabel(getTask(day.task_id)),
       String(day.hours || 0),
       day.accomplishments || "",
@@ -3596,7 +3772,7 @@ function summarizeApprovedTime({ profiles, reports, days }) {
 
     const profile = profileMap.get(report.user_id);
     const project = getProject(report.project_id);
-    const manager = getManager(report.manager_id);
+    const approvalRoute = approvalRouteFromReport(report, profile);
     const task = getTask(day.task_id);
     const key = [
       profile?.id || "",
@@ -3616,7 +3792,7 @@ function summarizeApprovedTime({ profiles, reports, days }) {
         project: project?.name || "",
         projectCode: project?.code || "",
         client: project?.client || "",
-        manager: manager?.manager_name || "",
+        manager: approvalRouteSummary(approvalRoute),
         task: task?.name || "",
         taskCode: task?.code || "",
         week: report.week_start,
@@ -3643,7 +3819,7 @@ function summarizeApprovedTime({ profiles, reports, days }) {
 function exportCsv() {
   const rows = [["Week", "Date", "Day", "Project", "Task", "Branch", "Division", "Manager", "Hours", "Notes", "Blockers", "Next Steps", "Status"]];
   const project = getProject(app.profile.project_id);
-  const manager = getManager(app.profile.manager_id);
+  const approvalRoute = app.report ? approvalRouteFromReport(app.report, app.profile) : resolveApprovalRoute(app.profile);
 
   for (const day of collectDailyReports().rows || []) {
     rows.push([
@@ -3654,7 +3830,7 @@ function exportCsv() {
       taskLabel(getTask(day.task_id)),
       app.profile.branch,
       app.profile.division,
-      manager?.manager_name || "",
+      approvalRouteSummary(approvalRoute),
       String(day.hours),
       day.accomplishments,
       day.blockers,
@@ -3691,6 +3867,104 @@ function getManager(id) {
   return app.managers.find((manager) => manager.id === id);
 }
 
+function resolveApprovalRoute(profile) {
+  const chain = findApprovalChainForProfile(profile);
+  const primaryManagerId = chain?.primary_manager_id || profile?.manager_id || "";
+  return {
+    chain,
+    primaryManagerId,
+    primary: getManager(primaryManagerId),
+    backup: getManager(chain?.backup_manager_id),
+    final: getManager(chain?.final_approver_id),
+    requireFinal: Boolean(chain?.require_final_approval),
+  };
+}
+
+function approvalRouteFromReport(report, profile = null) {
+  if (report?.approval_chain_snapshot && Object.keys(report.approval_chain_snapshot).length) {
+    return {
+      chain: report.approval_chain_snapshot.chain || null,
+      primaryManagerId: report.approval_chain_snapshot.primary?.id || report.manager_id || profile?.manager_id || "",
+      primary: report.approval_chain_snapshot.primary || getManager(report.manager_id),
+      backup: report.approval_chain_snapshot.backup || null,
+      final: report.approval_chain_snapshot.final || null,
+      requireFinal: Boolean(report.approval_chain_snapshot.requireFinal),
+    };
+  }
+  return resolveApprovalRoute(profile || { project_id: report?.project_id, manager_id: report?.manager_id });
+}
+
+function findApprovalChainForProfile(profile) {
+  if (!profile) return null;
+  const matching = app.approvalChains.filter((chain) =>
+    chain.active !== false
+    && (!chain.project_id || chain.project_id === profile.project_id)
+    && (!chain.branch || chain.branch === profile.branch)
+    && (!chain.division || chain.division === profile.division)
+  );
+
+  return matching.sort((a, b) => approvalChainSpecificity(b) - approvalChainSpecificity(a))[0] || null;
+}
+
+function approvalChainSpecificity(chain) {
+  return (chain.project_id ? 4 : 0) + (chain.branch ? 2 : 0) + (chain.division ? 1 : 0);
+}
+
+function approvalChainSnapshot(route) {
+  return {
+    chain: route.chain ? {
+      id: route.chain.id,
+      name: route.chain.name,
+      project_id: route.chain.project_id || null,
+      branch: route.chain.branch || null,
+      division: route.chain.division || null,
+    } : null,
+    primary: approvalManagerSnapshot(route.primary),
+    backup: approvalManagerSnapshot(route.backup),
+    final: approvalManagerSnapshot(route.final),
+    requireFinal: route.requireFinal,
+  };
+}
+
+function approvalManagerSnapshot(manager) {
+  return manager ? {
+    id: manager.id,
+    name: manager.manager_name,
+    email: manager.manager_email,
+  } : null;
+}
+
+function approvalRouteSummary(route) {
+  return route?.primary?.name || route?.primary?.manager_name || route?.primary?.manager_email || "No approver";
+}
+
+function approvalRouteLabel(chainOrRoute) {
+  const route = chainOrRoute?.primaryManagerId ? chainOrRoute : {
+    primary: getManager(chainOrRoute?.primary_manager_id),
+    backup: getManager(chainOrRoute?.backup_manager_id),
+    final: getManager(chainOrRoute?.final_approver_id),
+    requireFinal: Boolean(chainOrRoute?.require_final_approval),
+  };
+  const parts = [`Primary: ${route.primary?.manager_name || route.primary?.name || "-"}`];
+  if (route.backup) parts.push(`Backup: ${route.backup.manager_name || route.backup.name}`);
+  if (route.final) parts.push(`${route.requireFinal ? "Final" : "Optional final"}: ${route.final.manager_name || route.final.name}`);
+  return parts.join(" | ");
+}
+
+function canCurrentUserFinalApprove(route) {
+  if (isPortfolioManager()) return true;
+  const finalEmail = route?.final?.email || route?.final?.manager_email || "";
+  return Boolean(finalEmail && finalEmail.toLowerCase() === app.user?.email?.toLowerCase());
+}
+
+function approvalChainDetail(chain) {
+  return [
+    chain.project_id ? projectLabel(getProject(chain.project_id)) : "Any project",
+    chain.branch || "Any branch",
+    chain.division || "Any division",
+  ].filter(Boolean).join(" - ");
+}
+
 function getTask(id) {
   return app.tasks.find((task) => task.id === id);
 }
@@ -3711,11 +3985,22 @@ function roleLabel(role) {
   return ppmRoles[role] || role || "Resource";
 }
 
+function formatReportStatus(status) {
+  return {
+    draft: "Draft",
+    submitted: "Submitted",
+    pending_final: "Pending Final",
+    approved: "Approved",
+    rejected: "Sent Back",
+  }[status] || titleCase(String(status || "draft").replaceAll("_", " "));
+}
+
 function formatAuditAction(action) {
   return {
     draft_saved: "Draft saved",
     submitted: "Submitted",
     withdrawn: "Withdrawn",
+    final_requested: "Sent to final approval",
     approved: "Approved",
     rejected: "Sent back",
   }[action] || action || "Updated";

@@ -77,6 +77,21 @@ create table if not exists public.timesheet_tasks (
   unique (project_id, name)
 );
 
+create table if not exists public.timesheet_approval_chains (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  project_id uuid references public.timesheet_projects(id) on delete cascade,
+  branch text,
+  division text,
+  primary_manager_id uuid not null references public.timesheet_project_managers(id),
+  backup_manager_id uuid references public.timesheet_project_managers(id),
+  final_approver_id uuid references public.timesheet_project_managers(id),
+  require_final_approval boolean not null default false,
+  active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists public.timesheet_profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   email text not null,
@@ -117,7 +132,7 @@ create table if not exists public.timesheet_weekly_reports (
   week_start date not null,
   project_id uuid references public.timesheet_projects(id),
   manager_id uuid references public.timesheet_project_managers(id),
-  status text not null default 'draft' check (status in ('draft', 'submitted', 'approved', 'rejected')),
+  status text not null default 'draft' check (status in ('draft', 'submitted', 'pending_final', 'approved', 'rejected')),
   manager_notes text,
   reviewed_by uuid references auth.users(id) on delete set null,
   reviewer_email text,
@@ -133,6 +148,19 @@ alter table public.timesheet_weekly_reports
 
 alter table public.timesheet_weekly_reports
   add column if not exists reviewer_email text;
+
+alter table public.timesheet_weekly_reports
+  add column if not exists approval_chain_id uuid references public.timesheet_approval_chains(id) on delete set null;
+
+alter table public.timesheet_weekly_reports
+  add column if not exists approval_chain_snapshot jsonb not null default '{}'::jsonb;
+
+alter table public.timesheet_weekly_reports
+  drop constraint if exists timesheet_weekly_reports_status_check;
+
+alter table public.timesheet_weekly_reports
+  add constraint timesheet_weekly_reports_status_check
+  check (status in ('draft', 'submitted', 'pending_final', 'approved', 'rejected'));
 
 create table if not exists public.timesheet_daily_reports (
   id uuid primary key default gen_random_uuid(),
@@ -155,10 +183,17 @@ create table if not exists public.timesheet_report_audit (
   weekly_report_id uuid not null references public.timesheet_weekly_reports(id) on delete cascade,
   actor_id uuid references auth.users(id) on delete set null,
   actor_email text,
-  action text not null check (action in ('draft_saved', 'submitted', 'withdrawn', 'approved', 'rejected')),
+  action text not null check (action in ('draft_saved', 'submitted', 'withdrawn', 'final_requested', 'approved', 'rejected')),
   notes text,
   created_at timestamptz not null default now()
 );
+
+alter table public.timesheet_report_audit
+  drop constraint if exists timesheet_report_audit_action_check;
+
+alter table public.timesheet_report_audit
+  add constraint timesheet_report_audit_action_check
+  check (action in ('draft_saved', 'submitted', 'withdrawn', 'final_requested', 'approved', 'rejected'));
 
 create table if not exists public.timesheet_admin_audit (
   id uuid primary key default gen_random_uuid(),
@@ -252,6 +287,21 @@ create index if not exists timesheet_admin_audit_entity_idx
 
 create index if not exists timesheet_daily_reports_task_id_idx
   on public.timesheet_daily_reports (task_id);
+
+create index if not exists timesheet_approval_chains_scope_idx
+  on public.timesheet_approval_chains (project_id, branch, division, active);
+
+create index if not exists timesheet_approval_chains_primary_manager_idx
+  on public.timesheet_approval_chains (primary_manager_id);
+
+create index if not exists timesheet_approval_chains_backup_manager_idx
+  on public.timesheet_approval_chains (backup_manager_id);
+
+create index if not exists timesheet_approval_chains_final_approver_idx
+  on public.timesheet_approval_chains (final_approver_id);
+
+create index if not exists timesheet_weekly_reports_approval_chain_idx
+  on public.timesheet_weekly_reports (approval_chain_id);
 
 create index if not exists timesheet_entries_project_id_idx
   on public.timesheet_entries (project_id);
@@ -350,6 +400,12 @@ before update on public.timesheet_daily_reports
 for each row
 execute function public.set_timesheet_updated_at();
 
+drop trigger if exists set_timesheet_approval_chains_updated_at on public.timesheet_approval_chains;
+create trigger set_timesheet_approval_chains_updated_at
+before update on public.timesheet_approval_chains
+for each row
+execute function public.set_timesheet_updated_at();
+
 revoke execute on function public.set_timesheet_updated_at() from public, anon, authenticated;
 revoke execute on function public.set_timesheet_profile_role() from public, anon, authenticated;
 
@@ -360,6 +416,7 @@ alter table public.timesheet_invitations enable row level security;
 alter table public.timesheet_branches enable row level security;
 alter table public.timesheet_divisions enable row level security;
 alter table public.timesheet_tasks enable row level security;
+alter table public.timesheet_approval_chains enable row level security;
 alter table public.timesheet_profiles enable row level security;
 alter table public.timesheet_entries enable row level security;
 alter table public.timesheet_weekly_reports enable row level security;
@@ -473,6 +530,21 @@ to authenticated
 using (timesheet_private.current_user_role() = 'admin')
 with check (timesheet_private.current_user_role() = 'admin');
 
+drop policy if exists "Authenticated users can read active approval chains" on public.timesheet_approval_chains;
+create policy "Authenticated users can read active approval chains"
+on public.timesheet_approval_chains
+for select
+to authenticated
+using (active = true);
+
+drop policy if exists "Admins can manage approval chains" on public.timesheet_approval_chains;
+create policy "Admins can manage approval chains"
+on public.timesheet_approval_chains
+for all
+to authenticated
+using (timesheet_private.current_user_role() = 'admin')
+with check (timesheet_private.current_user_role() = 'admin');
+
 drop policy if exists "Users can insert their own profile" on public.timesheet_profiles;
 create policy "Users can insert their own profile"
 on public.timesheet_profiles
@@ -494,6 +566,20 @@ using (
       select 1
       from public.timesheet_project_managers m
       where m.id = timesheet_profiles.manager_id
+        and lower(m.manager_email) = lower(timesheet_private.current_user_email())
+    )
+  )
+  or (
+    timesheet_private.current_user_role() = 'manager'
+    and exists (
+      select 1
+      from public.timesheet_approval_chains c
+      join public.timesheet_project_managers m
+        on m.id in (c.primary_manager_id, c.backup_manager_id, c.final_approver_id)
+      where c.active = true
+        and (c.project_id is null or c.project_id = timesheet_profiles.project_id)
+        and (c.branch is null or c.branch = timesheet_profiles.branch)
+        and (c.division is null or c.division = timesheet_profiles.division)
         and lower(m.manager_email) = lower(timesheet_private.current_user_email())
     )
   )
@@ -556,6 +642,17 @@ using (
         and lower(m.manager_email) = lower(timesheet_private.current_user_email())
     )
   )
+  or (
+    timesheet_private.current_user_role() = 'manager'
+    and exists (
+      select 1
+      from public.timesheet_approval_chains c
+      join public.timesheet_project_managers m
+        on m.id in (c.primary_manager_id, c.backup_manager_id, c.final_approver_id)
+      where c.id = timesheet_weekly_reports.approval_chain_id
+        and lower(m.manager_email) = lower(timesheet_private.current_user_email())
+    )
+  )
 );
 
 drop policy if exists "Users can insert their own weekly reports" on public.timesheet_weekly_reports;
@@ -596,12 +693,42 @@ using (
         and lower(m.manager_email) = lower(timesheet_private.current_user_email())
     )
   )
+  or (
+    timesheet_private.current_user_role() = 'manager'
+    and exists (
+      select 1
+      from public.timesheet_approval_chains c
+      join public.timesheet_project_managers m
+        on m.id in (c.primary_manager_id, c.backup_manager_id, c.final_approver_id)
+      where c.id = timesheet_weekly_reports.approval_chain_id
+        and lower(m.manager_email) = lower(timesheet_private.current_user_email())
+    )
+  )
 )
 with check (
-  status in ('approved', 'rejected', 'submitted')
+  status in ('approved', 'rejected', 'submitted', 'pending_final')
   and (
     timesheet_private.current_user_role() = 'admin'
-    or timesheet_private.current_user_role() = 'manager'
+    or (
+      timesheet_private.current_user_role() = 'manager'
+      and (
+        status <> 'approved'
+        or not exists (
+          select 1
+          from public.timesheet_approval_chains c
+          where c.id = timesheet_weekly_reports.approval_chain_id
+            and c.require_final_approval = true
+        )
+        or exists (
+          select 1
+          from public.timesheet_approval_chains c
+          join public.timesheet_project_managers m
+            on m.id = c.final_approver_id
+          where c.id = timesheet_weekly_reports.approval_chain_id
+            and lower(m.manager_email) = lower(timesheet_private.current_user_email())
+        )
+      )
+    )
   )
 );
 
@@ -624,6 +751,14 @@ using (
             select 1
             from public.timesheet_project_managers m
             where m.id = w.manager_id
+              and lower(m.manager_email) = lower(timesheet_private.current_user_email())
+          )
+          or exists (
+            select 1
+            from public.timesheet_approval_chains c
+            join public.timesheet_project_managers m
+              on m.id in (c.primary_manager_id, c.backup_manager_id, c.final_approver_id)
+            where c.id = w.approval_chain_id
               and lower(m.manager_email) = lower(timesheet_private.current_user_email())
           )
         )
@@ -706,6 +841,14 @@ using (
             where m.id = w.manager_id
               and lower(m.manager_email) = lower(timesheet_private.current_user_email())
           )
+          or exists (
+            select 1
+            from public.timesheet_approval_chains c
+            join public.timesheet_project_managers m
+              on m.id in (c.primary_manager_id, c.backup_manager_id, c.final_approver_id)
+            where c.id = w.approval_chain_id
+              and lower(m.manager_email) = lower(timesheet_private.current_user_email())
+          )
         )
       )
   )
@@ -731,6 +874,14 @@ with check (
             select 1
             from public.timesheet_project_managers m
             where m.id = w.manager_id
+              and lower(m.manager_email) = lower(timesheet_private.current_user_email())
+          )
+          or exists (
+            select 1
+            from public.timesheet_approval_chains c
+            join public.timesheet_project_managers m
+              on m.id in (c.primary_manager_id, c.backup_manager_id, c.final_approver_id)
+            where c.id = w.approval_chain_id
               and lower(m.manager_email) = lower(timesheet_private.current_user_email())
           )
         )

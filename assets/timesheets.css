@@ -373,6 +373,27 @@ h1 {
   text-transform: uppercase;
 }
 
+.checkbox-field > div {
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid rgba(245, 241, 232, 0.22);
+  border-radius: var(--radius);
+  padding: 0 12px;
+  color: var(--paper);
+  background: rgba(255, 255, 255, 0.035);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+body.light-mode .checkbox-field > div {
+  border-color: rgba(21, 24, 29, 0.18);
+  color: var(--paper);
+  background: rgba(21, 24, 29, 0.04);
+}
+
 input,
 select,
 textarea {
@@ -754,6 +775,7 @@ body.light-mode .user-chip {
 }
 
 .status-pill.submitted { border-color: rgba(143, 227, 193, 0.42); color: var(--mint); }
+.status-pill.pending_final { border-color: rgba(142, 161, 173, 0.52); color: var(--steel); }
 .status-pill.approved { border-color: rgba(242, 217, 138, 0.48); color: var(--brass-soft); }
 .status-pill.rejected { border-color: rgba(255, 113, 95, 0.7); color: var(--signal); }
 

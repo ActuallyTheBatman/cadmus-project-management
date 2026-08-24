@@ -13,9 +13,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Libre+Baskerville:wght@700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/timesheets.css?v=20260824-admin-contrast">
-  <script src="/assets/timesheets-config.js?v=20260824-admin-contrast"></script>
-  <script type="module" src="/assets/timesheets.js?v=20260824-admin-contrast"></script>
+  <link rel="stylesheet" href="/assets/timesheets.css?v=20260824-approval-chains">
+  <script src="/assets/timesheets-config.js?v=20260824-approval-chains"></script>
+  <script type="module" src="/assets/timesheets.js?v=20260824-approval-chains"></script>
 </head>
 <body>
   <nav class="nav" aria-label="Primary navigation">
@@ -209,6 +209,7 @@
               </label>
               <select id="portfolioStatus" aria-label="Filter reports by status">
                 <option value="submitted">Submitted</option>
+                <option value="pending_final">Pending Final</option>
                 <option value="missing">Missing</option>
                 <option value="draft">Draft</option>
                 <option value="approved">Approved</option>
@@ -286,6 +287,22 @@
               <label class="field"><span>Manager email</span><input id="adminManagerEmail" type="email" required></label>
               <button class="button primary" type="submit">Add Manager</button>
               <ul id="managerList" class="admin-list"></ul>
+            </form>
+
+            <form id="approvalChainForm" class="admin-card wide-card">
+              <h3>Approval Chains</h3>
+              <div class="profile-grid tight-grid">
+                <label class="field"><span>Chain name</span><input id="approvalChainName" type="text" placeholder="BENCON Technology Controls" required></label>
+                <label class="field"><span>Project</span><select id="approvalChainProject"></select></label>
+                <label class="field"><span>Branch</span><select id="approvalChainBranch"></select></label>
+                <label class="field"><span>Division</span><select id="approvalChainDivision"></select></label>
+                <label class="field"><span>Primary approver</span><select id="approvalChainPrimary" required></select></label>
+                <label class="field"><span>Backup approver</span><select id="approvalChainBackup"></select></label>
+                <label class="field"><span>Final approver</span><select id="approvalChainFinal"></select></label>
+                <label class="field checkbox-field"><span>Final approval</span><div><input id="approvalChainRequireFinal" type="checkbox"> Require final approver</div></label>
+              </div>
+              <button class="button primary" type="submit">Add Chain</button>
+              <ul id="approvalChainList" class="admin-list"></ul>
             </form>
 
             <form id="branchForm" class="admin-card">
