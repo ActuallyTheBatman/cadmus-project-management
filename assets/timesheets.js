@@ -129,6 +129,7 @@ const els = {
   adminExportDivision: document.querySelector("#adminExportDivision"),
   adminExportStart: document.querySelector("#adminExportStart"),
   adminExportEnd: document.querySelector("#adminExportEnd"),
+  adminApprovedExport: document.querySelector("#adminApprovedExport"),
   userFilterForm: document.querySelector("#userFilterForm"),
   adminUserBranch: document.querySelector("#adminUserBranch"),
   adminUserDivision: document.querySelector("#adminUserDivision"),
@@ -306,6 +307,7 @@ function bindEvents() {
   els.divisionForm.addEventListener("submit", addDivision);
   els.taskForm.addEventListener("submit", addTask);
   els.adminExportForm.addEventListener("submit", exportAdminWork);
+  els.adminApprovedExport.addEventListener("click", exportApprovedTime);
   els.refreshExceptions.addEventListener("click", renderAdminExceptions);
   els.adminExportBranch.addEventListener("change", populateAdminExportDivisions);
   els.userFilterForm.addEventListener("submit", (event) => event.preventDefault());
@@ -2765,6 +2767,32 @@ async function exportAdminWork(event) {
   event.preventDefault();
   if (app.profile?.role !== "admin") return;
 
+  setMessage(els.adminMessage, "Building export...");
+  const exportData = await loadAdminExportData();
+  if (!exportData) return;
+
+  downloadAdminWorkCsv(exportData);
+  setMessage(els.adminMessage, `Exported ${exportData.days.length} work rows.`);
+}
+
+async function exportApprovedTime() {
+  if (app.profile?.role !== "admin") return;
+
+  setMessage(els.adminMessage, "Building approved time export...");
+  const exportData = await loadAdminExportData({ status: "approved" });
+  if (!exportData) return;
+
+  const summaries = summarizeApprovedTime(exportData);
+  if (!summaries.length) {
+    setMessage(els.adminMessage, "No approved time totals are available for that window.", true);
+    return;
+  }
+
+  downloadApprovedTimeCsv(exportData, summaries);
+  setMessage(els.adminMessage, `Exported ${summaries.length} approved time summary rows.`);
+}
+
+async function loadAdminExportData({ status = "" } = {}) {
   const branch = els.adminExportBranch.value;
   const division = els.adminExportDivision.value;
   const startDate = els.adminExportStart.value;
@@ -2772,15 +2800,13 @@ async function exportAdminWork(event) {
 
   if (!branch || !startDate || !endDate) {
     setMessage(els.adminMessage, "Choose a branch, start date, and end date before exporting.", true);
-    return;
+    return null;
   }
 
   if (startDate > endDate) {
     setMessage(els.adminMessage, "End date must be after the start date.", true);
-    return;
+    return null;
   }
-
-  setMessage(els.adminMessage, "Building export...");
 
   let profileQuery = app.supabase
     .from("timesheet_profiles")
@@ -2794,33 +2820,38 @@ async function exportAdminWork(event) {
   const { data: profiles, error: profileError } = await profileQuery.order("full_name");
   if (profileError) {
     setMessage(els.adminMessage, `Profile lookup failed: ${profileError.message}`, true);
-    return;
+    return null;
   }
 
   if (!profiles?.length) {
     setMessage(els.adminMessage, "No resources match that branch/division.", true);
-    return;
+    return null;
   }
 
   const userIds = profiles.map((profile) => profile.id);
   const reportStart = toDateInput(startOfWeek(parseLocalDate(startDate)));
   const reportEnd = toDateInput(startOfWeek(parseLocalDate(endDate)));
-  const { data: reports, error: reportError } = await app.supabase
+  let reportQuery = app.supabase
     .from("timesheet_weekly_reports")
-    .select("id, user_id, week_start, project_id, manager_id, status, submitted_at, reviewed_at")
+    .select("id, user_id, week_start, project_id, manager_id, status, submitted_at, reviewed_at, reviewer_email")
     .in("user_id", userIds)
     .gte("week_start", reportStart)
     .lte("week_start", reportEnd)
     .order("week_start", { ascending: true });
 
+  if (status) {
+    reportQuery = reportQuery.eq("status", status);
+  }
+
+  const { data: reports, error: reportError } = await reportQuery;
   if (reportError) {
     setMessage(els.adminMessage, `Report lookup failed: ${reportError.message}`, true);
-    return;
+    return null;
   }
 
   if (!reports?.length) {
-    setMessage(els.adminMessage, "No reports exist in that window.", true);
-    return;
+    setMessage(els.adminMessage, status === "approved" ? "No approved reports exist in that window." : "No reports exist in that window.", true);
+    return null;
   }
 
   const reportIds = reports.map((report) => report.id);
@@ -2835,16 +2866,15 @@ async function exportAdminWork(event) {
 
   if (dayError) {
     setMessage(els.adminMessage, `Work lookup failed: ${dayError.message}`, true);
-    return;
+    return null;
   }
 
   if (!days?.length) {
     setMessage(els.adminMessage, "No daily work entries match that window.", true);
-    return;
+    return null;
   }
 
-  downloadAdminWorkCsv({ profiles, reports, days, branch, division, startDate, endDate });
-  setMessage(els.adminMessage, `Exported ${days.length} work rows.`);
+  return { profiles, reports, days, branch, division, startDate, endDate };
 }
 
 function downloadAdminWorkCsv({ profiles, reports, days, branch, division, startDate, endDate }) {
@@ -2895,6 +2925,107 @@ function downloadAdminWorkCsv({ profiles, reports, days, branch, division, start
   const csv = rows.map((row) => row.map(csvCell).join(",")).join("\n");
   const scope = [branch, division && division !== "all" ? division : "all-divisions"].filter(Boolean).map(slugify).join("-");
   downloadCsv(csv, `cadmus-work-export-${scope}-${startDate}-to-${endDate}.csv`);
+}
+
+function downloadApprovedTimeCsv(exportData, summaries = summarizeApprovedTime(exportData)) {
+  const rows = [[
+    "Resource",
+    "Email",
+    "Company",
+    "Branch",
+    "Division",
+    "Project",
+    "Project Code",
+    "Client",
+    "Manager",
+    "Task",
+    "Task Code",
+    "Week",
+    "Approved Hours",
+    "Approved Date",
+    "Reviewer",
+    "Source Rows",
+  ]];
+
+  for (const row of summaries) {
+    rows.push([
+      row.resource,
+      row.email,
+      row.company,
+      row.branch,
+      row.division,
+      row.project,
+      row.projectCode,
+      row.client,
+      row.manager,
+      row.task,
+      row.taskCode,
+      row.week,
+      formatHours(row.hours),
+      row.reviewedAt,
+      row.reviewer,
+      String(row.sourceRows),
+    ]);
+  }
+
+  const csv = rows.map((row) => row.map(csvCell).join(",")).join("\n");
+  const scope = [exportData.branch, exportData.division && exportData.division !== "all" ? exportData.division : "all-divisions"].filter(Boolean).map(slugify).join("-");
+  downloadCsv(csv, `cadmus-approved-time-${scope}-${exportData.startDate}-to-${exportData.endDate}.csv`);
+}
+
+function summarizeApprovedTime({ profiles, reports, days }) {
+  const profileMap = new Map(profiles.map((profile) => [profile.id, profile]));
+  const reportMap = new Map(reports.map((report) => [report.id, report]));
+  const summaries = new Map();
+
+  for (const day of days) {
+    const report = reportMap.get(day.weekly_report_id);
+    if (!report || report.status !== "approved") continue;
+
+    const profile = profileMap.get(report.user_id);
+    const project = getProject(report.project_id);
+    const manager = getManager(report.manager_id);
+    const task = getTask(day.task_id);
+    const key = [
+      profile?.id || "",
+      report.project_id || "",
+      report.manager_id || "",
+      day.task_id || "",
+      report.week_start,
+    ].join("|");
+
+    if (!summaries.has(key)) {
+      summaries.set(key, {
+        resource: profile?.full_name || "",
+        email: profile?.email || "",
+        company: profile?.company || "",
+        branch: profile?.branch || "",
+        division: profile?.division || "",
+        project: project?.name || "",
+        projectCode: project?.code || "",
+        client: project?.client || "",
+        manager: manager?.manager_name || "",
+        task: task?.name || "",
+        taskCode: task?.code || "",
+        week: report.week_start,
+        hours: 0,
+        reviewedAt: report.reviewed_at || "",
+        reviewer: report.reviewer_email || "",
+        sourceRows: 0,
+      });
+    }
+
+    const summary = summaries.get(key);
+    summary.hours += Number(day.hours || 0);
+    summary.sourceRows += 1;
+  }
+
+  return [...summaries.values()].sort((a, b) =>
+    a.week.localeCompare(b.week)
+    || a.project.localeCompare(b.project)
+    || a.resource.localeCompare(b.resource)
+    || a.task.localeCompare(b.task)
+  );
 }
 
 function exportCsv() {
