@@ -13,9 +13,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Libre+Baskerville:wght@700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/timesheets.css?v=20260824-reminders">
-  <script src="/assets/timesheets-config.js?v=20260824-reminders"></script>
-  <script type="module" src="/assets/timesheets.js?v=20260824-reminders"></script>
+  <link rel="stylesheet" href="/assets/timesheets.css?v=20260824-auth-hardening">
+  <script src="/assets/timesheets-config.js?v=20260824-auth-hardening"></script>
+  <script type="module" src="/assets/timesheets.js?v=20260824-auth-hardening"></script>
 </head>
 <body>
   <nav class="nav" aria-label="Primary navigation">
@@ -61,7 +61,7 @@
 
         <section id="authView" class="auth-panel">
           <h2>Sign in</h2>
-          <p>Use a password for normal access. Magic links are available as a backup, but Supabase rate-limits those emails.</p>
+          <p>Use an email link for passwordless access. Password sign-in is available for returning users.</p>
           <form id="authForm" class="form-grid">
             <label class="field">
               <span>Email</span>
@@ -69,12 +69,12 @@
             </label>
             <label class="field">
               <span>Password</span>
-              <input id="password" type="password" autocomplete="current-password" minlength="8">
+              <input id="password" type="password" autocomplete="current-password" minlength="12">
             </label>
             <div class="toolbar auth-actions">
-              <button id="passwordSignIn" class="button primary" type="button">Sign In</button>
+              <button id="magicLink" class="button primary" type="submit">Email Link</button>
+              <button id="passwordSignIn" class="button" type="button">Sign In</button>
               <button id="passwordSignUp" class="button" type="button">Create Account</button>
-              <button id="magicLink" class="button" type="submit">Email Link</button>
               <button id="resetPassword" class="button" type="button">Reset Password</button>
             </div>
             <div id="authMessage" class="message" role="status"></div>
@@ -85,17 +85,17 @@
           <div class="panel-head">
             <div>
               <h2>Complete Profile</h2>
-              <p class="helper">Create your password and set your branch, division, project, and reporting manager before filing weekly updates.</p>
+              <p class="helper">Create a strong password and set your branch, division, project, and reporting manager before filing weekly updates.</p>
             </div>
           </div>
           <form id="profileForm" class="panel-body profile-grid">
             <label class="field">
               <span>Create password</span>
-              <input id="profilePassword" type="password" autocomplete="new-password" minlength="8" required>
+              <input id="profilePassword" type="password" autocomplete="new-password" minlength="12" required>
             </label>
             <label class="field">
               <span>Confirm password</span>
-              <input id="profilePasswordConfirm" type="password" autocomplete="new-password" minlength="8" required>
+              <input id="profilePasswordConfirm" type="password" autocomplete="new-password" minlength="12" required>
             </label>
             <label class="field">
               <span>Full name</span>
@@ -216,6 +216,7 @@
                 <input id="portfolioWeek" type="date">
               </label>
               <button id="refreshPortfolio" class="button" type="button">Refresh</button>
+              <button id="exportAudit" class="button" type="button">Export Audit</button>
             </div>
           </div>
           <div id="portfolioDashboard" class="portfolio-dashboard"></div>

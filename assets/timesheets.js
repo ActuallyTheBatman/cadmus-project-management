@@ -12,6 +12,18 @@ const ppmRoles = {
   manager: "Project Manager",
   admin: "Portfolio Manager",
 };
+const minimumPasswordLength = 12;
+const blockedPasswordTokens = new Set([
+  "cadmus",
+  "password",
+  "timesheet",
+  "welcome",
+  "qwerty",
+  "letmein",
+  "admin",
+  "project",
+  "company",
+]);
 
 const app = {
   supabase: null,
@@ -85,6 +97,7 @@ const els = {
   portfolioProject: document.querySelector("#portfolioProject"),
   portfolioWeek: document.querySelector("#portfolioWeek"),
   refreshPortfolio: document.querySelector("#refreshPortfolio"),
+  exportAudit: document.querySelector("#exportAudit"),
   portfolioDashboard: document.querySelector("#portfolioDashboard"),
   portfolioList: document.querySelector("#portfolioList"),
   projectForm: document.querySelector("#projectForm"),
@@ -278,6 +291,7 @@ function bindEvents() {
     renderDailyReports();
   });
   els.refreshPortfolio.addEventListener("click", loadPortfolio);
+  els.exportAudit.addEventListener("click", exportAuditHistory);
   els.portfolioStatus.addEventListener("change", loadPortfolio);
   els.portfolioProject.addEventListener("change", loadPortfolio);
   els.portfolioWeek.addEventListener("change", () => {
@@ -349,9 +363,15 @@ async function signInWithPassword() {
 async function signUpWithPassword() {
   const email = els.email.value.trim();
   const password = els.password.value;
+  const passwordIssue = validatePassword(password, email);
 
-  if (!email || password.length < 8) {
-    setMessage(els.authMessage, "Use an email and a password with at least 8 characters.", true);
+  if (!email) {
+    setMessage(els.authMessage, "Enter your email before creating an account.", true);
+    return;
+  }
+
+  if (passwordIssue) {
+    setMessage(els.authMessage, passwordIssue, true);
     return;
   }
 
@@ -367,7 +387,7 @@ async function signUpWithPassword() {
     return;
   }
 
-  setMessage(els.authMessage, "Account created. If confirmation is enabled, check your email once; otherwise sign in now.");
+  setMessage(els.authMessage, "Account created. Check your email once to confirm access.");
 }
 
 async function sendPasswordReset() {
@@ -611,8 +631,9 @@ async function saveProfile(event) {
     return;
   }
 
-  if (password.length < 8) {
-    setMessage(els.profileMessage, "Create a password with at least 8 characters.", true);
+  const passwordIssue = validatePassword(password, app.user.email);
+  if (passwordIssue) {
+    setMessage(els.profileMessage, passwordIssue, true);
     return;
   }
 
@@ -647,6 +668,34 @@ async function saveProfile(event) {
   els.profilePassword.value = "";
   els.profilePasswordConfirm.value = "";
   await renderForAuthState();
+}
+
+function validatePassword(password, email = "") {
+  if (password.length < minimumPasswordLength) {
+    return `Create a password with at least ${minimumPasswordLength} characters.`;
+  }
+
+  if (!/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/[0-9]/.test(password) || !/[^A-Za-z0-9]/.test(password)) {
+    return "Use a mix of uppercase, lowercase, numbers, and symbols.";
+  }
+
+  const normalized = password.toLowerCase();
+  const emailLocalPart = email.split("@")[0]?.toLowerCase();
+  if (emailLocalPart && emailLocalPart.length >= 4 && normalized.includes(emailLocalPart)) {
+    return "Do not include your email name in the password.";
+  }
+
+  for (const token of blockedPasswordTokens) {
+    if (normalized.includes(token)) {
+      return "Avoid company names, app names, and common words in the password.";
+    }
+  }
+
+  if (/(.)\1{3,}/.test(password)) {
+    return "Avoid repeated characters in the password.";
+  }
+
+  return "";
 }
 
 function renderProfileSummary() {
@@ -1323,6 +1372,119 @@ async function loadPortfolio() {
   for (const report of reports) {
     els.portfolioList.append(renderReviewCard(report, profileMap.get(report.user_id), daysByReport.get(report.id) || [], auditsByReport.get(report.id) || []));
   }
+}
+
+async function exportAuditHistory() {
+  if (els.portfolioStatus.value === "missing") {
+    showPortfolioNotice("Audit export is available for saved reports. Choose Draft, Submitted, Approved, Rejected, or All.");
+    return;
+  }
+
+  const selectedWeek = els.portfolioWeek.value ? toDateInput(startOfWeek(parseLocalDate(els.portfolioWeek.value))) : "";
+  let query = app.supabase
+    .from("timesheet_weekly_reports")
+    .select("id, user_id, week_start, project_id, manager_id, status, manager_notes, submitted_at, reviewed_at, reviewer_email")
+    .order("week_start", { ascending: false })
+    .limit(500);
+
+  if (els.portfolioStatus.value !== "all" && els.portfolioStatus.value !== "missing") {
+    query = query.eq("status", els.portfolioStatus.value);
+  }
+
+  if (els.portfolioProject.value && els.portfolioProject.value !== "all") {
+    query = query.eq("project_id", els.portfolioProject.value);
+  }
+
+  if (selectedWeek) {
+    query = query.eq("week_start", selectedWeek);
+  }
+
+  if (app.profile?.role === "manager" && app.profile.manager_id) {
+    query = query.eq("manager_id", app.profile.manager_id);
+  }
+
+  const { data: reports, error } = await query;
+  if (error) {
+    showPortfolioNotice(error.message, true);
+    return;
+  }
+
+  if (!reports?.length) {
+    showPortfolioNotice("No audit rows match the current filters.");
+    return;
+  }
+
+  const reportIds = reports.map((report) => report.id);
+  const userIds = [...new Set(reports.map((report) => report.user_id))];
+  const [{ data: profiles, error: profileError }, { data: audits, error: auditError }] = await Promise.all([
+    app.supabase.from("timesheet_profiles").select("id, full_name, email, branch, division").in("id", userIds),
+    app.supabase.from("timesheet_report_audit").select("weekly_report_id, actor_email, action, notes, created_at").in("weekly_report_id", reportIds).order("created_at", { ascending: false }),
+  ]);
+
+  if (profileError) {
+    showPortfolioNotice(profileError.message, true);
+    return;
+  }
+
+  if (auditError) {
+    showPortfolioNotice(auditError.message, true);
+    return;
+  }
+
+  const profileMap = new Map((profiles || []).map((profile) => [profile.id, profile]));
+  const auditsByReport = groupBy(audits || [], "weekly_report_id");
+  const rows = [["Week", "Resource", "Resource Email", "Branch", "Division", "Project", "Manager", "Status", "Action", "Actor", "Action Date", "Reviewer", "Submitted", "Reviewed", "Notes"]];
+
+  for (const report of reports) {
+    const profile = profileMap.get(report.user_id);
+    const project = getProject(report.project_id);
+    const manager = getManager(report.manager_id);
+    const reportAudits = auditsByReport.get(report.id) || [];
+    if (!reportAudits.length) {
+      rows.push(buildAuditExportRow({ report, profile, project, manager }));
+      continue;
+    }
+
+    for (const audit of reportAudits) {
+      rows.push(buildAuditExportRow({ report, profile, project, manager, audit }));
+    }
+  }
+
+  const csv = rows.map((row) => row.map(csvCell).join(",")).join("\n");
+  const scope = [
+    els.portfolioStatus.value || "all",
+    els.portfolioProject.value && els.portfolioProject.value !== "all" ? projectLabel(getProject(els.portfolioProject.value)) : "all-projects",
+    selectedWeek || "all-weeks",
+  ].map(slugify).join("-");
+  downloadCsv(csv, `cadmus-audit-history-${scope}.csv`);
+}
+
+function buildAuditExportRow({ report, profile, project, manager, audit = {} }) {
+  return [
+    report.week_start,
+    profile?.full_name || "",
+    profile?.email || "",
+    profile?.branch || "",
+    profile?.division || "",
+    projectLabel(project),
+    manager?.manager_name || "",
+    report.status,
+    audit.action ? formatAuditAction(audit.action) : "No audit event",
+    audit.actor_email || "",
+    audit.created_at || "",
+    report.reviewer_email || "",
+    report.submitted_at || "",
+    report.reviewed_at || "",
+    audit.notes || report.manager_notes || "",
+  ];
+}
+
+function showPortfolioNotice(message, isError = false) {
+  const notice = document.createElement("div");
+  notice.className = "notice";
+  notice.innerHTML = `<p>${escapeHtml(message)}</p>`;
+  if (isError) notice.classList.add("error");
+  els.portfolioList.prepend(notice);
 }
 
 async function loadPortfolioDashboard() {
