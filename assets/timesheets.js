@@ -856,7 +856,7 @@ async function loadWeek() {
       .order("line_index"),
     app.supabase
       .from("timesheet_report_audit")
-      .select("actor_email, action, notes, created_at")
+      .select("actor_email, action, notes, details, created_at")
       .eq("weekly_report_id", app.report.id)
       .order("created_at", { ascending: false }),
   ]);
@@ -963,7 +963,7 @@ function renderReportLifecycle({ locked }) {
       <span class="status-pill ${escapeHtml(status)}">${escapeHtml(formatReportStatus(status))}</span>
     </div>
     ${app.report?.manager_notes ? `<div class="review-note"><span>Latest review comment</span><p>${escapeHtml(app.report.manager_notes)}</p></div>` : ""}
-    ${app.reportAudits.length ? `<div class="audit-list">${app.reportAudits.slice(0, 6).map(renderAuditItem).join("")}</div>` : ""}
+    ${app.reportAudits.length ? renderAuditTimeline(app.reportAudits, 8) : ""}
   `;
   els.dailyGrid.append(panel);
 }
@@ -1308,10 +1308,10 @@ async function saveWeek(targetStatus) {
     }
 
     app.report = submittedReport;
-    await logTimesheetAudit(report.id, "submitted");
+    await logTimesheetAudit(report.id, "submitted", "", auditDetailsForReport(submittedReport, dailyPayload.rows));
   } else {
     app.report = report;
-    await logTimesheetAudit(report.id, "draft_saved");
+    await logTimesheetAudit(report.id, "draft_saved", "", auditDetailsForReport(report, dailyPayload.rows));
   }
 
   setMessage(els.appMessage, targetStatus === "submitted" ? "Week submitted." : "Draft saved.");
@@ -1337,7 +1337,12 @@ async function withdrawWeek() {
   }
 
   app.report = report;
-  await logTimesheetAudit(report.id, "withdrawn");
+  await logTimesheetAudit(report.id, "withdrawn", "", {
+    from_status: "submitted",
+    to_status: "draft",
+    week_start: report.week_start,
+    project: projectLabel(getProject(report.project_id)),
+  });
   setMessage(els.appMessage, "Submission withdrawn. You can edit and resubmit this week.");
   await loadWeek();
   if (canReviewPortfolio()) await loadPortfolio();
@@ -1493,7 +1498,7 @@ function qualityPanelHtml(quality) {
   `;
 }
 
-async function logTimesheetAudit(reportId, action, notes = "") {
+async function logTimesheetAudit(reportId, action, notes = "", details = {}) {
   if (!reportId) return;
   await app.supabase.from("timesheet_report_audit").insert({
     weekly_report_id: reportId,
@@ -1501,7 +1506,21 @@ async function logTimesheetAudit(reportId, action, notes = "") {
     actor_email: app.user.email,
     action,
     notes: notes.trim() || null,
+    details,
   });
+}
+
+function auditDetailsForReport(report, rows = []) {
+  const totalHours = rows.reduce((sum, row) => sum + Number(row.hours || 0), 0);
+  const filledRows = rows.filter((row) => Number(row.hours || 0) > 0 || row.task_id || row.accomplishments || row.blockers || row.next_steps);
+  return {
+    status: report?.status || "draft",
+    week_start: report?.week_start || toDateInput(app.weekStart),
+    project: projectLabel(getProject(report?.project_id || app.profile?.project_id)),
+    approval_route: approvalRouteSummary(report ? approvalRouteFromReport(report, app.profile) : resolveApprovalRoute(app.profile)),
+    total_hours: Number(formatHours(totalHours)),
+    task_lines: filledRows.length,
+  };
 }
 
 function getReportInputsForLine(line) {
@@ -1575,7 +1594,7 @@ async function loadPortfolio() {
   const [{ data: profiles }, { data: days }, { data: audits }] = await Promise.all([
     app.supabase.from("timesheet_profiles").select("id, full_name, email, company, branch, division, active").in("id", userIds),
     app.supabase.from("timesheet_daily_reports").select("weekly_report_id, day_index, line_index, work_date, task_id, hours, accomplishments, blockers, next_steps").in("weekly_report_id", reportIds).order("day_index").order("line_index"),
-    app.supabase.from("timesheet_report_audit").select("weekly_report_id, actor_email, action, notes, created_at").in("weekly_report_id", reportIds).order("created_at", { ascending: false }),
+    app.supabase.from("timesheet_report_audit").select("weekly_report_id, actor_email, action, notes, details, created_at").in("weekly_report_id", reportIds).order("created_at", { ascending: false }),
   ]);
 
   const profileMap = new Map((profiles || []).map((profile) => [profile.id, profile]));
@@ -1692,7 +1711,7 @@ async function exportAuditHistory() {
   const userIds = [...new Set(reports.map((report) => report.user_id))];
   const [{ data: profiles, error: profileError }, { data: audits, error: auditError }] = await Promise.all([
     app.supabase.from("timesheet_profiles").select("id, full_name, email, branch, division").in("id", userIds),
-    app.supabase.from("timesheet_report_audit").select("weekly_report_id, actor_email, action, notes, created_at").in("weekly_report_id", reportIds).order("created_at", { ascending: false }),
+    app.supabase.from("timesheet_report_audit").select("weekly_report_id, actor_email, action, notes, details, created_at").in("weekly_report_id", reportIds).order("created_at", { ascending: false }),
   ]);
 
   if (profileError) {
@@ -1707,20 +1726,19 @@ async function exportAuditHistory() {
 
   const profileMap = new Map((profiles || []).map((profile) => [profile.id, profile]));
   const auditsByReport = groupBy(audits || [], "weekly_report_id");
-  const rows = [["Week", "Resource", "Resource Email", "Branch", "Division", "Project", "Manager", "Status", "Action", "Actor", "Action Date", "Reviewer", "Submitted", "Reviewed", "Notes"]];
+  const rows = [["Week", "Resource", "Resource Email", "Branch", "Division", "Project", "Approval Route", "Current Status", "Action", "From Status", "To Status", "Actor", "Action Date", "Reviewer", "Submitted", "Reviewed", "Total Hours", "Task Lines", "Notes", "Details"]];
 
   for (const report of reports) {
     const profile = profileMap.get(report.user_id);
     const project = getProject(report.project_id);
-    const manager = getManager(report.manager_id);
     const reportAudits = auditsByReport.get(report.id) || [];
     if (!reportAudits.length) {
-      rows.push(buildAuditExportRow({ report, profile, project, manager }));
+      rows.push(buildAuditExportRow({ report, profile, project }));
       continue;
     }
 
     for (const audit of reportAudits) {
-      rows.push(buildAuditExportRow({ report, profile, project, manager, audit }));
+      rows.push(buildAuditExportRow({ report, profile, project, audit }));
     }
   }
 
@@ -1733,7 +1751,9 @@ async function exportAuditHistory() {
   downloadCsv(csv, `cadmus-audit-history-${scope}.csv`);
 }
 
-function buildAuditExportRow({ report, profile, project, manager, audit = {} }) {
+function buildAuditExportRow({ report, profile, project, audit = {} }) {
+  const route = approvalRouteFromReport(report, profile);
+  const details = audit.details || {};
   return [
     report.week_start,
     profile?.full_name || "",
@@ -1741,15 +1761,20 @@ function buildAuditExportRow({ report, profile, project, manager, audit = {} }) 
     profile?.branch || "",
     profile?.division || "",
     projectLabel(project),
-    manager?.manager_name || "",
-    report.status,
+    approvalRouteSummary(route),
+    formatReportStatus(report.status),
     audit.action ? formatAuditAction(audit.action) : "No audit event",
+    details.from_status ? formatReportStatus(details.from_status) : "",
+    details.to_status ? formatReportStatus(details.to_status) : "",
     audit.actor_email || "",
     audit.created_at || "",
     report.reviewer_email || "",
     report.submitted_at || "",
     report.reviewed_at || "",
+    details.total_hours ?? "",
+    details.task_lines ?? "",
     audit.notes || report.manager_notes || "",
+    Object.keys(details).length ? JSON.stringify(details) : "",
   ];
 }
 
@@ -2162,7 +2187,7 @@ function renderReviewCard(report, profile, days, audits = []) {
     <div class="review-days">
       ${days.map(renderReviewDay).join("")}
     </div>
-    ${audits.length ? `<div class="audit-list">${audits.slice(0, 5).map(renderAuditItem).join("")}</div>` : ""}
+    ${audits.length ? renderAuditTimeline(audits, 6) : ""}
   `;
 
   if (["submitted", "pending_final", "rejected"].includes(report.status) && canReviewPortfolio()) {
@@ -2206,12 +2231,43 @@ function submittedAgeInDays(report) {
 
 function renderAuditItem(audit) {
   return `
-    <div>
+    <div class="audit-event">
       <strong>${escapeHtml(formatAuditAction(audit.action))}</strong>
       <span>${escapeHtml([audit.actor_email, formatShortDate(audit.created_at)].filter(Boolean).join(" - "))}</span>
       ${audit.notes ? `<p>${escapeHtml(audit.notes)}</p>` : ""}
+      ${renderAuditDetails(audit.details)}
     </div>
   `;
+}
+
+function renderAuditTimeline(audits, limit = 6) {
+  return `
+    <div class="audit-list" aria-label="Report history timeline">
+      ${audits.slice(0, limit).map(renderAuditItem).join("")}
+      ${audits.length > limit ? `<div class="audit-event"><strong>+${audits.length - limit} more events</strong><span>Use Export Audit for the full history.</span></div>` : ""}
+    </div>
+  `;
+}
+
+function renderAuditDetails(details = {}) {
+  const chips = [];
+  const statusChange = formatAuditStatusChange(details);
+  if (statusChange) chips.push(statusChange);
+  if (details.total_hours !== undefined) chips.push(`${formatHours(details.total_hours)}h`);
+  if (details.task_lines !== undefined) chips.push(`${details.task_lines} task line${Number(details.task_lines) === 1 ? "" : "s"}`);
+  if (details.approval_route) chips.push(`Route: ${details.approval_route}`);
+  if (details.bulk_action) chips.push("Bulk action");
+  if (!chips.length) return "";
+  return `<div class="audit-detail-chips">${chips.map((chip) => `<span>${escapeHtml(chip)}</span>`).join("")}</div>`;
+}
+
+function formatAuditStatusChange(details = {}) {
+  if (details.from_status && details.to_status) {
+    return `${formatReportStatus(details.from_status)} -> ${formatReportStatus(details.to_status)}`;
+  }
+  if (details.to_status) return `To ${formatReportStatus(details.to_status)}`;
+  if (details.from_status) return `From ${formatReportStatus(details.from_status)}`;
+  return "";
 }
 
 function reviewMeta(label, value) {
@@ -2265,7 +2321,14 @@ async function reviewReport(reportId, status, notes = "") {
     return;
   }
 
-  await logTimesheetAudit(reportId, nextStatus === "pending_final" ? "final_requested" : status === "approved" ? "approved" : "rejected", reviewNotes);
+  await logTimesheetAudit(reportId, nextStatus === "pending_final" ? "final_requested" : status === "approved" ? "approved" : "rejected", reviewNotes, {
+    from_status: report?.status || "submitted",
+    to_status: nextStatus,
+    reviewer: app.user.email,
+    approval_route: approvalRouteSummary(approvalRoute),
+    final_required: approvalRoute.requireFinal,
+    notes_required: status === "rejected",
+  });
   await loadPortfolio();
 }
 
@@ -2311,7 +2374,14 @@ async function approveCleanSubmittedReports() {
       continue;
     }
 
-    await logTimesheetAudit(report.id, auditAction, auditNotes);
+    await logTimesheetAudit(report.id, auditAction, auditNotes, {
+      from_status: report.status,
+      to_status: nextStatus,
+      reviewer: app.user.email,
+      approval_route: approvalRouteSummary(approvalRoute),
+      bulk_action: true,
+      final_required: approvalRoute.requireFinal,
+    });
     approved += 1;
   }
 

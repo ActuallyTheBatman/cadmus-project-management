@@ -1434,14 +1434,16 @@ body.light-mode .user-chip {
 
 .audit-list {
   display: grid;
-  gap: 8px;
+  gap: 10px;
   border-top: 1px solid var(--line);
   padding-top: 12px;
 }
 
-.audit-list div {
+.audit-event {
+  border-left: 3px solid rgba(214, 168, 71, 0.46);
   display: grid;
-  gap: 3px;
+  gap: 4px;
+  padding: 2px 0 2px 10px;
 }
 
 .audit-list span,
@@ -1449,6 +1451,35 @@ body.light-mode .user-chip {
   color: rgba(245, 241, 232, 0.62);
   font-size: 12px;
   line-height: 1.4;
+}
+
+.audit-detail-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.audit-detail-chips span {
+  background: rgba(214, 168, 71, 0.12);
+  border: 1px solid rgba(214, 168, 71, 0.24);
+  border-radius: 999px;
+  color: rgba(245, 241, 232, 0.78);
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+  padding: 6px 8px;
+  text-transform: uppercase;
+}
+
+body.light-mode .audit-event {
+  border-left-color: rgba(176, 132, 36, 0.5);
+}
+
+body.light-mode .audit-detail-chips span {
+  background: rgba(176, 132, 36, 0.1);
+  border-color: rgba(176, 132, 36, 0.24);
+  color: rgba(21, 24, 29, 0.72);
 }
 
 .empty-state {

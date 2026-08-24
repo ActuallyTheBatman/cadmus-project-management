@@ -194,8 +194,12 @@ create table if not exists public.timesheet_report_audit (
   actor_email text,
   action text not null check (action in ('draft_saved', 'submitted', 'withdrawn', 'final_requested', 'approved', 'rejected')),
   notes text,
+  details jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
 );
+
+alter table public.timesheet_report_audit
+  add column if not exists details jsonb not null default '{}'::jsonb;
 
 alter table public.timesheet_report_audit
   drop constraint if exists timesheet_report_audit_action_check;
