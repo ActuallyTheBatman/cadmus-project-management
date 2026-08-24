@@ -36,6 +36,7 @@ const app = {
   divisions: [],
   tasks: [],
   approvalChains: [],
+  allowedDomains: [],
   adminProfiles: [],
   adminAudit: [],
   pendingInvite: null,
@@ -113,6 +114,7 @@ const els = {
   projectForm: document.querySelector("#projectForm"),
   managerForm: document.querySelector("#managerForm"),
   approvalChainForm: document.querySelector("#approvalChainForm"),
+  domainForm: document.querySelector("#domainForm"),
   branchForm: document.querySelector("#branchForm"),
   divisionForm: document.querySelector("#divisionForm"),
   taskForm: document.querySelector("#taskForm"),
@@ -141,6 +143,7 @@ const els = {
   approvalChainBackup: document.querySelector("#approvalChainBackup"),
   approvalChainFinal: document.querySelector("#approvalChainFinal"),
   approvalChainRequireFinal: document.querySelector("#approvalChainRequireFinal"),
+  allowedDomain: document.querySelector("#allowedDomain"),
   adminBranchName: document.querySelector("#adminBranchName"),
   adminDivisionBranch: document.querySelector("#adminDivisionBranch"),
   adminDivisionName: document.querySelector("#adminDivisionName"),
@@ -169,6 +172,7 @@ const els = {
   projectList: document.querySelector("#projectList"),
   managerList: document.querySelector("#managerList"),
   approvalChainList: document.querySelector("#approvalChainList"),
+  domainList: document.querySelector("#domainList"),
   branchList: document.querySelector("#branchList"),
   divisionList: document.querySelector("#divisionList"),
   taskList: document.querySelector("#taskList"),
@@ -195,6 +199,7 @@ async function boot() {
       autoRefreshToken: true,
     },
   });
+  await loadAllowedDomains();
   bindEvents();
   await handleAuthCallback();
   subscribeToProjectSettings();
@@ -208,6 +213,16 @@ async function boot() {
     if (_event === "PASSWORD_RECOVERY") app.passwordRecovery = true;
     await renderForAuthState();
   });
+}
+
+async function loadAllowedDomains() {
+  const { data, error } = await app.supabase
+    .from("timesheet_allowed_domains")
+    .select("domain, active")
+    .eq("active", true)
+    .order("domain");
+
+  if (!error) app.allowedDomains = data || [];
 }
 
 function applySavedTheme() {
@@ -371,6 +386,7 @@ function bindEvents() {
   els.approvalChainForm.addEventListener("submit", addApprovalChain);
   els.approvalChainProject.addEventListener("change", populateApprovalChainApprovers);
   els.approvalChainBranch.addEventListener("change", populateApprovalChainDivisions);
+  els.domainForm.addEventListener("submit", addAllowedDomain);
   els.branchForm.addEventListener("submit", addBranch);
   els.divisionForm.addEventListener("submit", addDivision);
   els.taskForm.addEventListener("submit", addTask);
@@ -400,9 +416,10 @@ function bindEvents() {
 
 async function signIn(event) {
   event.preventDefault();
+  const email = els.email.value.trim();
+  if (!validateAuthEmailDomain(email, els.authMessage)) return;
   setMessage(els.authMessage, "Sending sign-in link...");
   setMagicLinkCooldown();
-  const email = els.email.value.trim();
   const redirectTo = authRedirectUrl();
   const { error } = await app.supabase.auth.signInWithOtp({
     email,
@@ -425,6 +442,7 @@ async function signInWithPassword() {
     setMessage(els.authMessage, "Enter email and password.", true);
     return;
   }
+  if (!validateAuthEmailDomain(email, els.authMessage)) return;
 
   setMessage(els.authMessage, "Signing in...");
   const { error } = await app.supabase.auth.signInWithPassword({ email, password });
@@ -445,6 +463,7 @@ async function signUpWithPassword() {
     setMessage(els.authMessage, "Enter your email before creating an account.", true);
     return;
   }
+  if (!validateAuthEmailDomain(email, els.authMessage)) return;
 
   if (passwordIssue) {
     setMessage(els.authMessage, passwordIssue, true);
@@ -472,6 +491,7 @@ async function sendPasswordReset() {
     setMessage(els.authMessage, "Enter your email first, then reset your password.", true);
     return;
   }
+  if (!validateAuthEmailDomain(email, els.authMessage)) return;
 
   setMessage(els.authMessage, "Sending password reset...");
   const { error } = await app.supabase.auth.resetPasswordForEmail(email, {
@@ -574,6 +594,7 @@ async function loadReferenceData() {
     { data: divisions, error: divisionError },
     { data: tasks, error: taskError },
     { data: approvalChains, error: approvalChainError },
+    { data: allowedDomains, error: allowedDomainError },
   ] = await Promise.all([
     app.supabase.from("timesheet_projects").select("id, name, code, client, reporting_formats").eq("active", true).order("name"),
     app.supabase.from("timesheet_project_managers").select("id, project_id, manager_name, manager_email").eq("active", true).order("manager_name"),
@@ -581,6 +602,7 @@ async function loadReferenceData() {
     app.supabase.from("timesheet_divisions").select("id, branch_id, name").eq("active", true).order("name"),
     app.supabase.from("timesheet_tasks").select("id, project_id, name, code").eq("active", true).order("name"),
     app.supabase.from("timesheet_approval_chains").select("id, name, project_id, branch, division, primary_manager_id, backup_manager_id, final_approver_id, require_final_approval, active").eq("active", true).order("name"),
+    app.supabase.from("timesheet_allowed_domains").select("domain, active").eq("active", true).order("domain"),
   ]);
 
   if (projectError) setMessage(els.profileMessage, `Project load failed: ${projectError.message}`, true);
@@ -589,6 +611,7 @@ async function loadReferenceData() {
   if (divisionError) setMessage(els.profileMessage, `Division load failed: ${divisionError.message}`, true);
   if (taskError) setMessage(els.profileMessage, `Task load failed: ${taskError.message}`, true);
   if (approvalChainError) setMessage(els.profileMessage, `Approval chain load failed: ${approvalChainError.message}`, true);
+  if (allowedDomainError) setMessage(els.profileMessage, `Domain allowlist load failed: ${allowedDomainError.message}`, true);
 
   app.projects = projects || [];
   app.managers = managers || [];
@@ -596,6 +619,7 @@ async function loadReferenceData() {
   app.divisions = divisions || [];
   app.tasks = tasks || [];
   app.approvalChains = approvalChains || [];
+  app.allowedDomains = allowedDomains || [];
 }
 
 async function loadProfile() {
@@ -705,6 +729,8 @@ async function saveProfile(event) {
     project_id: els.profileProject.value,
     manager_id: els.profileManager.value,
   };
+
+  if (!validateAuthEmailDomain(payload.email, els.profileMessage)) return;
 
   if (!payload.full_name || !payload.company || !payload.branch || !payload.division || !payload.project_id || !payload.manager_id) {
     setMessage(els.profileMessage, "Complete every profile field before continuing.", true);
@@ -2500,6 +2526,7 @@ function populateManagerSelectElement(select, managers, placeholder, placeholder
 function renderAdminLists() {
   renderProjectAdminList();
   renderApprovalChainAdminList();
+  renderDomainAdminList();
   const managers = filterByFocusedProject(app.managers);
   const tasks = filterByFocusedProject(app.tasks);
   renderAdminList(
@@ -2540,6 +2567,7 @@ async function renderAdminExceptions() {
   const activeProfiles = app.adminProfiles.filter((profile) => profile.active !== false);
   const inactiveAssigned = app.adminProfiles.filter((profile) => profile.active === false && profile.project_id);
   const profilesMissingSetup = activeProfiles.filter((profile) => !profile.project_id || !profile.manager_id || !profile.branch || !profile.division);
+  const profilesOutsideDomains = activeProfiles.filter((profile) => !emailAllowedByDomain(profile.email));
   const managersWithoutProfiles = app.managers.filter((manager) => !activeProfiles.some((profile) => profile.manager_id === manager.id));
   const projectsMissingManagers = app.projects.filter((project) => !app.managers.some((manager) => manager.project_id === project.id));
   const projectsMissingTasks = app.projects.filter((project) => !app.tasks.some((task) => task.project_id === project.id));
@@ -2568,6 +2596,18 @@ async function renderAdminExceptions() {
         meta: missingProfileFields(profile).join(", "),
       })),
       action: profilesMissingSetup.length ? () => focusUserExceptions("active") : null,
+      actionLabel: "Filter Users",
+    },
+    {
+      title: "Domain Exceptions",
+      tone: profilesOutsideDomains.length ? "rejected" : "approved",
+      count: profilesOutsideDomains.length,
+      detail: `Active users outside allowed domains: ${allowedDomainSummary()}`,
+      items: profilesOutsideDomains.map((profile) => ({
+        title: profile.full_name || profile.email,
+        meta: profile.email,
+      })),
+      action: profilesOutsideDomains.length ? () => focusUserExceptions("active") : null,
       actionLabel: "Filter Users",
     },
     {
@@ -2791,6 +2831,7 @@ function formatAdminAuditAction(action) {
 
 function formatEntityType(entityType) {
   return {
+    allowed_domain: "Allowed Domain",
     approval_chain: "Approval Chain",
     project: "Project",
     project_manager: "Resource Manager",
@@ -2862,6 +2903,28 @@ function renderApprovalChainAdminList() {
     `;
     row.querySelector("button").addEventListener("click", () => deactivateAdminItem("timesheet_approval_chains", chain.id, "Approval chain removed."));
     els.approvalChainList.append(row);
+  }
+}
+
+function renderDomainAdminList() {
+  if (!app.allowedDomains.length) {
+    els.domainList.innerHTML = `<li class="admin-item"><span>No domain restrictions configured.</span></li>`;
+    return;
+  }
+
+  els.domainList.innerHTML = "";
+  for (const item of app.allowedDomains) {
+    const row = document.createElement("li");
+    row.className = "admin-item";
+    row.innerHTML = `
+      <div>
+        <strong>@${escapeHtml(item.domain)}</strong>
+        <span>Allowed for invitations and onboarding</span>
+      </div>
+      <button class="button danger small-button" type="button">Remove</button>
+    `;
+    row.querySelector("button").addEventListener("click", () => deactivateAllowedDomain(item.domain));
+    els.domainList.append(row);
   }
 }
 
@@ -3191,6 +3254,49 @@ async function addApprovalChain(event) {
   });
 }
 
+async function addAllowedDomain(event) {
+  event.preventDefault();
+  const domain = normalizeAllowedDomain(els.allowedDomain.value);
+  if (!domain) {
+    setMessage(els.adminMessage, "Enter a valid domain like calstrs.com.", true);
+    return;
+  }
+
+  setMessage(els.adminMessage, "Adding allowed domain...");
+  const payload = {
+    domain,
+    active: true,
+    created_by: app.user.id,
+  };
+  const { error } = await app.supabase.from("timesheet_allowed_domains").upsert(payload, { onConflict: "domain" });
+  await finishAdminSave(error, els.domainForm, "Allowed domain saved.", {
+    action: "created",
+    entityType: "allowed_domain",
+    entityId: null,
+    entityLabel: `@${domain}`,
+    details: payload,
+  });
+}
+
+async function deactivateAllowedDomain(domain) {
+  if (!window.confirm(`Remove @${domain} from the allowed email domains? New invitations and onboarding for this domain will be blocked.`)) return;
+  setMessage(els.adminMessage, "Removing allowed domain...");
+  const { error } = await app.supabase
+    .from("timesheet_allowed_domains")
+    .update({ active: false })
+    .eq("domain", domain);
+
+  if (error) {
+    setMessage(els.adminMessage, error.message, true);
+    return;
+  }
+
+  await logAdminChange("deactivated", "allowed_domain", null, `@${domain}`, { domain });
+  await loadReferenceData();
+  await renderAdminConsole();
+  setMessage(els.adminMessage, "Allowed domain removed.");
+}
+
 async function addBranch(event) {
   event.preventDefault();
   setMessage(els.adminMessage, "Adding branch...");
@@ -3370,6 +3476,10 @@ function buildDefaultInvitationRows() {
   if (!els.inviteProject.value) errors.push({ row: "-", message: "Choose a project." });
 
   for (const email of emails) {
+    if (!emailAllowedByDomain(email)) {
+      errors.push({ row: "-", message: `${email} is outside the allowed domains: ${allowedDomainSummary()}.` });
+      continue;
+    }
     rows.push({
       rowNumber: "-",
       email,
@@ -3418,6 +3528,7 @@ function validateInvitationRecord(record, rowNumber, seen) {
   const errors = [];
   const email = record.email?.toLowerCase();
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.push({ row: rowNumber, message: "Valid email is required." });
+  if (email && !emailAllowedByDomain(email)) errors.push({ row: rowNumber, message: `Email domain must be one of: ${allowedDomainSummary()}.` });
   if (seen.has(email)) errors.push({ row: rowNumber, message: "Duplicate email in import." });
   seen.add(email);
 
@@ -3983,6 +4094,35 @@ function isPortfolioManager() {
 
 function roleLabel(role) {
   return ppmRoles[role] || role || "Resource";
+}
+
+function normalizeAllowedDomain(value) {
+  const domain = String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/^@+/, "");
+  return /^[a-z0-9.-]+\.[a-z]{2,}$/.test(domain) ? domain : "";
+}
+
+function emailDomain(email) {
+  return String(email || "").trim().toLowerCase().split("@")[1] || "";
+}
+
+function emailAllowedByDomain(email) {
+  if (!app.allowedDomains.length) return true;
+  return app.allowedDomains.some((item) => item.active !== false && item.domain === emailDomain(email));
+}
+
+function validateAuthEmailDomain(email, messageNode) {
+  if (emailAllowedByDomain(email)) return true;
+  setMessage(messageNode, `This email domain is not approved for Cadmus Timesheets. Allowed domains: ${allowedDomainSummary()}.`, true);
+  return false;
+}
+
+function allowedDomainSummary() {
+  return app.allowedDomains.length
+    ? app.allowedDomains.map((item) => `@${item.domain}`).join(", ")
+    : "all domains";
 }
 
 function formatReportStatus(status) {

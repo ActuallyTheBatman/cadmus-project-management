@@ -30,6 +30,15 @@ create table if not exists public.timesheet_admin_emails (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.timesheet_allowed_domains (
+  domain text primary key,
+  active boolean not null default true,
+  created_by uuid references auth.users(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  check (domain = lower(domain) and domain !~ '^@' and domain like '%.%')
+);
+
 create table if not exists public.timesheet_invitations (
   id uuid primary key default gen_random_uuid(),
   email text not null,
@@ -258,6 +267,27 @@ revoke execute on function timesheet_private.current_user_email() from public, a
 grant execute on function timesheet_private.current_user_role() to authenticated;
 grant execute on function timesheet_private.current_user_email() to authenticated;
 
+create or replace function timesheet_private.email_domain_allowed(email_value text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select
+    exists (select 1 from public.timesheet_admin_emails a where lower(a.email) = lower(email_value))
+    or not exists (select 1 from public.timesheet_allowed_domains d where d.active = true)
+    or exists (
+      select 1
+      from public.timesheet_allowed_domains d
+      where d.active = true
+        and lower(split_part(email_value, '@', 2)) = d.domain
+    )
+$$;
+
+revoke execute on function timesheet_private.email_domain_allowed(text) from public, anon;
+grant execute on function timesheet_private.email_domain_allowed(text) to authenticated;
+
 create index if not exists timesheet_weekly_reports_user_week_idx
   on public.timesheet_weekly_reports (user_id, week_start);
 
@@ -284,6 +314,9 @@ create index if not exists timesheet_admin_audit_actor_id_idx
 
 create index if not exists timesheet_admin_audit_entity_idx
   on public.timesheet_admin_audit (entity_type, entity_id);
+
+create index if not exists timesheet_allowed_domains_active_idx
+  on public.timesheet_allowed_domains (active, domain);
 
 create index if not exists timesheet_daily_reports_task_id_idx
   on public.timesheet_daily_reports (task_id);
@@ -388,6 +421,12 @@ before insert or update on public.timesheet_profiles
 for each row
 execute function public.set_timesheet_profile_role();
 
+drop trigger if exists set_timesheet_allowed_domains_updated_at on public.timesheet_allowed_domains;
+create trigger set_timesheet_allowed_domains_updated_at
+before update on public.timesheet_allowed_domains
+for each row
+execute function public.set_timesheet_updated_at();
+
 drop trigger if exists set_timesheet_weekly_reports_updated_at on public.timesheet_weekly_reports;
 create trigger set_timesheet_weekly_reports_updated_at
 before update on public.timesheet_weekly_reports
@@ -412,6 +451,7 @@ revoke execute on function public.set_timesheet_profile_role() from public, anon
 alter table public.timesheet_projects enable row level security;
 alter table public.timesheet_project_managers enable row level security;
 alter table public.timesheet_admin_emails enable row level security;
+alter table public.timesheet_allowed_domains enable row level security;
 alter table public.timesheet_invitations enable row level security;
 alter table public.timesheet_branches enable row level security;
 alter table public.timesheet_divisions enable row level security;
@@ -462,13 +502,32 @@ to authenticated
 using (timesheet_private.current_user_role() = 'admin')
 with check (timesheet_private.current_user_role() = 'admin');
 
+drop policy if exists "Authenticated users can read active allowed domains" on public.timesheet_allowed_domains;
+drop policy if exists "Anyone can read active allowed domains" on public.timesheet_allowed_domains;
+create policy "Anyone can read active allowed domains"
+on public.timesheet_allowed_domains
+for select
+to anon, authenticated
+using (active = true);
+
+drop policy if exists "Admins can manage allowed domains" on public.timesheet_allowed_domains;
+create policy "Admins can manage allowed domains"
+on public.timesheet_allowed_domains
+for all
+to authenticated
+using (timesheet_private.current_user_role() = 'admin')
+with check (timesheet_private.current_user_role() = 'admin');
+
 drop policy if exists "Admins can manage invitations" on public.timesheet_invitations;
 create policy "Admins can manage invitations"
 on public.timesheet_invitations
 for all
 to authenticated
 using (timesheet_private.current_user_role() = 'admin')
-with check (timesheet_private.current_user_role() = 'admin');
+with check (
+  timesheet_private.current_user_role() = 'admin'
+  and timesheet_private.email_domain_allowed(email)
+);
 
 drop policy if exists "Invited users can read their own invitations" on public.timesheet_invitations;
 create policy "Invited users can read their own invitations"
@@ -550,7 +609,10 @@ create policy "Users can insert their own profile"
 on public.timesheet_profiles
 for insert
 to authenticated
-with check (auth.uid() = id);
+with check (
+  auth.uid() = id
+  and timesheet_private.email_domain_allowed(email)
+);
 
 drop policy if exists "Users can read visible profiles" on public.timesheet_profiles;
 create policy "Users can read visible profiles"
@@ -593,7 +655,10 @@ to authenticated
 using (auth.uid() = id or timesheet_private.current_user_role() = 'admin')
 with check (
   timesheet_private.current_user_role() = 'admin'
-  or auth.uid() = id
+  or (
+    auth.uid() = id
+    and timesheet_private.email_domain_allowed(email)
+  )
 );
 
 drop policy if exists "Users can read their own time entries" on public.timesheet_entries;
@@ -940,6 +1005,22 @@ on conflict (project_id, manager_email) do update set
 insert into public.timesheet_admin_emails (email)
 values ('Garrett@cadmusprojects.com')
 on conflict (email) do nothing;
+
+insert into public.timesheet_allowed_domains (domain)
+select distinct lower(split_part(email, '@', 2))
+from public.timesheet_admin_emails
+where email like '%@%'
+on conflict (domain) do update set active = true;
+
+insert into public.timesheet_allowed_domains (domain)
+select distinct lower(split_part(email, '@', 2))
+from public.timesheet_profiles
+where email like '%@%'
+on conflict (domain) do update set active = true;
+
+insert into public.timesheet_allowed_domains (domain)
+values ('calstrs.com')
+on conflict (domain) do update set active = true;
 
 insert into public.timesheet_branches (name)
 values

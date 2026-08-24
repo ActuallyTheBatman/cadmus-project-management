@@ -13,9 +13,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Libre+Baskerville:wght@700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/timesheets.css?v=20260824-approval-chains">
-  <script src="/assets/timesheets-config.js?v=20260824-approval-chains"></script>
-  <script type="module" src="/assets/timesheets.js?v=20260824-approval-chains"></script>
+  <link rel="stylesheet" href="/assets/timesheets.css?v=20260824-domain-allowlist">
+  <script src="/assets/timesheets-config.js?v=20260824-domain-allowlist"></script>
+  <script type="module" src="/assets/timesheets.js?v=20260824-domain-allowlist"></script>
 </head>
 <body>
   <nav class="nav" aria-label="Primary navigation">
@@ -303,6 +303,13 @@
               </div>
               <button class="button primary" type="submit">Add Chain</button>
               <ul id="approvalChainList" class="admin-list"></ul>
+            </form>
+
+            <form id="domainForm" class="admin-card">
+              <h3>Allowed Domains</h3>
+              <label class="field"><span>Email domain</span><input id="allowedDomain" type="text" placeholder="calstrs.com" required></label>
+              <button class="button primary" type="submit">Add Domain</button>
+              <ul id="domainList" class="admin-list"></ul>
             </form>
 
             <form id="branchForm" class="admin-card">
