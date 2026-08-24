@@ -116,12 +116,20 @@ create table if not exists public.timesheet_weekly_reports (
   manager_id uuid references public.timesheet_project_managers(id),
   status text not null default 'draft' check (status in ('draft', 'submitted', 'approved', 'rejected')),
   manager_notes text,
+  reviewed_by uuid references auth.users(id) on delete set null,
+  reviewer_email text,
   submitted_at timestamptz,
   reviewed_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (user_id, week_start)
 );
+
+alter table public.timesheet_weekly_reports
+  add column if not exists reviewed_by uuid references auth.users(id) on delete set null;
+
+alter table public.timesheet_weekly_reports
+  add column if not exists reviewer_email text;
 
 create table if not exists public.timesheet_daily_reports (
   id uuid primary key default gen_random_uuid(),
@@ -489,13 +497,27 @@ to authenticated
 with check (auth.uid() = user_id);
 
 drop policy if exists "Users and reviewers can update weekly reports" on public.timesheet_weekly_reports;
-create policy "Users and reviewers can update weekly reports"
+drop policy if exists "Users can submit or withdraw their own weekly reports" on public.timesheet_weekly_reports;
+create policy "Users can submit or withdraw their own weekly reports"
 on public.timesheet_weekly_reports
 for update
 to authenticated
 using (
-  (auth.uid() = user_id and status in ('draft', 'rejected', 'submitted'))
-  or public.current_user_role() = 'admin'
+  auth.uid() = user_id
+  and status in ('draft', 'rejected', 'submitted')
+)
+with check (
+  auth.uid() = user_id
+  and status in ('draft', 'submitted')
+);
+
+drop policy if exists "Reviewers can approve or reject weekly reports" on public.timesheet_weekly_reports;
+create policy "Reviewers can approve or reject weekly reports"
+on public.timesheet_weekly_reports
+for update
+to authenticated
+using (
+  public.current_user_role() = 'admin'
   or (
     public.current_user_role() = 'manager'
     and exists (
@@ -507,9 +529,11 @@ using (
   )
 )
 with check (
-  auth.uid() = user_id
-  or public.current_user_role() = 'admin'
-  or public.current_user_role() = 'manager'
+  status in ('approved', 'rejected', 'submitted')
+  and (
+    public.current_user_role() = 'admin'
+    or public.current_user_role() = 'manager'
+  )
 );
 
 drop policy if exists "Users and reviewers can read daily reports" on public.timesheet_daily_reports;

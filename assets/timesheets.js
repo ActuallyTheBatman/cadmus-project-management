@@ -27,6 +27,7 @@ const app = {
   adminProjectFocus: "all",
   passwordRecovery: false,
   report: null,
+  reportAudits: [],
   dailyReports: [],
   reportFormat: "weekly_grid",
   weekStart: startOfWeek(new Date()),
@@ -676,24 +677,41 @@ async function loadWeek() {
 
   app.report = report || null;
   if (!app.report) {
+    app.reportAudits = [];
     app.dailyReports = buildBlankDailyReports(null);
     renderDailyReports();
     setMessage(els.appMessage, "");
     return;
   }
 
-  const { data: days, error: daysError } = await app.supabase
-    .from("timesheet_daily_reports")
-    .select("id, weekly_report_id, day_index, line_index, work_date, task_id, hours, accomplishments, blockers, next_steps")
-    .eq("weekly_report_id", app.report.id)
-    .order("day_index")
-    .order("line_index");
+  const [
+    { data: days, error: daysError },
+    { data: audits, error: auditError },
+  ] = await Promise.all([
+    app.supabase
+      .from("timesheet_daily_reports")
+      .select("id, weekly_report_id, day_index, line_index, work_date, task_id, hours, accomplishments, blockers, next_steps")
+      .eq("weekly_report_id", app.report.id)
+      .order("day_index")
+      .order("line_index"),
+    app.supabase
+      .from("timesheet_report_audit")
+      .select("actor_email, action, notes, created_at")
+      .eq("weekly_report_id", app.report.id)
+      .order("created_at", { ascending: false }),
+  ]);
 
   if (daysError) {
     setMessage(els.appMessage, `Daily boxes failed: ${daysError.message}`, true);
     return;
   }
 
+  if (auditError) {
+    setMessage(els.appMessage, `Audit history failed: ${auditError.message}`, true);
+    return;
+  }
+
+  app.reportAudits = audits || [];
   app.dailyReports = mergeDailyReports(days || []);
   renderDailyReports();
   setMessage(els.appMessage, "");
@@ -750,6 +768,8 @@ function renderDailyReports() {
     renderDailyCards({ locked, projectTasks });
   }
 
+  renderReportLifecycle({ locked });
+
   const status = app.report?.status || "draft";
   els.reportStatus.textContent = status[0].toUpperCase() + status.slice(1);
   els.saveWeek.disabled = locked;
@@ -757,6 +777,32 @@ function renderDailyReports() {
   els.withdrawWeek.classList.toggle("hidden", !canWithdraw);
   els.withdrawWeek.disabled = !canWithdraw;
   updateTotalsFromDom();
+}
+
+function renderReportLifecycle({ locked }) {
+  const existing = els.dailyGrid.querySelector(".report-lifecycle");
+  if (existing) existing.remove();
+  if (!app.report && !app.reportAudits.length) return;
+
+  const panel = document.createElement("section");
+  panel.className = "report-lifecycle";
+  const status = app.report?.status || "draft";
+  const lockText = status === "approved"
+    ? "Approved weeks are locked. Contact a Portfolio Manager if an adjustment is required."
+    : "Submitted weeks are locked while they are waiting for review. Withdraw to make changes before approval.";
+
+  panel.innerHTML = `
+    <div class="lifecycle-head">
+      <div>
+        <h3>Report History</h3>
+        <p>${escapeHtml(locked ? lockText : "This week is editable until it is submitted for manager review.")}</p>
+      </div>
+      <span class="status-pill ${escapeHtml(status)}">${escapeHtml(status)}</span>
+    </div>
+    ${app.report?.manager_notes ? `<div class="review-note"><span>Latest review comment</span><p>${escapeHtml(app.report.manager_notes)}</p></div>` : ""}
+    ${app.reportAudits.length ? `<div class="audit-list">${app.reportAudits.slice(0, 6).map(renderAuditItem).join("")}</div>` : ""}
+  `;
+  els.dailyGrid.append(panel);
 }
 
 function renderFormatSelector(enabledFormats) {
@@ -1103,7 +1149,7 @@ async function withdrawWeek() {
   setMessage(els.appMessage, "Withdrawing submission...");
   const { data: report, error } = await app.supabase
     .from("timesheet_weekly_reports")
-    .update({ status: "draft", submitted_at: null, reviewed_at: null })
+    .update({ status: "draft", submitted_at: null, reviewed_at: null, reviewed_by: null, reviewer_email: null })
     .eq("id", app.report.id)
     .eq("status", "submitted")
     .select("id, user_id, week_start, project_id, manager_id, status, manager_notes, submitted_at, reviewed_at")
@@ -1426,9 +1472,21 @@ function renderReviewDay(day) {
 }
 
 async function reviewReport(reportId, status, notes = "") {
+  const trimmedNotes = notes.trim();
+  if (status === "rejected" && trimmedNotes.length < 8) {
+    els.portfolioList.insertAdjacentHTML("afterbegin", `<div class="notice"><p>Send-back comments are required so the resource knows what to fix.</p></div>`);
+    return;
+  }
+
   const { error } = await app.supabase
     .from("timesheet_weekly_reports")
-    .update({ status, manager_notes: notes.trim() || null, reviewed_at: new Date().toISOString() })
+    .update({
+      status,
+      manager_notes: trimmedNotes || null,
+      reviewed_by: app.user.id,
+      reviewer_email: app.user.email,
+      reviewed_at: new Date().toISOString(),
+    })
     .eq("id", reportId);
 
   if (error) {
@@ -1436,7 +1494,7 @@ async function reviewReport(reportId, status, notes = "") {
     return;
   }
 
-  await logTimesheetAudit(reportId, status === "approved" ? "approved" : "rejected", notes);
+  await logTimesheetAudit(reportId, status === "approved" ? "approved" : "rejected", trimmedNotes);
   await loadPortfolio();
 }
 

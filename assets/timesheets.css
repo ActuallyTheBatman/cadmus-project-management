@@ -860,6 +860,55 @@ select option { color: #111418; }
   min-height: 72px;
 }
 
+.report-lifecycle {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 12px;
+  border: 1px solid rgba(143, 227, 193, 0.22);
+  border-radius: var(--radius);
+  padding: 14px;
+  background: rgba(143, 227, 193, 0.045);
+}
+
+.lifecycle-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.lifecycle-head h3 {
+  font-size: 14px;
+  text-transform: uppercase;
+}
+
+.lifecycle-head p {
+  margin-top: 5px;
+  color: rgba(245, 241, 232, 0.68);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.review-note {
+  display: grid;
+  gap: 5px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
+.review-note span {
+  color: rgba(245, 241, 232, 0.54);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.review-note p {
+  color: rgba(245, 241, 232, 0.78);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .audit-list {
   display: grid;
   gap: 8px;
@@ -928,7 +977,8 @@ footer {
   .nav-inner,
   .status-bar,
   .panel-head,
-  .review-head {
+  .review-head,
+  .lifecycle-head {
     align-items: flex-start;
     flex-direction: column;
   }
