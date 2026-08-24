@@ -2,6 +2,7 @@ import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 
 const weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
 const config = window.CADMUS_TIMESHEETS_CONFIG || {};
+const themeStorageKey = "cadmus-timesheets-theme";
 const reportingFormats = {
   daily_cards: "Daily Cards",
   weekly_grid: "Weekly Grid",
@@ -71,6 +72,7 @@ const els = {
   authMessage: document.querySelector("#authMessage"),
   userEmail: document.querySelector("#userEmail"),
   rolePill: document.querySelector("#rolePill"),
+  themeToggle: document.querySelector("#themeToggle"),
   signOut: document.querySelector("#signOut"),
   profileForm: document.querySelector("#profileForm"),
   profilePassword: document.querySelector("#profilePassword"),
@@ -163,6 +165,7 @@ const els = {
   adminMessage: document.querySelector("#adminMessage"),
 };
 
+applySavedTheme();
 boot();
 
 async function boot() {
@@ -194,6 +197,42 @@ async function boot() {
     if (_event === "PASSWORD_RECOVERY") app.passwordRecovery = true;
     await renderForAuthState();
   });
+}
+
+function applySavedTheme() {
+  const savedTheme = readSavedTheme();
+  setTheme(savedTheme === "light" ? "light" : "dark");
+}
+
+function toggleTheme() {
+  const nextTheme = document.body.classList.contains("light-mode") ? "dark" : "light";
+  setTheme(nextTheme);
+  saveTheme(nextTheme);
+}
+
+function setTheme(theme) {
+  const light = theme === "light";
+  document.body.classList.toggle("light-mode", light);
+  if (els.themeToggle) {
+    els.themeToggle.textContent = light ? "Dark Mode" : "Light Mode";
+    els.themeToggle.setAttribute("aria-pressed", String(light));
+  }
+}
+
+function readSavedTheme() {
+  try {
+    return localStorage.getItem(themeStorageKey) || "dark";
+  } catch {
+    return "dark";
+  }
+}
+
+function saveTheme(theme) {
+  try {
+    localStorage.setItem(themeStorageKey, theme);
+  } catch {
+    // The toggle still works for the current page if browser storage is disabled.
+  }
 }
 
 function subscribeToProjectSettings() {
@@ -287,6 +326,7 @@ function bindEvents() {
   els.passwordSignIn.addEventListener("click", signInWithPassword);
   els.passwordSignUp.addEventListener("click", signUpWithPassword);
   els.resetPassword.addEventListener("click", sendPasswordReset);
+  if (els.themeToggle) els.themeToggle.addEventListener("click", toggleTheme);
   els.profileForm.addEventListener("submit", saveProfile);
   els.profileProject.addEventListener("change", () => populateManagerSelect());
   els.profileBranch.addEventListener("change", () => populateDivisionSelect());

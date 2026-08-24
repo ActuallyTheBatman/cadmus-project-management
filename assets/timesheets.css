@@ -1,5 +1,6 @@
 :root {
   --ink: #07090c;
+  --ink-soft: #12161c;
   --carbon: #111418;
   --graphite: #1c2127;
   --paper: #f5f1e8;
@@ -13,14 +14,92 @@
   --radius: 8px;
 }
 
+body.light-mode {
+  --ink: #f5f3ee;
+  --ink-soft: #ece7dd;
+  --carbon: #fffdf8;
+  --graphite: #e3ddd2;
+  --paper: #15181d;
+  --muted: #5f6470;
+  --line: rgba(21, 24, 29, 0.16);
+  --brass: #b08424;
+  --brass-soft: #765816;
+  --signal: #ba3b2f;
+  --mint: #19705a;
+  --steel: #647481;
+}
+
 * { box-sizing: border-box; }
 html { background: var(--ink); }
 body {
   margin: 0;
   color: var(--paper);
   background: var(--ink);
+  color-scheme: dark;
   font-family: Inter, Arial, sans-serif;
   letter-spacing: 0;
+}
+
+body.light-mode {
+  color-scheme: light;
+}
+
+body.light-mode .nav {
+  border-bottom-color: rgba(21, 24, 29, 0.12);
+  background: rgba(255, 253, 248, 0.9);
+}
+
+body.light-mode .hero {
+  background:
+    linear-gradient(90deg, rgba(245, 243, 238, 0.98), rgba(245, 243, 238, 0.82)),
+    url("/assets/cadmus-hero.png") center / cover no-repeat;
+}
+
+body.light-mode .button {
+  border-color: rgba(21, 24, 29, 0.22);
+  background: rgba(21, 24, 29, 0.04);
+}
+
+body.light-mode .button.primary {
+  color: #15120b;
+}
+
+body.light-mode .button.danger {
+  color: var(--signal);
+  background: rgba(186, 59, 47, 0.04);
+}
+
+body.light-mode .status-pill {
+  border-color: rgba(21, 24, 29, 0.18);
+  color: rgba(21, 24, 29, 0.72);
+  background: rgba(21, 24, 29, 0.035);
+}
+
+body.light-mode :is(.auth-panel, .panel, .admin-card, .review-card, .daily-card, .ops-summary-head, .ops-metric, .ops-breakdown, .queue-head, .queue-metric, .exception-group, .quality-head, .report-lifecycle, .notice) {
+  border-color: rgba(21, 24, 29, 0.14);
+  background: rgba(255, 253, 248, 0.78);
+}
+
+body.light-mode :is(.weekly-grid-head, .weekly-grid-day, .weekly-grid-notes, .weekly-grid-add-row, .weekly-grid-table .field, .work-log-row, .metric, .review-day, .quality-list li, .import-summary) {
+  background: rgba(21, 24, 29, 0.04);
+}
+
+body.light-mode :is(input, select, textarea) {
+  border-color: rgba(21, 24, 29, 0.18);
+  color: var(--paper);
+  background: rgba(255, 253, 248, 0.9);
+}
+
+body.light-mode :is(.nav-links, .lead, .auth-panel p, .helper, .status-bar, .notice, .message, .ops-summary-head p, .ops-metric p, .ops-breakdown p, .queue-head p, .queue-metric p, .exception-head p, .exception-list span, .quality-head p, .quality-list span, .review-day p, .review-note p, .audit-list span, .audit-list p, .import-preview li, .import-summary span, footer) {
+  color: rgba(21, 24, 29, 0.68);
+}
+
+body.light-mode :is(.field span, .metric span, .weekly-grid-head, .review-meta span, .review-day span, .ops-metric span, .ops-breakdown h4, .queue-metric span, .review-note span, .admin-row-status, .exception-head h4) {
+  color: rgba(21, 24, 29, 0.58);
+}
+
+body.light-mode :is(.metric strong, .review-meta strong, .review-day strong, .ops-metric strong, .queue-metric strong, .exception-list strong, .quality-list strong, .admin-item strong, .import-summary strong) {
+  color: var(--paper);
 }
 a { color: inherit; text-decoration: none; }
 button, input, select, textarea { font: inherit; }
