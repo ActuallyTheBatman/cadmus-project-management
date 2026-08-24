@@ -2234,6 +2234,7 @@ function renderUserAdminList() {
         <div>
           <strong>${escapeHtml(user.full_name || user.email)}</strong>
           <span>${escapeHtml([user.email, roleLabel(user.role), user.active === false ? "Inactive" : "Active"].join(" - "))}</span>
+          <span class="admin-row-status" data-user-status>Ready</span>
         </div>
         <button class="button danger small-button" type="button" data-toggle-active>${user.active === false ? "Reactivate" : "Deactivate"}</button>
       </div>
@@ -2267,22 +2268,58 @@ function renderUserAdminList() {
 
     const divisionSelect = row.querySelector('[data-user-field="division"]');
     populateDivisionOptionsForBranch(divisionSelect, branchSelect.value, user.division);
+    const statusNode = row.querySelector("[data-user-status]");
 
-    roleSelect.addEventListener("change", () => updateManagedUser(user.id, { role: roleSelect.value }));
+    roleSelect.addEventListener("change", async () => {
+      const previousRole = user.role || "resource";
+      const nextRole = roleSelect.value;
+      if (!confirmManagedUserChange(user, { role: nextRole })) {
+        roleSelect.value = previousRole;
+        return;
+      }
+      await updateManagedUser(user.id, { role: nextRole }, statusNode);
+    });
     projectSelect.addEventListener("change", () => {
       populateManagerOptionsForProject(managerSelect, projectSelect.value, "");
-      updateManagedUser(user.id, { project_id: projectSelect.value || null, manager_id: managerSelect.value || null });
+      updateManagedUser(user.id, { project_id: projectSelect.value || null, manager_id: managerSelect.value || null }, statusNode);
     });
-    managerSelect.addEventListener("change", () => updateManagedUser(user.id, { manager_id: managerSelect.value || null }));
+    managerSelect.addEventListener("change", () => updateManagedUser(user.id, { manager_id: managerSelect.value || null }, statusNode));
     branchSelect.addEventListener("change", () => {
       populateDivisionOptionsForBranch(divisionSelect, branchSelect.value, "");
-      updateManagedUser(user.id, { branch: branchSelect.value, division: divisionSelect.value });
+      updateManagedUser(user.id, { branch: branchSelect.value, division: divisionSelect.value }, statusNode);
     });
-    divisionSelect.addEventListener("change", () => updateManagedUser(user.id, { division: divisionSelect.value }));
-    row.querySelector("[data-toggle-active]").addEventListener("click", () => updateManagedUser(user.id, { active: user.active === false }));
+    divisionSelect.addEventListener("change", () => updateManagedUser(user.id, { division: divisionSelect.value }, statusNode));
+    row.querySelector("[data-toggle-active]").addEventListener("click", () => {
+      const nextActive = user.active === false;
+      if (!confirmManagedUserChange(user, { active: nextActive })) return;
+      updateManagedUser(user.id, { active: nextActive }, statusNode);
+    });
 
     els.userList.append(row);
   }
+}
+
+function confirmManagedUserChange(user, patch) {
+  const displayName = user.full_name || user.email || "this user";
+  if (user.id === app.user?.id && patch.role && patch.role !== "admin") {
+    setMessage(els.adminMessage, "You cannot remove your own Portfolio Manager access.", true);
+    return false;
+  }
+
+  if (user.id === app.user?.id && patch.active === false) {
+    setMessage(els.adminMessage, "You cannot deactivate your own account.", true);
+    return false;
+  }
+
+  if (patch.role === "admin" && user.role !== "admin") {
+    return window.confirm(`Promote ${displayName} to Portfolio Manager? This grants portfolio setup and user-management access.`);
+  }
+
+  if (patch.active === false) {
+    return window.confirm(`Deactivate ${displayName}? They will no longer be able to use the timesheet portal.`);
+  }
+
+  return true;
 }
 
 function populateManagerOptionsForProject(select, projectId, selectedId = "") {
@@ -2306,14 +2343,16 @@ function populateDivisionOptionsForBranch(select, branchName, selectedValue = ""
   select.value = selectedValue && divisions.some((division) => division.name === selectedValue) ? selectedValue : "";
 }
 
-async function updateManagedUser(userId, patch) {
+async function updateManagedUser(userId, patch, statusNode = null) {
   setMessage(els.adminMessage, "Updating user...");
+  setRowStatus(statusNode, "Saving...");
   const { error } = await app.supabase
     .from("timesheet_profiles")
     .update(patch)
     .eq("id", userId);
 
   if (error) {
+    setRowStatus(statusNode, "Update failed", true);
     setMessage(els.adminMessage, `User update failed: ${error.message}`, true);
     await renderAdminConsole();
     return;
@@ -2322,7 +2361,14 @@ async function updateManagedUser(userId, patch) {
   const user = app.adminProfiles.find((profile) => profile.id === userId);
   if (user) Object.assign(user, patch);
   setMessage(els.adminMessage, "User updated.");
-  renderUserAdminList();
+  setRowStatus(statusNode, "Saved");
+  window.setTimeout(renderUserAdminList, 700);
+}
+
+function setRowStatus(node, message, isError = false) {
+  if (!node) return;
+  node.textContent = message;
+  node.classList.toggle("error", isError);
 }
 
 async function addProject(event) {
