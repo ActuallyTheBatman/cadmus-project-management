@@ -754,6 +754,70 @@ select option { color: #111418; }
   white-space: nowrap;
 }
 
+.review-queue-summary {
+  display: grid;
+  gap: 12px;
+  padding: 18px 18px 0;
+}
+
+.queue-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  border: 1px solid rgba(245, 241, 232, 0.14);
+  border-radius: var(--radius);
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.028);
+}
+
+.queue-head h3 {
+  font-size: 15px;
+  text-transform: uppercase;
+}
+
+.queue-head p {
+  margin-top: 5px;
+  color: rgba(245, 241, 232, 0.66);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.queue-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.queue-metric {
+  display: grid;
+  gap: 5px;
+  border: 1px solid rgba(245, 241, 232, 0.12);
+  border-radius: var(--radius);
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.024);
+}
+
+.queue-metric span {
+  color: rgba(245, 241, 232, 0.58);
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.queue-metric strong {
+  color: var(--paper);
+  font-size: 22px;
+  line-height: 1;
+  overflow-wrap: anywhere;
+}
+
+.queue-metric p {
+  color: rgba(245, 241, 232, 0.62);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .portfolio-list {
   display: grid;
   gap: 12px;
@@ -1040,11 +1104,23 @@ select option { color: #111418; }
   background: rgba(255, 255, 255, 0.028);
 }
 
+.stale-review-card {
+  border-color: rgba(255, 113, 95, 0.38);
+  background: rgba(255, 113, 95, 0.045);
+}
+
 .review-head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
+}
+
+.review-status-stack {
+  display: flex;
+  align-items: flex-end;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .review-head h3 {
@@ -1218,7 +1294,8 @@ footer {
   .admin-card-head,
   .review-head,
   .lifecycle-head,
-  .ops-summary-head {
+  .ops-summary-head,
+  .queue-head {
     align-items: flex-start;
     flex-direction: column;
   }
@@ -1231,6 +1308,7 @@ footer {
   .exceptions-grid,
   .ops-metric-grid,
   .ops-breakdown-grid,
+  .queue-metric-grid,
   .review-meta,
   .review-days { grid-template-columns: 1fr; }
 

@@ -100,6 +100,7 @@ const els = {
   refreshPortfolio: document.querySelector("#refreshPortfolio"),
   exportAudit: document.querySelector("#exportAudit"),
   portfolioDashboard: document.querySelector("#portfolioDashboard"),
+  reviewQueueSummary: document.querySelector("#reviewQueueSummary"),
   portfolioList: document.querySelector("#portfolioList"),
   projectForm: document.querySelector("#projectForm"),
   managerForm: document.querySelector("#managerForm"),
@@ -1337,6 +1338,7 @@ async function loadPortfolio() {
   els.portfolioList.innerHTML = `<div class="empty-state"><p>Loading portfolio reports...</p></div>`;
   await loadPortfolioDashboard();
   if (els.portfolioStatus.value === "missing") {
+    els.reviewQueueSummary.innerHTML = "";
     await loadMissingTimesheets();
     return;
   }
@@ -1362,11 +1364,13 @@ async function loadPortfolio() {
 
   const { data: reports, error } = await query;
   if (error) {
+    els.reviewQueueSummary.innerHTML = "";
     els.portfolioList.innerHTML = `<div class="empty-state"><p>${escapeHtml(error.message)}</p></div>`;
     return;
   }
 
   if (!reports || reports.length === 0) {
+    els.reviewQueueSummary.innerHTML = "";
     els.portfolioList.innerHTML = `<div class="empty-state"><p>No reports match this view.</p></div>`;
     return;
   }
@@ -1382,11 +1386,61 @@ async function loadPortfolio() {
   const profileMap = new Map((profiles || []).map((profile) => [profile.id, profile]));
   const daysByReport = groupBy(days || [], "weekly_report_id");
   const auditsByReport = groupBy(audits || [], "weekly_report_id");
+  renderReviewQueueSummary(reports, daysByReport);
   els.portfolioList.innerHTML = "";
 
   for (const report of reports) {
     els.portfolioList.append(renderReviewCard(report, profileMap.get(report.user_id), daysByReport.get(report.id) || [], auditsByReport.get(report.id) || []));
   }
+}
+
+function renderReviewQueueSummary(reports, daysByReport) {
+  const statusCounts = countBy(reports, "status");
+  const submitted = reports.filter((report) => report.status === "submitted");
+  const stale = submitted.filter(isStaleSubmittedReport);
+  const totalHours = reports.reduce((sum, report) => {
+    const days = daysByReport.get(report.id) || [];
+    return sum + days.reduce((daySum, day) => daySum + Number(day.hours || 0), 0);
+  }, 0);
+  const oldest = submitted
+    .map((report) => report.submitted_at)
+    .filter(Boolean)
+    .sort()[0];
+
+  els.reviewQueueSummary.innerHTML = `
+    <div class="queue-head">
+      <div>
+        <h3>Review Queue</h3>
+        <p>${escapeHtml(reviewQueueScopeLabel())}</p>
+      </div>
+      <span class="status-pill ${stale.length ? "rejected" : "approved"}">${stale.length ? `${stale.length} stale` : "current"}</span>
+    </div>
+    <div class="queue-metric-grid">
+      ${queueMetric("Loaded", reports.length, "Reports in this view")}
+      ${queueMetric("Submitted", statusCounts.submitted || 0, "Awaiting manager action")}
+      ${queueMetric("Stale", stale.length, "Submitted 3+ days ago")}
+      ${queueMetric("Approved", statusCounts.approved || 0, "Locked reports")}
+      ${queueMetric("Hours", `${formatHours(totalHours)}h`, "Total loaded report hours")}
+      ${queueMetric("Oldest", oldest ? formatShortDate(oldest) : "-", "Oldest pending submission")}
+    </div>
+  `;
+}
+
+function reviewQueueScopeLabel() {
+  const status = els.portfolioStatus.options[els.portfolioStatus.selectedIndex]?.text || "All";
+  const project = els.portfolioProject.value && els.portfolioProject.value !== "all" ? projectLabel(getProject(els.portfolioProject.value)) : "All projects";
+  const week = els.portfolioWeek.value ? `week of ${formatShortDate(els.portfolioWeek.value)}` : "latest loaded reports";
+  return `${status} - ${project} - ${week}`;
+}
+
+function queueMetric(label, value, helper) {
+  return `
+    <div class="queue-metric">
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value)}</strong>
+      <p>${escapeHtml(helper)}</p>
+    </div>
+  `;
 }
 
 async function exportAuditHistory() {
@@ -1874,15 +1928,19 @@ function renderReviewCard(report, profile, days, audits = []) {
   const project = getProject(report.project_id);
   const manager = getManager(report.manager_id);
   const total = days.reduce((sum, day) => sum + Number(day.hours || 0), 0);
+  const stale = isStaleSubmittedReport(report);
   const card = document.createElement("article");
-  card.className = "review-card";
+  card.className = `review-card${stale ? " stale-review-card" : ""}`;
   card.innerHTML = `
     <div class="review-head">
       <div>
         <h3>${escapeHtml(profile?.full_name || "Unknown resource")}</h3>
         <p class="helper">${escapeHtml(profile?.email || "")}</p>
       </div>
-      <span class="status-pill ${escapeHtml(report.status)}">${escapeHtml(report.status)}</span>
+      <div class="review-status-stack">
+        ${stale ? `<span class="status-pill rejected">${submittedAgeInDays(report)} days waiting</span>` : ""}
+        <span class="status-pill ${escapeHtml(report.status)}">${escapeHtml(report.status)}</span>
+      </div>
     </div>
     <div class="review-meta">
       ${reviewMeta("Week", formatShortDate(report.week_start))}
@@ -1893,6 +1951,7 @@ function renderReviewCard(report, profile, days, audits = []) {
       ${reviewMeta("Total hours", `${formatHours(total)}h`)}
       ${reviewMeta("Company", profile?.company || "-")}
       ${reviewMeta("Submitted", report.submitted_at ? formatShortDate(report.submitted_at) : "-")}
+      ${reviewMeta("Queue age", report.status === "submitted" && report.submitted_at ? `${submittedAgeInDays(report)} days` : "-")}
       ${reviewMeta("Review notes", report.manager_notes || "-")}
     </div>
     <div class="review-days">
@@ -1926,6 +1985,17 @@ function renderReviewCard(report, profile, days, audits = []) {
   }
 
   return card;
+}
+
+function isStaleSubmittedReport(report) {
+  return report.status === "submitted" && submittedAgeInDays(report) >= 3;
+}
+
+function submittedAgeInDays(report) {
+  if (!report.submitted_at) return 0;
+  const submittedAt = new Date(report.submitted_at);
+  if (Number.isNaN(submittedAt.getTime())) return 0;
+  return Math.max(0, Math.floor((Date.now() - submittedAt.getTime()) / 86400000));
 }
 
 function renderAuditItem(audit) {
