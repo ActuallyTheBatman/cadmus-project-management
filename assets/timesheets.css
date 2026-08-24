@@ -90,16 +90,28 @@ body.light-mode :is(input, select, textarea) {
   background: rgba(255, 253, 248, 0.9);
 }
 
-body.light-mode :is(.nav-links, .lead, .auth-panel p, .helper, .status-bar, .notice, .message, .ops-summary-head p, .ops-metric p, .ops-breakdown p, .queue-head p, .queue-metric p, .exception-head p, .exception-list span, .quality-head p, .quality-list span, .review-day p, .review-note p, .audit-list span, .audit-list p, .import-preview li, .import-summary span, footer) {
+body.light-mode :is(.nav-links, .lead, .auth-panel p, .helper, .status-bar, .notice, .message, .profile-summary span, .task-line-head strong, .ops-summary-head p, .ops-metric p, .ops-breakdown p, .ops-row, .queue-head p, .queue-metric p, .exception-head p, .exception-list span, .quality-head p, .quality-list span, .review-day p, .review-note p, .audit-list span, .audit-list p, .admin-card-head p, .admin-item, .import-preview li, .import-summary span, .empty-state, footer) {
   color: rgba(21, 24, 29, 0.68);
 }
 
-body.light-mode :is(.field span, .metric span, .weekly-grid-head, .review-meta span, .review-day span, .ops-metric span, .ops-breakdown h4, .queue-metric span, .review-note span, .admin-row-status, .exception-head h4) {
+body.light-mode :is(.field span, .metric span, .weekly-grid-head, .review-meta span, .review-day span, .ops-metric span, .ops-breakdown h4, .queue-metric span, .review-note span, .admin-row-status, .exception-head h4, .small-button) {
   color: rgba(21, 24, 29, 0.58);
 }
 
-body.light-mode :is(.metric strong, .review-meta strong, .review-day strong, .ops-metric strong, .queue-metric strong, .exception-list strong, .quality-list strong, .admin-item strong, .import-summary strong) {
+body.light-mode :is(.profile-summary strong, .metric strong, .review-meta strong, .review-day strong, .ops-metric strong, .queue-metric strong, .exception-list strong, .quality-list strong, .admin-item strong, .import-summary strong) {
   color: var(--paper);
+}
+
+body.light-mode :is(.day-card time, .weekly-grid-day span, .work-log-date span, .ops-row strong, .notice strong, .nav-links a:hover, .nav-links a[aria-current="page"]) {
+  color: var(--brass-soft);
+}
+
+body.light-mode :is(.message, .admin-row-status, .status-pill.submitted) {
+  color: var(--mint);
+}
+
+body.light-mode :is(.message.error, .admin-row-status.error, .status-pill.rejected) {
+  color: var(--signal);
 }
 a { color: inherit; text-decoration: none; }
 button, input, select, textarea { font: inherit; }
