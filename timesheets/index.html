@@ -13,9 +13,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Libre+Baskerville:wght@700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/timesheets.css?v=20260824-enterprise-audit">
-  <script src="/assets/timesheets-config.js?v=20260824-enterprise-audit"></script>
-  <script type="module" src="/assets/timesheets.js?v=20260824-enterprise-audit"></script>
+  <link rel="stylesheet" href="/assets/timesheets.css?v=20260824-ops-dashboard">
+  <script src="/assets/timesheets-config.js?v=20260824-ops-dashboard"></script>
+  <script type="module" src="/assets/timesheets.js?v=20260824-ops-dashboard"></script>
 </head>
 <body>
   <nav class="nav" aria-label="Primary navigation">
@@ -195,8 +195,8 @@
         <section id="portfolioView" class="panel portfolio-panel hidden">
           <div class="panel-head">
             <div>
-              <h2>Portfolio Review</h2>
-              <p class="helper">Managers see their project resources. Admins see the full reporting portfolio.</p>
+              <h2>Portfolio Operations</h2>
+              <p class="helper">Track submission coverage, approval backlog, missing reports, and weekly project load.</p>
             </div>
               <div class="toolbar">
               <label class="field inline-filter">
@@ -218,6 +218,7 @@
               <button id="refreshPortfolio" class="button" type="button">Refresh</button>
             </div>
           </div>
+          <div id="portfolioDashboard" class="portfolio-dashboard"></div>
           <div id="portfolioList" class="portfolio-list"></div>
         </section>
 

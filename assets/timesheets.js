@@ -81,6 +81,7 @@ const els = {
   portfolioProject: document.querySelector("#portfolioProject"),
   portfolioWeek: document.querySelector("#portfolioWeek"),
   refreshPortfolio: document.querySelector("#refreshPortfolio"),
+  portfolioDashboard: document.querySelector("#portfolioDashboard"),
   portfolioList: document.querySelector("#portfolioList"),
   projectForm: document.querySelector("#projectForm"),
   managerForm: document.querySelector("#managerForm"),
@@ -1266,6 +1267,7 @@ async function loadPortfolio() {
   if (!app.profile || !canReviewPortfolio()) return;
 
   els.portfolioList.innerHTML = `<div class="empty-state"><p>Loading portfolio reports...</p></div>`;
+  await loadPortfolioDashboard();
   if (els.portfolioStatus.value === "missing") {
     await loadMissingTimesheets();
     return;
@@ -1319,13 +1321,194 @@ async function loadPortfolio() {
   }
 }
 
+async function loadPortfolioDashboard() {
+  const selectedWeek = portfolioSelectedWeek();
+  const selectedProjectId = els.portfolioProject.value || "all";
+  let profilesQuery = app.supabase
+    .from("timesheet_profiles")
+    .select("id, full_name, email, branch, division, project_id, manager_id, active")
+    .eq("active", true)
+    .order("full_name");
+
+  if (app.profile?.role === "manager") {
+    profilesQuery = profilesQuery.eq("manager_id", app.profile.manager_id);
+  }
+
+  const { data: profiles, error: profileError } = await profilesQuery;
+  if (profileError) {
+    renderPortfolioDashboardError(profileError.message);
+    return;
+  }
+
+  const scopedProfiles = selectedProjectId !== "all"
+    ? (profiles || []).filter((profile) => profile.project_id === selectedProjectId)
+    : profiles || [];
+
+  if (!scopedProfiles.length) {
+    renderPortfolioDashboard({
+      selectedWeek,
+      selectedProjectId,
+      profiles: [],
+      reports: [],
+      days: [],
+    });
+    return;
+  }
+
+  const userIds = scopedProfiles.map((profile) => profile.id);
+  let reportQuery = app.supabase
+    .from("timesheet_weekly_reports")
+    .select("id, user_id, week_start, project_id, manager_id, status, submitted_at, reviewed_at")
+    .in("user_id", userIds)
+    .eq("week_start", selectedWeek);
+
+  if (selectedProjectId !== "all") {
+    reportQuery = reportQuery.eq("project_id", selectedProjectId);
+  }
+
+  const { data: reports, error: reportError } = await reportQuery;
+  if (reportError) {
+    renderPortfolioDashboardError(reportError.message);
+    return;
+  }
+
+  const reportIds = (reports || []).map((report) => report.id);
+  let days = [];
+  if (reportIds.length) {
+    const { data: dayRows, error: dayError } = await app.supabase
+      .from("timesheet_daily_reports")
+      .select("weekly_report_id, hours, task_id")
+      .in("weekly_report_id", reportIds);
+
+    if (dayError) {
+      renderPortfolioDashboardError(dayError.message);
+      return;
+    }
+
+    days = dayRows || [];
+  }
+
+  renderPortfolioDashboard({
+    selectedWeek,
+    selectedProjectId,
+    profiles: scopedProfiles,
+    reports: reports || [],
+    days,
+  });
+}
+
+function renderPortfolioDashboardError(message) {
+  els.portfolioDashboard.innerHTML = `<div class="notice"><p>${escapeHtml(message)}</p></div>`;
+}
+
+function renderPortfolioDashboard({ selectedWeek, selectedProjectId, profiles, reports, days }) {
+  const reportByUser = new Map(reports.map((report) => [report.user_id, report]));
+  const daysByReport = groupBy(days, "weekly_report_id");
+  const missingProfiles = profiles.filter((profile) => !reportByUser.has(profile.id) || ["draft", "rejected"].includes(reportByUser.get(profile.id)?.status));
+  const statusCounts = countBy(reports, "status");
+  const totalHours = days.reduce((sum, day) => sum + Number(day.hours || 0), 0);
+  const pendingApproval = statusCounts.submitted || 0;
+  const approved = statusCounts.approved || 0;
+  const submitted = pendingApproval + approved;
+  const submissionRate = profiles.length ? Math.round((submitted / profiles.length) * 100) : 0;
+  const overdueCount = isPortfolioWeekPastDue(selectedWeek) ? missingProfiles.length : 0;
+  const reportHours = new Map(reports.map((report) => [
+    report.id,
+    (daysByReport.get(report.id) || []).reduce((sum, day) => sum + Number(day.hours || 0), 0),
+  ]));
+  const projectBreakdown = summarizeByProject(reports, reportHours);
+  const branchBreakdown = summarizeByBranch(profiles, reports, reportHours);
+  const projectLabelText = selectedProjectId === "all" ? "All projects" : projectLabel(getProject(selectedProjectId));
+
+  els.portfolioDashboard.innerHTML = `
+    <div class="ops-summary-head">
+      <div>
+        <h3>Operations Summary</h3>
+        <p>${escapeHtml(projectLabelText)} - week of ${escapeHtml(formatShortDate(selectedWeek))}</p>
+      </div>
+      <span class="status-pill ${overdueCount ? "rejected" : "approved"}">${overdueCount ? `${overdueCount} late` : "on track"}</span>
+    </div>
+    <div class="ops-metric-grid">
+      ${opsMetric("Submission Rate", `${submissionRate}%`, `${submitted} of ${profiles.length} submitted or approved`)}
+      ${opsMetric("Pending Approval", pendingApproval, "Reports awaiting manager action")}
+      ${opsMetric("Missing / Draft", missingProfiles.length, "Not submitted or sent back")}
+      ${opsMetric("Approved", approved, "Reports locked for the week")}
+      ${opsMetric("Total Hours", `${formatHours(totalHours)}h`, "Approved, submitted, draft, and rejected")}
+      ${opsMetric("Active Resources", profiles.length, "In the selected project scope")}
+    </div>
+    <div class="ops-breakdown-grid">
+      ${opsBreakdown("Project Load", projectBreakdown, "No reported hours yet.")}
+      ${opsBreakdown("Branch Coverage", branchBreakdown, "No branch activity yet.")}
+    </div>
+  `;
+}
+
+function opsMetric(label, value, helper) {
+  return `
+    <div class="ops-metric">
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value)}</strong>
+      <p>${escapeHtml(helper)}</p>
+    </div>
+  `;
+}
+
+function opsBreakdown(title, rows, emptyText) {
+  return `
+    <div class="ops-breakdown">
+      <h4>${escapeHtml(title)}</h4>
+      ${rows.length ? rows.slice(0, 5).map((row) => `
+        <div class="ops-row">
+          <span>${escapeHtml(row.label)}</span>
+          <strong>${escapeHtml(formatHours(row.hours))}h</strong>
+        </div>
+      `).join("") : `<p>${escapeHtml(emptyText)}</p>`}
+    </div>
+  `;
+}
+
+function summarizeByProject(reports, reportHours) {
+  const totals = new Map();
+  for (const report of reports) {
+    const label = projectLabel(getProject(report.project_id));
+    totals.set(label, (totals.get(label) || 0) + Number(reportHours.get(report.id) || 0));
+  }
+  return [...totals.entries()]
+    .map(([label, hours]) => ({ label, hours }))
+    .sort((a, b) => b.hours - a.hours || a.label.localeCompare(b.label));
+}
+
+function summarizeByBranch(profiles, reports, reportHours) {
+  const profileMap = new Map(profiles.map((profile) => [profile.id, profile]));
+  const totals = new Map();
+  for (const report of reports) {
+    const branch = profileMap.get(report.user_id)?.branch || "Unassigned";
+    totals.set(branch, (totals.get(branch) || 0) + Number(reportHours.get(report.id) || 0));
+  }
+  return [...totals.entries()]
+    .map(([label, hours]) => ({ label, hours }))
+    .sort((a, b) => b.hours - a.hours || a.label.localeCompare(b.label));
+}
+
+function portfolioSelectedWeek() {
+  return els.portfolioWeek.value ? toDateInput(startOfWeek(parseLocalDate(els.portfolioWeek.value))) : toDateInput(app.weekStart);
+}
+
+function isPortfolioWeekPastDue(weekStart) {
+  return new Date() > addDays(parseLocalDate(weekStart), 4);
+}
+
 async function loadMissingTimesheets() {
-  const selectedWeek = els.portfolioWeek.value ? toDateInput(startOfWeek(parseLocalDate(els.portfolioWeek.value))) : toDateInput(app.weekStart);
+  const selectedWeek = portfolioSelectedWeek();
   let profileQuery = app.supabase
     .from("timesheet_profiles")
     .select("id, full_name, email, branch, division, project_id, manager_id, active")
     .eq("active", true)
     .order("full_name");
+
+  if (app.profile?.role === "manager") {
+    profileQuery = profileQuery.eq("manager_id", app.profile.manager_id);
+  }
 
   if (els.portfolioProject.value && els.portfolioProject.value !== "all") {
     profileQuery = profileQuery.eq("project_id", els.portfolioProject.value);
@@ -2377,6 +2560,14 @@ function groupBy(items, key) {
     map.get(value).push(item);
   }
   return map;
+}
+
+function countBy(items, key) {
+  return items.reduce((counts, item) => {
+    const value = item[key] || "unknown";
+    counts[value] = (counts[value] || 0) + 1;
+    return counts;
+  }, {});
 }
 
 function startOfWeek(date) {
