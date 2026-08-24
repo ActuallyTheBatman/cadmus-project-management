@@ -35,6 +35,7 @@ const app = {
   divisions: [],
   tasks: [],
   adminProfiles: [],
+  adminAudit: [],
   pendingInvite: null,
   adminProjectFocus: "all",
   passwordRecovery: false,
@@ -109,6 +110,9 @@ const els = {
   inviteForm: document.querySelector("#inviteForm"),
   refreshExceptions: document.querySelector("#refreshExceptions"),
   adminExceptions: document.querySelector("#adminExceptions"),
+  refreshAdminAudit: document.querySelector("#refreshAdminAudit"),
+  exportAdminAudit: document.querySelector("#exportAdminAudit"),
+  adminAuditList: document.querySelector("#adminAuditList"),
   adminProjectFocus: document.querySelector("#adminProjectFocus"),
   adminProjectName: document.querySelector("#adminProjectName"),
   adminProjectCode: document.querySelector("#adminProjectCode"),
@@ -309,6 +313,8 @@ function bindEvents() {
   els.adminExportForm.addEventListener("submit", exportAdminWork);
   els.adminApprovedExport.addEventListener("click", exportApprovedTime);
   els.refreshExceptions.addEventListener("click", renderAdminExceptions);
+  els.refreshAdminAudit.addEventListener("click", loadAndRenderAdminAudit);
+  els.exportAdminAudit.addEventListener("click", exportAdminAuditLog);
   els.adminExportBranch.addEventListener("change", populateAdminExportDivisions);
   els.userFilterForm.addEventListener("submit", (event) => event.preventDefault());
   els.adminUserBranch.addEventListener("change", () => {
@@ -1977,6 +1983,7 @@ async function renderAdminConsole() {
   populateAdminSelects();
   renderAdminLists();
   await renderAdminExceptions();
+  await loadAndRenderAdminAudit();
 }
 
 async function loadAdminProfiles() {
@@ -2308,6 +2315,118 @@ function focusUserExceptions(status = "active") {
   els.userFilterForm.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
+async function loadAndRenderAdminAudit() {
+  if (!isPortfolioManager()) return;
+  els.adminAuditList.innerHTML = `<li class="admin-item"><span>Loading change log...</span></li>`;
+
+  const { data, error } = await app.supabase
+    .from("timesheet_admin_audit")
+    .select("id, actor_email, action, entity_type, entity_id, entity_label, details, created_at")
+    .order("created_at", { ascending: false })
+    .limit(25);
+
+  if (error) {
+    app.adminAudit = [];
+    els.adminAuditList.innerHTML = `<li class="admin-item"><span>${escapeHtml(error.message)}</span></li>`;
+    return;
+  }
+
+  app.adminAudit = data || [];
+  renderAdminAuditList();
+}
+
+function renderAdminAuditList() {
+  if (!app.adminAudit.length) {
+    els.adminAuditList.innerHTML = `<li class="admin-item"><span>No admin changes logged yet.</span></li>`;
+    return;
+  }
+
+  els.adminAuditList.innerHTML = "";
+  for (const item of app.adminAudit) {
+    const row = document.createElement("li");
+    row.className = "admin-item";
+    row.innerHTML = `
+      <div>
+        <strong>${escapeHtml(formatAdminAuditAction(item.action))}</strong>
+        <span>${escapeHtml([item.entity_label || formatEntityType(item.entity_type), item.actor_email, formatShortDate(item.created_at)].filter(Boolean).join(" - "))}</span>
+      </div>
+    `;
+    els.adminAuditList.append(row);
+  }
+}
+
+async function exportAdminAuditLog() {
+  if (!isPortfolioManager()) return;
+  setMessage(els.adminMessage, "Exporting admin change log...");
+
+  const { data, error } = await app.supabase
+    .from("timesheet_admin_audit")
+    .select("actor_email, action, entity_type, entity_id, entity_label, details, created_at")
+    .order("created_at", { ascending: false })
+    .limit(500);
+
+  if (error) {
+    setMessage(els.adminMessage, `Admin change log export failed: ${error.message}`, true);
+    return;
+  }
+
+  const rows = [["Date", "Actor", "Action", "Entity Type", "Entity", "Entity ID", "Details"]];
+  for (const item of data || []) {
+    rows.push([
+      item.created_at,
+      item.actor_email || "",
+      formatAdminAuditAction(item.action),
+      formatEntityType(item.entity_type),
+      item.entity_label || "",
+      item.entity_id || "",
+      JSON.stringify(item.details || {}),
+    ]);
+  }
+
+  const csv = rows.map((row) => row.map(csvCell).join(",")).join("\n");
+  downloadCsv(csv, `cadmus-admin-change-log-${toDateInput(new Date())}.csv`);
+  setMessage(els.adminMessage, `Exported ${Math.max(0, rows.length - 1)} admin change rows.`);
+}
+
+async function logAdminChange(action, entityType, entityId, entityLabel, details = {}) {
+  if (!isPortfolioManager()) return;
+
+  const { error } = await app.supabase.from("timesheet_admin_audit").insert({
+    actor_id: app.user.id,
+    actor_email: app.user.email,
+    action,
+    entity_type: entityType,
+    entity_id: entityId || null,
+    entity_label: entityLabel || null,
+    details,
+  });
+
+  if (error) {
+    setMessage(els.adminMessage, `Change saved, but audit logging failed: ${error.message}`, true);
+  }
+}
+
+function formatAdminAuditAction(action) {
+  return {
+    created: "Created",
+    updated: "Updated",
+    deactivated: "Deactivated",
+    invited: "Invitation Sent",
+  }[action] || titleCase(String(action || "changed").replaceAll("_", " "));
+}
+
+function formatEntityType(entityType) {
+  return {
+    project: "Project",
+    project_manager: "Resource Manager",
+    branch: "Branch",
+    division: "Division",
+    task: "Task",
+    user: "User",
+    invitation: "Invitation",
+  }[entityType] || titleCase(String(entityType || "item").replaceAll("_", " "));
+}
+
 function filterByFocusedProject(items) {
   if (app.adminProjectFocus === "all") return items;
   return items.filter((item) => item.project_id === app.adminProjectFocus || item.id === app.adminProjectFocus);
@@ -2522,8 +2641,10 @@ async function updateManagedUser(userId, patch, statusNode = null) {
 
   const user = app.adminProfiles.find((profile) => profile.id === userId);
   if (user) Object.assign(user, patch);
+  await logAdminChange("updated", "user", userId, user?.full_name || user?.email || userId, patch);
   setMessage(els.adminMessage, "User updated.");
   setRowStatus(statusNode, "Saved");
+  await loadAndRenderAdminAudit();
   window.setTimeout(renderUserAdminList, 700);
 }
 
@@ -2550,7 +2671,12 @@ async function addProject(event) {
   }
 
   const { error } = await app.supabase.from("timesheet_projects").upsert(payload, { onConflict: "code" });
-  await finishAdminSave(error, els.projectForm, "Project saved.");
+  await finishAdminSave(error, els.projectForm, "Project saved.", {
+    action: "created",
+    entityType: "project",
+    entityLabel: `${payload.name} (${payload.code || "no code"})`,
+    details: payload,
+  });
 }
 
 async function updateProjectFormats(projectId, row) {
@@ -2575,12 +2701,15 @@ async function updateProjectFormats(projectId, row) {
 
   const project = getProject(projectId);
   if (project) project.reporting_formats = selected;
+  await logAdminChange("updated", "project", projectId, projectLabel(project), { reporting_formats: selected });
   if (app.profile?.project_id === projectId) renderDailyReports();
+  await loadAndRenderAdminAudit();
   setMessage(els.adminMessage, "Project views updated.");
 }
 
 async function deactivateAdminItem(table, id, successMessage) {
   setMessage(els.adminMessage, "Removing value...");
+  const auditTarget = adminAuditTargetForTable(table, id);
   const { error } = await app.supabase.from(table).update({ active: false }).eq("id", id);
 
   if (error) {
@@ -2588,6 +2717,7 @@ async function deactivateAdminItem(table, id, successMessage) {
     return;
   }
 
+  await logAdminChange("deactivated", auditTarget.entityType, id, auditTarget.entityLabel, { table });
   await loadReferenceData();
   if (app.profile?.role === "admin") await renderAdminConsole();
   if (app.profile) renderProfileSummary();
@@ -2611,7 +2741,12 @@ async function addManager(event) {
   }
 
   const { error } = await app.supabase.from("timesheet_project_managers").upsert(payload, { onConflict: "project_id,manager_email" });
-  await finishAdminSave(error, els.managerForm, "Resource manager saved.");
+  await finishAdminSave(error, els.managerForm, "Resource manager saved.", {
+    action: "created",
+    entityType: "project_manager",
+    entityLabel: `${payload.manager_name} - ${payload.manager_email}`,
+    details: { ...payload, project: projectLabel(getProject(payload.project_id)) },
+  });
 }
 
 async function addBranch(event) {
@@ -2628,7 +2763,12 @@ async function addBranch(event) {
   }
 
   const { error } = await app.supabase.from("timesheet_branches").upsert(payload, { onConflict: "name" });
-  await finishAdminSave(error, els.branchForm, "Branch saved.");
+  await finishAdminSave(error, els.branchForm, "Branch saved.", {
+    action: "created",
+    entityType: "branch",
+    entityLabel: payload.name,
+    details: payload,
+  });
 }
 
 async function addDivision(event) {
@@ -2646,7 +2786,12 @@ async function addDivision(event) {
   }
 
   const { error } = await app.supabase.from("timesheet_divisions").upsert(payload, { onConflict: "branch_id,name" });
-  await finishAdminSave(error, els.divisionForm, "Division saved.");
+  await finishAdminSave(error, els.divisionForm, "Division saved.", {
+    action: "created",
+    entityType: "division",
+    entityLabel: payload.name,
+    details: { ...payload, branch: app.branches.find((branch) => branch.id === payload.branch_id)?.name || "" },
+  });
 }
 
 async function addTask(event) {
@@ -2665,7 +2810,12 @@ async function addTask(event) {
   }
 
   const { error } = await app.supabase.from("timesheet_tasks").upsert(payload, { onConflict: "project_id,name" });
-  await finishAdminSave(error, els.taskForm, "Task saved.");
+  await finishAdminSave(error, els.taskForm, "Task saved.", {
+    action: "created",
+    entityType: "task",
+    entityLabel: taskLabel(payload),
+    details: { ...payload, project: projectLabel(getProject(payload.project_id)) },
+  });
 }
 
 async function sendBulkInvitations(event) {
@@ -2734,16 +2884,31 @@ async function sendBulkInvitations(event) {
     return;
   }
 
+  await logAdminChange("invited", "invitation", null, `${inviteLinks.length} invitation${inviteLinks.length === 1 ? "" : "s"}`, {
+    count: inviteLinks.length,
+    sent,
+    linkOnly,
+    role: payloadBase.role,
+    project: projectLabel(getProject(payloadBase.project_id)),
+    manager: getManager(payloadBase.manager_id)?.manager_name || "",
+    branch: payloadBase.branch,
+    division: payloadBase.division,
+  });
   els.inviteForm.reset();
   populateInviteBranches();
   populateInviteManagers();
+  await loadAndRenderAdminAudit();
   setMessage(els.adminMessage, linkOnly ? `Sent ${sent}. Supabase throttled ${linkOnly}; manual invite links were downloaded.` : `Sent ${sent} invitations.`);
 }
 
-async function finishAdminSave(error, form, successMessage) {
+async function finishAdminSave(error, form, successMessage, auditEvent = null) {
   if (error) {
     setMessage(els.adminMessage, error.message, true);
     return;
+  }
+
+  if (auditEvent) {
+    await logAdminChange(auditEvent.action, auditEvent.entityType, auditEvent.entityId || null, auditEvent.entityLabel, auditEvent.details || {});
   }
 
   form.reset();
@@ -2756,6 +2921,41 @@ async function finishAdminSave(error, form, successMessage) {
   await renderAdminConsole();
   renderDailyReports();
   setMessage(els.adminMessage, successMessage);
+}
+
+function adminAuditTargetForTable(table, id) {
+  const targets = {
+    timesheet_projects: {
+      entityType: "project",
+      item: app.projects.find((project) => project.id === id),
+      labelFor: (item) => projectLabel(item),
+    },
+    timesheet_project_managers: {
+      entityType: "project_manager",
+      item: app.managers.find((manager) => manager.id === id),
+      labelFor: (item) => item ? `${item.manager_name} - ${item.manager_email}` : "",
+    },
+    timesheet_branches: {
+      entityType: "branch",
+      item: app.branches.find((branch) => branch.id === id),
+      labelFor: (item) => item?.name || "",
+    },
+    timesheet_divisions: {
+      entityType: "division",
+      item: app.divisions.find((division) => division.id === id),
+      labelFor: (item) => item?.name || "",
+    },
+    timesheet_tasks: {
+      entityType: "task",
+      item: app.tasks.find((task) => task.id === id),
+      labelFor: (item) => taskLabel(item),
+    },
+  };
+  const target = targets[table] || {};
+  return {
+    entityType: target.entityType || table,
+    entityLabel: target.labelFor ? target.labelFor(target.item) : id,
+  };
 }
 
 function setDefaultAdminExportWindow() {
@@ -3143,6 +3343,14 @@ function projectLabel(project) {
 function taskLabel(task) {
   if (!task) return "";
   return [task.code, task.name].filter(Boolean).join(" - ");
+}
+
+function titleCase(value) {
+  return String(value || "")
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => `${word.charAt(0).toUpperCase()}${word.slice(1).toLowerCase()}`)
+    .join(" ");
 }
 
 function normalizeLookup(value) {

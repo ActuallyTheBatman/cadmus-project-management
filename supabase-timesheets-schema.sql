@@ -156,6 +156,18 @@ create table if not exists public.timesheet_report_audit (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.timesheet_admin_audit (
+  id uuid primary key default gen_random_uuid(),
+  actor_id uuid references auth.users(id) on delete set null,
+  actor_email text,
+  action text not null,
+  entity_type text not null,
+  entity_id uuid,
+  entity_label text,
+  details jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
 alter table public.timesheet_daily_reports
   add column if not exists task_id uuid references public.timesheet_tasks(id);
 
@@ -224,6 +236,15 @@ create index if not exists timesheet_report_audit_report_idx
 
 create index if not exists timesheet_report_audit_actor_id_idx
   on public.timesheet_report_audit (actor_id);
+
+create index if not exists timesheet_admin_audit_created_at_idx
+  on public.timesheet_admin_audit (created_at desc);
+
+create index if not exists timesheet_admin_audit_actor_id_idx
+  on public.timesheet_admin_audit (actor_id);
+
+create index if not exists timesheet_admin_audit_entity_idx
+  on public.timesheet_admin_audit (entity_type, entity_id);
 
 create index if not exists timesheet_daily_reports_task_id_idx
   on public.timesheet_daily_reports (task_id);
@@ -340,6 +361,7 @@ alter table public.timesheet_entries enable row level security;
 alter table public.timesheet_weekly_reports enable row level security;
 alter table public.timesheet_daily_reports enable row level security;
 alter table public.timesheet_report_audit enable row level security;
+alter table public.timesheet_admin_audit enable row level security;
 
 drop policy if exists "Authenticated users can read active projects" on public.timesheet_projects;
 create policy "Authenticated users can read active projects"
@@ -710,6 +732,23 @@ with check (
         )
       )
   )
+);
+
+drop policy if exists "Admins can read admin audit" on public.timesheet_admin_audit;
+create policy "Admins can read admin audit"
+on public.timesheet_admin_audit
+for select
+to authenticated
+using (timesheet_private.current_user_role() = 'admin');
+
+drop policy if exists "Admins can create admin audit" on public.timesheet_admin_audit;
+create policy "Admins can create admin audit"
+on public.timesheet_admin_audit
+for insert
+to authenticated
+with check (
+  timesheet_private.current_user_role() = 'admin'
+  and auth.uid() = actor_id
 );
 
 drop function if exists public.current_user_role();
