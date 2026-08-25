@@ -1660,6 +1660,22 @@ body.light-mode .user-chip {
   border-left: 3px solid var(--signal);
 }
 
+.resource-register {
+  min-width: 1420px;
+}
+
+.resource-register-row.active td:first-child {
+  border-left: 3px solid var(--mint);
+}
+
+.resource-register-row.inactive td:first-child {
+  border-left: 3px solid var(--signal);
+}
+
+.resource-register-row.inactive {
+  opacity: 0.72;
+}
+
 .task-assignment-control {
   display: flex;
   align-items: center;

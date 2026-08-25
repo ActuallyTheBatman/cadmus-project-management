@@ -4261,6 +4261,8 @@ function setActiveAdminSection(section) {
 async function loadAdminProfiles() {
   if (!isPortfolioManager()) {
     app.adminProfiles = [];
+    app.adminAssignmentCounts = new Map();
+    app.adminWeekHours = new Map();
     return;
   }
 
@@ -4271,11 +4273,51 @@ async function loadAdminProfiles() {
 
   if (error) {
     app.adminProfiles = [];
+    app.adminAssignmentCounts = new Map();
+    app.adminWeekHours = new Map();
     setMessage(els.adminMessage, `User load failed: ${error.message}`, true);
     return;
   }
 
   app.adminProfiles = data || [];
+  await loadAdminResourceStats(app.adminProfiles.map((profile) => profile.id));
+}
+
+async function loadAdminResourceStats(userIds) {
+  app.adminAssignmentCounts = new Map();
+  app.adminWeekHours = new Map();
+  if (!userIds.length) return;
+
+  const { data: assignments } = await app.supabase
+    .from("timesheet_task_assignments")
+    .select("user_id")
+    .eq("active", true)
+    .in("user_id", userIds);
+
+  for (const assignment of assignments || []) {
+    app.adminAssignmentCounts.set(assignment.user_id, (app.adminAssignmentCounts.get(assignment.user_id) || 0) + 1);
+  }
+
+  const weekStart = toDateInput(startOfWeek(new Date()));
+  const { data: reports } = await app.supabase
+    .from("timesheet_weekly_reports")
+    .select("id, user_id")
+    .eq("week_start", weekStart)
+    .in("user_id", userIds);
+
+  if (!reports?.length) return;
+
+  const reportUserById = new Map(reports.map((report) => [report.id, report.user_id]));
+  const { data: days } = await app.supabase
+    .from("timesheet_daily_reports")
+    .select("weekly_report_id, hours")
+    .in("weekly_report_id", reports.map((report) => report.id));
+
+  for (const day of days || []) {
+    const userId = reportUserById.get(day.weekly_report_id);
+    if (!userId) continue;
+    app.adminWeekHours.set(userId, (app.adminWeekHours.get(userId) || 0) + Number(day.hours || 0));
+  }
 }
 
 function populateAdminSelects() {
@@ -5024,34 +5066,55 @@ function renderUserAdminList() {
   }
 
   if (!users.length) {
-    els.userList.innerHTML = `<li class="admin-item"><span>${escapeHtml(search ? "No users match this search and filter set." : "No users match this view.")}</span></li>`;
+    els.userList.innerHTML = `<div class="empty-state"><p>${escapeHtml(search ? "No users match this search and filter set." : "No users match this view.")}</p></div>`;
     return;
   }
 
-  els.userList.innerHTML = "";
+  els.userList.innerHTML = `
+    <div class="task-register-scroll">
+      <table class="task-register resource-register">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Tier</th>
+            <th>Project</th>
+            <th>Manager</th>
+            <th>Branch</th>
+            <th>Division</th>
+            <th>Status</th>
+            <th>Assignments</th>
+            <th>This Week</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="userRegisterBody"></tbody>
+      </table>
+    </div>
+  `;
+
+  const tbody = els.userList.querySelector("#userRegisterBody");
   for (const user of users) {
-    const row = document.createElement("li");
-    row.className = "admin-item admin-item-stacked user-admin-item";
+    const assignmentCount = app.adminAssignmentCounts?.get(user.id) || 0;
+    const weekHours = app.adminWeekHours?.get(user.id) || 0;
+    const row = document.createElement("tr");
+    row.className = `resource-register-row ${user.active === false ? "inactive" : "active"}`;
     row.innerHTML = `
-      <div class="admin-item-main">
-        <div>
-          <strong>${escapeHtml(user.full_name || user.email)}</strong>
-          <span>${escapeHtml([user.email, roleLabel(user.role), user.active === false ? "Inactive" : "Active"].join(" - "))}</span>
-          <span class="admin-row-status" data-user-status>Ready</span>
-        </div>
-        <button class="button danger small-button" type="button" data-toggle-active>${user.active === false ? "Reactivate" : "Deactivate"}</button>
-      </div>
-      <div class="profile-grid tight-grid">
-        <label class="field"><span>Tier</span><select data-user-field="role">
-          <option value="resource">Resource</option>
-          <option value="manager">Project Manager</option>
-          <option value="admin">Portfolio Manager</option>
-        </select></label>
-        <label class="field"><span>Project</span><select data-user-field="project_id"></select></label>
-        <label class="field"><span>Manager</span><select data-user-field="manager_id"></select></label>
-        <label class="field"><span>Branch</span><select data-user-field="branch"></select></label>
-        <label class="field"><span>Division</span><select data-user-field="division"></select></label>
-      </div>
+      <td><strong>${escapeHtml(user.full_name || user.email)}</strong></td>
+      <td>${escapeHtml(user.email)}</td>
+      <td><select data-user-field="role">
+        <option value="resource">Resource</option>
+        <option value="manager">Project Manager</option>
+        <option value="admin">Portfolio Manager</option>
+      </select></td>
+      <td><select data-user-field="project_id"></select></td>
+      <td><select data-user-field="manager_id"></select></td>
+      <td><select data-user-field="branch"></select></td>
+      <td><select data-user-field="division"></select></td>
+      <td><span data-user-status>${user.active === false ? "Inactive" : "Active"}</span></td>
+      <td>${escapeHtml(String(assignmentCount))}</td>
+      <td>${escapeHtml(formatHours(weekHours))}h</td>
+      <td><button class="button danger small-button" type="button" data-toggle-active>${user.active === false ? "Reactivate" : "Deactivate"}</button></td>
     `;
 
     const roleSelect = row.querySelector('[data-user-field="role"]');
@@ -5098,7 +5161,7 @@ function renderUserAdminList() {
       updateManagedUser(user.id, { active: nextActive }, statusNode);
     });
 
-    els.userList.append(row);
+    tbody.append(row);
   }
 }
 
