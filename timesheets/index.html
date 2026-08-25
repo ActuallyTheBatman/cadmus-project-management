@@ -13,9 +13,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Libre+Baskerville:wght@700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/timesheets.css?v=20260824-ux-polish">
-  <script src="/assets/timesheets-config.js?v=20260824-ux-polish"></script>
-  <script type="module" src="/assets/timesheets.js?v=20260824-ux-polish"></script>
+  <link rel="stylesheet" href="/assets/timesheets.css?v=20260824-load-ux">
+  <script src="/assets/timesheets-config.js?v=20260824-load-ux"></script>
+  <script type="module" src="/assets/timesheets.js?v=20260824-load-ux"></script>
 </head>
 <body>
   <nav class="nav" aria-label="Primary navigation">
@@ -50,6 +50,14 @@
           <p>Add the Supabase project URL and public anon key to <code>/assets/timesheets-config.js</code>, then run <code>/supabase-timesheets-schema.sql</code>.</p>
         </div>
 
+        <div id="loadingView" class="loading-view hidden" role="status" aria-live="polite">
+          <div class="loading-mark" aria-hidden="true"></div>
+          <div>
+            <strong>Loading workspace</strong>
+            <p id="loadingMessage">Preparing your reporting view...</p>
+          </div>
+        </div>
+
         <div class="status-bar">
           <div class="user-chip">
             <span class="dot good"></span>
@@ -63,11 +71,11 @@
         </div>
 
         <div id="appNav" class="app-nav hidden" aria-label="Resource reporting sections">
-          <button class="app-nav-button" type="button" data-app-view="dashboard">Dashboard</button>
-          <button class="app-nav-button" type="button" data-app-view="timesheet">Timesheet</button>
-          <button class="app-nav-button" type="button" data-app-view="reviews">Reviews</button>
-          <button class="app-nav-button" type="button" data-app-view="reports">Reports</button>
-          <button class="app-nav-button" type="button" data-app-view="admin">Admin</button>
+          <button class="app-nav-button" type="button" data-app-view="dashboard"><span>01</span> Dashboard</button>
+          <button class="app-nav-button" type="button" data-app-view="timesheet"><span>02</span> Timesheet</button>
+          <button class="app-nav-button" type="button" data-app-view="reviews"><span>03</span> Review Queue</button>
+          <button class="app-nav-button" type="button" data-app-view="reports"><span>04</span> Reports</button>
+          <button class="app-nav-button" type="button" data-app-view="admin"><span>05</span> Admin Console</button>
         </div>
 
         <section id="authView" class="auth-panel">

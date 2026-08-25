@@ -34,6 +34,7 @@ const blockedPasswordTokens = new Set([
 const app = {
   supabase: null,
   user: null,
+  renderNonce: 0,
   profile: null,
   projects: [],
   managers: [],
@@ -70,6 +71,8 @@ const app = {
 
 const els = {
   setupNotice: document.querySelector("#setupNotice"),
+  loadingView: document.querySelector("#loadingView"),
+  loadingMessage: document.querySelector("#loadingMessage"),
   authView: document.querySelector("#authView"),
   profileView: document.querySelector("#profileView"),
   appNav: document.querySelector("#appNav"),
@@ -218,8 +221,10 @@ boot();
 
 async function boot() {
   els.weekStart.value = toDateInput(app.weekStart);
+  setAppLoading(true, "Connecting to Cadmus Resource Reporting...");
 
   if (!config.supabaseUrl || !config.supabaseAnonKey) {
+    setAppLoading(false);
     els.setupNotice.classList.remove("hidden");
     els.authView.classList.add("hidden");
     return;
@@ -239,12 +244,13 @@ async function boot() {
 
   const { data } = await app.supabase.auth.getSession();
   app.user = data.session?.user || null;
-  await renderForAuthState();
+  await renderForAuthState({ showLoading: true });
 
   app.supabase.auth.onAuthStateChange(async (_event, session) => {
+    if (_event === "INITIAL_SESSION" || _event === "TOKEN_REFRESHED") return;
     app.user = session?.user || null;
     if (_event === "PASSWORD_RECOVERY") app.passwordRecovery = true;
-    await renderForAuthState();
+    await renderForAuthState({ showLoading: true });
   });
 }
 
@@ -577,62 +583,69 @@ function setMagicLinkCooldown() {
   }, 1000);
 }
 
-async function renderForAuthState() {
+async function renderForAuthState({ showLoading = false } = {}) {
+  const renderId = ++app.renderNonce;
+  if (showLoading) setAppLoading(true, app.user ? "Loading your reporting workspace..." : "Preparing sign-in...");
   hideAllViews();
   els.signOut.classList.toggle("hidden", !app.user);
   els.rolePill.classList.add("hidden");
 
-  if (!app.user) {
-    els.authView.classList.remove("hidden");
-    els.userEmail.textContent = "Not signed in";
-    if (new URL(window.location.href).searchParams.get("invite")) {
-      setMessage(els.authMessage, "Invitation link detected. Sign in or create an account with the invited email address to continue.");
+  try {
+    if (!app.user) {
+      els.authView.classList.remove("hidden");
+      els.userEmail.textContent = "Not signed in";
+      if (new URL(window.location.href).searchParams.get("invite")) {
+        setMessage(els.authMessage, "Invitation link detected. Sign in or create an account with the invited email address to continue.");
+      }
+      return;
     }
-    return;
+
+    els.userEmail.textContent = app.user.email;
+    await loadReferenceData();
+    await loadPendingInvitation();
+    await loadProfile();
+    if (renderId !== app.renderNonce) return;
+
+    if (app.profile?.active === false) {
+      els.authView.classList.remove("hidden");
+      setMessage(els.authMessage, "This timesheet account is inactive. Contact your Portfolio Manager for access.", true);
+      return;
+    }
+
+    if (!app.profile) {
+      renderProfileForm();
+      els.profileView.classList.remove("hidden");
+      return;
+    }
+
+    if (app.passwordRecovery) {
+      renderProfileForm();
+      els.profileView.classList.remove("hidden");
+      setMessage(els.profileMessage, "Create a new password before continuing.");
+      return;
+    }
+
+    els.rolePill.textContent = roleLabel(app.profile.role);
+    els.rolePill.classList.remove("hidden");
+    els.appNav.classList.remove("hidden");
+    renderProfileSummary();
+    await loadWeek();
+    if (renderId !== app.renderNonce) return;
+
+    if (canReviewPortfolio()) {
+      if (!els.portfolioWeek.value) els.portfolioWeek.value = toDateInput(app.weekStart);
+      populatePortfolioProjectFilter();
+    }
+
+    if (isPortfolioManager()) {
+      populateAdminSelects();
+      setDefaultAdminExportWindow();
+    }
+
+    await setActiveAppView(defaultAppView());
+  } finally {
+    if (renderId === app.renderNonce) setAppLoading(false);
   }
-
-  els.userEmail.textContent = app.user.email;
-  await loadReferenceData();
-  await loadPendingInvitation();
-  await loadProfile();
-
-  if (app.profile?.active === false) {
-    els.authView.classList.remove("hidden");
-    setMessage(els.authMessage, "This timesheet account is inactive. Contact your Portfolio Manager for access.", true);
-    return;
-  }
-
-  if (!app.profile) {
-    renderProfileForm();
-    els.profileView.classList.remove("hidden");
-    return;
-  }
-
-  if (app.passwordRecovery) {
-    renderProfileForm();
-    els.profileView.classList.remove("hidden");
-    setMessage(els.profileMessage, "Create a new password before continuing.");
-    return;
-  }
-
-  els.rolePill.textContent = roleLabel(app.profile.role);
-  els.rolePill.classList.remove("hidden");
-  els.appNav.classList.remove("hidden");
-  renderProfileSummary();
-  await loadWeek();
-
-  if (canReviewPortfolio()) {
-    if (!els.portfolioWeek.value) els.portfolioWeek.value = toDateInput(app.weekStart);
-    populatePortfolioProjectFilter();
-    await loadPortfolio();
-  }
-
-  if (isPortfolioManager()) {
-    await renderAdminConsole();
-    setDefaultAdminExportWindow();
-  }
-
-  await setActiveAppView(defaultAppView());
 }
 
 function hideAllViews() {
@@ -643,6 +656,12 @@ function hideAllViews() {
   els.appView.classList.add("hidden");
   els.portfolioView.classList.add("hidden");
   els.adminView.classList.add("hidden");
+}
+
+function setAppLoading(isLoading, message = "Preparing your reporting view...") {
+  if (!els.loadingView) return;
+  els.loadingView.classList.toggle("hidden", !isLoading);
+  if (els.loadingMessage) els.loadingMessage.textContent = message;
 }
 
 function defaultAppView() {
@@ -696,6 +715,7 @@ async function setActiveAppView(view) {
 
   if (nextView === "admin") {
     els.adminView.classList.remove("hidden");
+    await renderAdminConsole();
     setActiveAdminSection(app.activeAdminSection || "overview");
   }
 }
@@ -728,7 +748,9 @@ async function renderDashboard() {
   const status = app.report?.status || "draft";
   const totalHours = app.dailyReports.reduce((sum, day) => sum + Number(day.hours || 0), 0);
   const dueDate = formatShortDate(deadlineDateForWeek(app.weekStart));
+  const nextAction = resourceNextAction(status, totalHours);
   els.dashboardContent.innerHTML = `
+    ${commandPanel(nextAction)}
     <div class="ops-summary-head">
       <div>
         <h3>This Week</h3>
@@ -744,6 +766,42 @@ async function renderDashboard() {
     </div>
     ${app.reportAudits.length ? renderAuditTimeline(app.reportAudits, 5) : `<div class="empty-state"><p>No report history yet for this week.</p></div>`}
   `;
+  bindCommandPanelActions(els.dashboardContent);
+}
+
+function resourceNextAction(status, totalHours) {
+  if (status === "approved") {
+    return { label: "Current Week Complete", detail: "This week is approved and locked. Request a reopen only if the labor record needs correction.", action: "Open Timesheet", view: "timesheet", tone: "approved" };
+  }
+  if (status === "submitted" || status === "pending_final") {
+    return { label: "Waiting On Review", detail: "Your week is submitted. No action is needed unless you withdraw before approval.", action: "View Timesheet", view: "timesheet", tone: "submitted" };
+  }
+  if (status === "rejected") {
+    return { label: "Correction Needed", detail: "This week was sent back. Update the task lines and resubmit for review.", action: "Fix Timesheet", view: "timesheet", tone: "rejected" };
+  }
+  if (totalHours > 0) {
+    return { label: "Ready To Submit", detail: "Review the pre-submit checks, then send the week to your manager.", action: "Submit Week", view: "timesheet", tone: "submitted" };
+  }
+  return { label: "Start This Week", detail: "Add project task lines as work happens. The dashboard will update as the week fills in.", action: "Enter Time", view: "timesheet", tone: "draft" };
+}
+
+function commandPanel({ label, detail, action, view, tone = "draft" }) {
+  return `
+    <div class="command-panel ${escapeHtml(tone)}">
+      <div>
+        <span>Next action</span>
+        <strong>${escapeHtml(label)}</strong>
+        <p>${escapeHtml(detail)}</p>
+      </div>
+      <button class="button primary" type="button" data-command-view="${escapeHtml(view)}">${escapeHtml(action)}</button>
+    </div>
+  `;
+}
+
+function bindCommandPanelActions(container) {
+  for (const button of container.querySelectorAll("[data-command-view]")) {
+    button.addEventListener("click", () => setActiveAppView(button.dataset.commandView));
+  }
 }
 
 async function loadReferenceData() {
@@ -2397,8 +2455,10 @@ function renderPortfolioDashboard({ selectedWeek, selectedProjectId, profiles, r
       .filter((report) => ["submitted", "pending_final"].includes(report.status))
       .map((report) => buildApprovalReminderTarget(report, profileById.get(report.user_id), reportHours.get(report.id) || 0)),
   };
+  const nextAction = portfolioNextAction({ pendingApproval, overdueCount, lateSubmissions, submissionRate });
 
   target.innerHTML = `
+    ${commandPanel(nextAction)}
     <div class="ops-summary-head">
       <div>
         <h3>Operations Summary</h3>
@@ -2427,11 +2487,28 @@ function renderPortfolioDashboard({ selectedWeek, selectedProjectId, profiles, r
       ${opsBreakdown("Task Load", taskBreakdown, "No task activity yet.")}
     </div>
   `;
+  bindCommandPanelActions(target);
 
   target.querySelector("[data-export-ops-summary]")?.addEventListener("click", exportOperationsSummary);
   for (const button of target.querySelectorAll("[data-export-reminders]")) {
     button.addEventListener("click", () => exportReminderTargets(button.dataset.exportReminders));
   }
+}
+
+function portfolioNextAction({ pendingApproval, overdueCount, lateSubmissions, submissionRate }) {
+  if (pendingApproval > 0) {
+    return { label: "Review Queue Ready", detail: `${pendingApproval} report${pendingApproval === 1 ? "" : "s"} waiting for approval. Clear the queue before the weekly close.`, action: "Open Reviews", view: "reviews", tone: "submitted" };
+  }
+  if (overdueCount > 0) {
+    return { label: "Missing Submissions", detail: `${overdueCount} resource${overdueCount === 1 ? "" : "s"} past the current deadline. Export reminders or follow up directly.`, action: "View Reports", view: "reports", tone: "rejected" };
+  }
+  if (lateSubmissions > 0) {
+    return { label: "Late Submissions Logged", detail: "Review late submissions and confirm whether any follow-up is needed.", action: "View Reports", view: "reports", tone: "rejected" };
+  }
+  if (submissionRate >= 90) {
+    return { label: "Portfolio On Track", detail: "Coverage and approvals are in good shape for the selected week.", action: "View Reports", view: "reports", tone: "approved" };
+  }
+  return { label: "Monitor Coverage", detail: "Submission coverage is still building for the selected week.", action: "View Reports", view: "reports", tone: "draft" };
 }
 
 function buildMissingReminderTarget(profile, report, selectedWeek) {
@@ -2863,13 +2940,13 @@ function renderReviewCard(report, profile, days, audits = [], adjustments = []) 
     const approve = document.createElement("button");
     approve.className = "button primary";
     approve.type = "button";
-    approve.textContent = report.status === "pending_final" ? "Final Approve" : "Approve";
+    approve.textContent = report.status === "pending_final" ? "Final Approve Week" : "Approve Week";
     approve.disabled = report.status === "pending_final" && !canCurrentUserFinalApprove(approvalRoute);
     approve.addEventListener("click", () => reviewReport(report.id, "approved", notes.value));
     const reject = document.createElement("button");
     reject.className = "button danger";
     reject.type = "button";
-    reject.textContent = "Send Back";
+    reject.textContent = "Send Back with Comments";
     reject.addEventListener("click", () => reviewReport(report.id, "rejected", notes.value));
     const buttons = document.createElement("div");
     buttons.className = "toolbar";

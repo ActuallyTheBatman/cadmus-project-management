@@ -98,7 +98,7 @@ body.light-mode .status-pill.rejected {
   background: rgba(186, 59, 47, 0.07);
 }
 
-body.light-mode :is(.auth-panel, .panel, .admin-card, .review-card, .daily-card, .ops-summary-head, .ops-metric, .ops-breakdown, .queue-head, .queue-metric, .exception-group, .quality-head, .report-lifecycle, .adjustment-request-panel, .notice) {
+body.light-mode :is(.auth-panel, .panel, .admin-card, .review-card, .daily-card, .loading-view, .command-panel, .ops-summary-head, .ops-metric, .ops-breakdown, .queue-head, .queue-metric, .exception-group, .quality-head, .report-lifecycle, .adjustment-request-panel, .notice) {
   border-color: rgba(21, 24, 29, 0.14);
   background: rgba(255, 253, 248, 0.78);
 }
@@ -147,6 +147,39 @@ body.light-mode :is(.field span, .metric span, .weekly-grid-head, .review-meta s
 
 body.light-mode :is(.profile-summary strong, .metric strong, .review-meta strong, .review-day strong, .ops-metric strong, .queue-metric strong, .exception-list strong, .quality-list strong, .admin-item strong, .import-summary strong) {
   color: var(--paper);
+}
+
+body.light-mode .command-panel strong {
+  color: var(--paper);
+}
+
+body.light-mode .command-panel p {
+  color: rgba(21, 24, 29, 0.68);
+}
+
+body.light-mode .loading-view strong {
+  color: var(--paper);
+}
+
+body.light-mode .loading-view p {
+  color: rgba(21, 24, 29, 0.66);
+}
+
+body.light-mode .loading-mark {
+  border-color: rgba(25, 112, 90, 0.2);
+  border-top-color: var(--mint);
+}
+
+body.light-mode .command-panel.approved span {
+  color: var(--mint);
+}
+
+body.light-mode .command-panel.submitted span {
+  color: var(--sky);
+}
+
+body.light-mode .command-panel.rejected span {
+  color: var(--signal);
 }
 
 body.light-mode .lifecycle-step span {
@@ -345,6 +378,43 @@ h1 {
 .app-shell { padding: 22px 0 74px; }
 .hidden { display: none !important; }
 
+.loading-view {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 14px;
+  border: 1px solid rgba(143, 227, 193, 0.2);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  background: rgba(143, 227, 193, 0.045);
+}
+
+.loading-mark {
+  width: 28px;
+  height: 28px;
+  border: 3px solid rgba(143, 227, 193, 0.22);
+  border-top-color: var(--mint);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+
+.loading-view strong {
+  display: block;
+  color: var(--paper);
+  font-size: 13px;
+  text-transform: uppercase;
+}
+
+.loading-view p {
+  margin-top: 3px;
+  color: rgba(245, 241, 232, 0.66);
+  font-size: 13px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 .status-bar {
   display: flex;
   align-items: center;
@@ -376,6 +446,11 @@ h1 {
   font-size: 12px;
   font-weight: 900;
   text-transform: uppercase;
+}
+
+.app-nav-button span {
+  color: rgba(214, 168, 71, 0.86);
+  font-size: 10px;
 }
 
 .app-nav-button:hover,
@@ -1229,6 +1304,70 @@ body.light-mode .user-chip {
   line-height: 1.4;
 }
 
+.command-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border: 1px solid rgba(214, 168, 71, 0.28);
+  border-radius: var(--radius);
+  padding: 16px;
+  background: rgba(214, 168, 71, 0.055);
+}
+
+.command-panel span {
+  display: block;
+  color: rgba(214, 168, 71, 0.9);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.command-panel strong {
+  display: block;
+  margin-top: 5px;
+  color: var(--paper);
+  font-size: clamp(20px, 2.5vw, 30px);
+  font-weight: 900;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.command-panel p {
+  margin-top: 7px;
+  max-width: 680px;
+  color: rgba(245, 241, 232, 0.68);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.command-panel.approved {
+  border-color: rgba(92, 197, 168, 0.3);
+  background: rgba(92, 197, 168, 0.06);
+}
+
+.command-panel.approved span {
+  color: rgba(143, 227, 193, 0.92);
+}
+
+.command-panel.submitted {
+  border-color: rgba(103, 176, 217, 0.28);
+  background: rgba(103, 176, 217, 0.06);
+}
+
+.command-panel.submitted span {
+  color: rgba(103, 176, 217, 0.95);
+}
+
+.command-panel.rejected {
+  border-color: rgba(255, 113, 95, 0.34);
+  background: rgba(255, 113, 95, 0.06);
+}
+
+.command-panel.rejected span {
+  color: rgba(255, 176, 164, 0.95);
+}
+
 .calendar-badge {
   display: inline-flex;
   align-items: center;
@@ -1858,6 +1997,16 @@ footer {
   .nav-links,
   .ops-actions,
   .toolbar { justify-content: flex-start; }
+
+  .command-panel {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .command-panel .button {
+    width: 100%;
+  }
+
   .profile-grid,
   .admin-grid,
   .exceptions-grid,
