@@ -1043,7 +1043,7 @@ function taskRegisterRows(task, currentWeekHours) {
           ? `<select data-task-field="task_status">${taskStatusOptionsHtml(task.task_status || "not_started")}</select>`
           : `<span class="status-pill ${escapeHtml(status.tone)}">${escapeHtml(status.label)}</span>`}
       </td>
-      <td>${canManage ? taskAssignmentLink(task, assignments) : `<div class="assigned-resource-list">${assignedResourceLabels(assignments)}</div>`}</td>
+      <td>${canManage ? taskAssignmentControl(task, assignments) : `<div class="assigned-resource-list">${assignedResourceLabels(assignments)}</div>`}</td>
       <td>${escapeHtml(formatHours(currentWeekHours))}h</td>
     </tr>
   `;
@@ -1054,13 +1054,12 @@ function taskProjectOptions(currentProjectId) {
   return projects.map((project) => `<option value="${escapeHtml(project.id)}" ${project.id === currentProjectId ? "selected" : ""}>${escapeHtml(projectLabel(project))}</option>`).join("");
 }
 
-function taskAssignmentLink(task, assignments) {
-  const countLabel = assignments.length ? `${assignments.length} assigned` : "Unassigned";
+function taskAssignmentControl(task, assignments) {
   return `
-    <button class="task-assignment-link" type="button" data-open-task-assignment="${escapeHtml(task.id)}">
-      <span>Assigned Resources</span>
-      <strong>${escapeHtml(countLabel)}</strong>
-    </button>
+    <div class="task-assignment-control">
+      <div class="assigned-resource-list">${assignedResourceLabels(assignments)}</div>
+      <button class="task-assignment-add" type="button" data-open-task-assignment="${escapeHtml(task.id)}" aria-label="Assign resources to ${escapeHtml(taskLabel(task))}">+</button>
+    </div>
   `;
 }
 

@@ -1648,31 +1648,38 @@ body.light-mode .user-chip {
   border-left: 3px solid var(--signal);
 }
 
-.task-assignment-link {
-  display: grid;
-  gap: 3px;
-  width: max-content;
-  max-width: 100%;
-  border: 0;
-  padding: 0;
+.task-assignment-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 230px;
+}
+
+.task-assignment-control .assigned-resource-list {
+  flex: 1;
+}
+
+.task-assignment-add {
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid rgba(109, 168, 214, 0.46);
+  border-radius: 999px;
   color: var(--sky);
-  background: transparent;
+  background: rgba(109, 168, 214, 0.08);
   font: inherit;
-  text-align: left;
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1;
   cursor: pointer;
 }
 
-.task-assignment-link span {
-  width: max-content;
-  max-width: 100%;
-  border-bottom: 1px solid currentColor;
-  color: inherit;
-  font-weight: 900;
-}
-
-.task-assignment-link strong {
-  color: rgba(245, 241, 232, 0.62);
-  font-size: 11px;
+.task-assignment-add:hover,
+.task-assignment-add:focus-visible {
+  border-color: rgba(109, 168, 214, 0.72);
+  background: rgba(109, 168, 214, 0.14);
 }
 
 .task-assignment-backdrop {
