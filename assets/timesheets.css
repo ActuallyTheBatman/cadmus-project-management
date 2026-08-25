@@ -98,6 +98,12 @@ body.light-mode .status-pill.rejected {
   background: rgba(186, 59, 47, 0.07);
 }
 
+body.light-mode .status-pill.warning {
+  border-color: rgba(176, 132, 36, 0.3);
+  color: var(--brass);
+  background: rgba(176, 132, 36, 0.08);
+}
+
 body.light-mode .danger-zone {
   border-color: rgba(186, 59, 47, 0.28);
   background: rgba(186, 59, 47, 0.06);
@@ -1093,6 +1099,12 @@ body.light-mode .user-chip {
   border-color: rgba(255, 113, 95, 0.34);
   color: var(--signal);
   background: rgba(255, 113, 95, 0.08);
+}
+
+.status-pill.warning {
+  border-color: rgba(214, 168, 71, 0.36);
+  color: var(--brass);
+  background: rgba(214, 168, 71, 0.1);
 }
 
 .portfolio-panel { margin-top: 18px; }
@@ -2111,6 +2123,28 @@ body.light-mode .calendar-badge.non_working {
 .admin-card h3 {
   font-size: 16px;
   text-transform: uppercase;
+}
+
+.inline-add-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: end;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.inline-add-fields .field {
+  flex: 1 1 160px;
+}
+
+.inline-add-fields .profile-grid {
+  flex: 1 1 100%;
+}
+
+.inline-add-fields > button[type="submit"] {
+  flex: 0 0 auto;
 }
 
 .admin-card-head {

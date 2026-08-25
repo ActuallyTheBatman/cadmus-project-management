@@ -78,6 +78,8 @@ const app = {
   userTaskAssignments: [],
   activeTaskDetailId: "",
   activeProjectDetailId: "",
+  activeUserDetailId: "",
+  userDetailAssignments: [],
   taskQuickAddOpen: false,
   projectQuickAddOpen: false,
   projectResourceCounts: new Map(),
@@ -111,6 +113,9 @@ const els = {
   projectDetailView: document.querySelector("#projectDetailView"),
   projectDetailBreadcrumb: document.querySelector("#projectDetailBreadcrumb"),
   projectDetailContent: document.querySelector("#projectDetailContent"),
+  userDetailView: document.querySelector("#userDetailView"),
+  userDetailBreadcrumb: document.querySelector("#userDetailBreadcrumb"),
+  userDetailContent: document.querySelector("#userDetailContent"),
   tasksView: document.querySelector("#tasksView"),
   tasksBreadcrumb: document.querySelector("#tasksBreadcrumb"),
   taskDetailView: document.querySelector("#taskDetailView"),
@@ -204,6 +209,7 @@ const els = {
   refreshAdminAudit: document.querySelector("#refreshAdminAudit"),
   exportAdminAudit: document.querySelector("#exportAdminAudit"),
   adminAuditList: document.querySelector("#adminAuditList"),
+  adminAuditSearch: document.querySelector("#adminAuditSearch"),
   adminSubNav: document.querySelector("#adminSubNav"),
   adminProjectFocus: document.querySelector("#adminProjectFocus"),
   adminManagerProject: document.querySelector("#adminManagerProject"),
@@ -515,6 +521,7 @@ function bindEvents() {
     loadPortfolio();
   });
   els.managerForm.addEventListener("submit", addManager);
+  setupInlineAddToggles();
   els.approvalChainForm.addEventListener("submit", addApprovalChain);
   els.approvalChainProject.addEventListener("change", populateApprovalChainApprovers);
   els.approvalChainBranch.addEventListener("change", populateApprovalChainDivisions);
@@ -527,6 +534,7 @@ function bindEvents() {
   els.adminApprovedExport.addEventListener("click", exportApprovedTime);
   els.refreshExceptions.addEventListener("click", renderAdminExceptions);
   els.refreshAdminAudit.addEventListener("click", loadAndRenderAdminAudit);
+  els.adminAuditSearch.addEventListener("input", renderAdminAuditList);
   els.exportAdminAudit.addEventListener("click", exportAdminAuditLog);
   els.adminExportBranch.addEventListener("change", populateAdminExportDivisions);
   els.userFilterForm.addEventListener("submit", (event) => event.preventDefault());
@@ -733,6 +741,7 @@ function hideAllViews() {
   els.notificationsView.classList.add("hidden");
   els.portfolioView.classList.add("hidden");
   els.adminView.classList.add("hidden");
+  els.userDetailView.classList.add("hidden");
 }
 
 function setAppLoading(isLoading, message = "Preparing your reporting view...") {
@@ -748,7 +757,7 @@ function defaultAppView() {
 function allowedAppViews() {
   const views = ["dashboard", "timesheet", "tasks", "taskDetail", "notifications"];
   if (canReviewPortfolio()) views.push("projects", "projectDetail", "reviews", "reports");
-  if (isPortfolioManager()) views.push("admin");
+  if (isPortfolioManager()) views.push("admin", "userDetail");
   return views;
 }
 
@@ -761,11 +770,13 @@ async function setActiveAppView(view) {
   els.dashboardView.classList.add("hidden");
   els.appView.classList.add("hidden");
   els.projectsView.classList.add("hidden");
+  els.projectDetailView.classList.add("hidden");
   els.tasksView.classList.add("hidden");
   els.taskDetailView.classList.add("hidden");
   els.notificationsView.classList.add("hidden");
   els.portfolioView.classList.add("hidden");
   els.adminView.classList.add("hidden");
+  els.userDetailView.classList.add("hidden");
 
   if (nextView === "dashboard") {
     els.dashboardView.classList.remove("hidden");
@@ -831,6 +842,13 @@ async function setActiveAppView(view) {
     els.adminView.classList.remove("hidden");
     await renderAdminConsole();
     setActiveAdminSection(app.activeAdminSection || "overview");
+    return;
+  }
+
+  if (nextView === "userDetail") {
+    els.userDetailView.classList.remove("hidden");
+    await loadUserDetailData(app.activeUserDetailId);
+    renderUserDetailView();
   }
 }
 
@@ -979,7 +997,7 @@ function renderBreadcrumb(items) {
   return `<nav class="breadcrumb" aria-label="Breadcrumb">${visible.map((item, index) => {
     const isLast = index === visible.length - 1;
     if (item.current || isLast) return `<span class="breadcrumb-current">${escapeHtml(item.label)}</span>`;
-    return `<button type="button" class="breadcrumb-crumb" data-breadcrumb-view="${escapeHtml(item.view)}" ${item.projectId ? `data-breadcrumb-project="${escapeHtml(item.projectId)}"` : ""}>${escapeHtml(item.label)}</button><span class="breadcrumb-sep">/</span>`;
+    return `<button type="button" class="breadcrumb-crumb" data-breadcrumb-view="${escapeHtml(item.view)}" ${item.projectId ? `data-breadcrumb-project="${escapeHtml(item.projectId)}"` : ""} ${item.adminSection ? `data-breadcrumb-admin-section="${escapeHtml(item.adminSection)}"` : ""}>${escapeHtml(item.label)}</button><span class="breadcrumb-sep">/</span>`;
   }).join("")}</nav>`;
 }
 
@@ -989,8 +1007,12 @@ function bindBreadcrumbActions(container) {
     button.addEventListener("click", () => {
       const view = button.dataset.breadcrumbView;
       const projectId = button.dataset.breadcrumbProject;
+      const adminSection = button.dataset.breadcrumbAdminSection;
       if (view === "tasks" && projectId && canReviewPortfolio()) {
         els.taskProjectFilter.value = projectId;
+      }
+      if (view === "admin" && adminSection) {
+        app.activeAdminSection = adminSection;
       }
       setActiveAppView(view);
     });
@@ -1306,6 +1328,160 @@ async function deactivateProjectFromDetail(projectId) {
   await logAdminChange("deactivated", "project", projectId, projectLabel(project), {});
   await loadReferenceData();
   setActiveAppView("projects");
+}
+
+function openUserDetail(userId) {
+  app.activeUserDetailId = userId;
+  setActiveAppView("userDetail");
+}
+
+async function loadUserDetailData(userId) {
+  app.userDetailAssignments = [];
+  if (!userId) return;
+  const { data, error } = await app.supabase
+    .from("timesheet_task_assignments")
+    .select("id, task_id, user_id, assigned_at, active")
+    .eq("user_id", userId)
+    .order("assigned_at", { ascending: false });
+
+  if (!isMissingTaskAssignmentTableError(error)) app.userDetailAssignments = data || [];
+}
+
+function renderUserDetailView() {
+  if (!els.userDetailContent) return;
+  const user = app.adminProfiles.find((profile) => profile.id === app.activeUserDetailId);
+  if (!user) {
+    els.userDetailBreadcrumb.innerHTML = "";
+    els.userDetailContent.innerHTML = `<div class="empty-state"><p>This user could not be found. It may have been removed.</p></div>`;
+    return;
+  }
+
+  const canManage = isPortfolioManager();
+  const project = getProject(user.project_id);
+  const manager = getManager(user.manager_id);
+  const assignmentCount = app.adminAssignmentCounts?.get(user.id) || 0;
+  const weekHours = app.adminWeekHours?.get(user.id) || 0;
+  const assignments = [...app.userDetailAssignments]
+    .sort((a, b) => (b.assigned_at || "").localeCompare(a.assigned_at || ""))
+    .slice(0, 12);
+
+  els.userDetailBreadcrumb.innerHTML = renderBreadcrumb([
+    { label: "Users", view: "admin", adminSection: "users" },
+    { label: user.full_name || user.email, current: true },
+  ]);
+  bindBreadcrumbActions(els.userDetailBreadcrumb);
+
+  els.userDetailContent.innerHTML = `
+    <div class="ops-summary-head">
+      <div>
+        <h3>${escapeHtml(user.full_name || user.email)}</h3>
+        <p>${escapeHtml(user.email)}</p>
+      </div>
+      <span class="status-pill ${user.active === false ? "rejected" : "approved"}">${user.active === false ? "Inactive" : "Active"}</span>
+    </div>
+    <div class="ops-metric-grid task-metrics">
+      ${opsMetric("Assignments", assignmentCount, "Active task assignments", "")}
+      ${opsMetric("This Week", `${formatHours(weekHours)}h`, "Logged this week", "")}
+    </div>
+    <div id="userDetailMessage" class="message" role="status"></div>
+    <div class="profile-grid" data-user-id="${escapeHtml(user.id)}">
+      <label class="field"><span>Role</span><select data-user-detail-field="role" ${canManage ? "" : "disabled"}>
+        <option value="resource">Resource</option>
+        <option value="manager">Project Manager</option>
+        <option value="admin">Portfolio Manager</option>
+      </select></label>
+      <label class="field"><span>Project</span><select data-user-detail-field="project_id" ${canManage ? "" : "disabled"}></select></label>
+      <label class="field"><span>Manager</span><select data-user-detail-field="manager_id" ${canManage ? "" : "disabled"}></select></label>
+      <label class="field"><span>Branch</span><select data-user-detail-field="branch" ${canManage ? "" : "disabled"}></select></label>
+      <label class="field"><span>Division</span><select data-user-detail-field="division" ${canManage ? "" : "disabled"}></select></label>
+    </div>
+    <div class="admin-card task-detail-resources">
+      <h3>Task Assignment History</h3>
+      <p class="helper">${assignments.length ? `Showing ${assignments.length} most recent.` : "No task assignments yet."}</p>
+      ${assignments.length ? `
+        <ul class="admin-list">
+          ${assignments.map((assignment) => {
+            const task = getTask(assignment.task_id);
+            const taskProject = task ? getProject(task.project_id) : null;
+            return `
+              <li class="admin-item">
+                <div>
+                  ${task ? `<button class="task-name-link" type="button" data-open-task-detail="${escapeHtml(task.id)}">${escapeHtml(task.name || "Untitled task")}</button>` : `<span>Task removed</span>`}
+                  <span>${escapeHtml(taskProject ? projectLabel(taskProject) : "")}</span>
+                </div>
+                <span class="status-pill ${assignment.active === false ? "rejected" : "approved"}">${assignment.active === false ? "Ended" : "Active"}</span>
+              </li>
+            `;
+          }).join("")}
+        </ul>
+      ` : ""}
+    </div>
+    ${canManage ? `
+      <div class="admin-card task-detail-resources danger-zone">
+        <h3>${user.active === false ? "Reactivate" : "Deactivate"} User</h3>
+        <p class="helper">${user.active === false ? "Restores this user's access to the timesheet portal." : "Removes this user's access to the timesheet portal. Their history is kept."}</p>
+        <button class="button danger small-button" type="button" data-toggle-user-active="${escapeHtml(user.id)}">${user.active === false ? "Reactivate User" : "Deactivate User"}</button>
+      </div>
+    ` : ""}
+  `;
+  bindUserDetailActions(user);
+}
+
+function bindUserDetailActions(user) {
+  const canManage = isPortfolioManager();
+  const messageNode = els.userDetailContent.querySelector("#userDetailMessage");
+
+  const roleSelect = els.userDetailContent.querySelector('[data-user-detail-field="role"]');
+  const projectSelect = els.userDetailContent.querySelector('[data-user-detail-field="project_id"]');
+  const managerSelect = els.userDetailContent.querySelector('[data-user-detail-field="manager_id"]');
+  const branchSelect = els.userDetailContent.querySelector('[data-user-detail-field="branch"]');
+  const divisionSelect = els.userDetailContent.querySelector('[data-user-detail-field="division"]');
+  if (!roleSelect) return;
+
+  roleSelect.value = user.role || "resource";
+  populateProjectSelectElement(projectSelect, "Select project", "");
+  projectSelect.value = user.project_id || "";
+  populateManagerOptionsForProject(managerSelect, projectSelect.value, user.manager_id);
+  branchSelect.innerHTML = "";
+  branchSelect.append(new Option("Select branch", ""));
+  for (const branchItem of app.branches) branchSelect.append(new Option(branchItem.name, branchItem.name));
+  branchSelect.value = user.branch || "";
+  populateDivisionOptionsForBranch(divisionSelect, branchSelect.value, user.division);
+
+  if (!canManage) return;
+
+  roleSelect.addEventListener("change", async () => {
+    const previousRole = user.role || "resource";
+    const nextRole = roleSelect.value;
+    if (!confirmManagedUserChange(user, { role: nextRole })) {
+      roleSelect.value = previousRole;
+      return;
+    }
+    await updateManagedUser(user.id, { role: nextRole }, messageNode);
+  });
+  projectSelect.addEventListener("change", () => {
+    populateManagerOptionsForProject(managerSelect, projectSelect.value, "");
+    updateManagedUser(user.id, { project_id: projectSelect.value || null, manager_id: managerSelect.value || null }, messageNode);
+  });
+  managerSelect.addEventListener("change", () => updateManagedUser(user.id, { manager_id: managerSelect.value || null }, messageNode));
+  branchSelect.addEventListener("change", () => {
+    populateDivisionOptionsForBranch(divisionSelect, branchSelect.value, "");
+    updateManagedUser(user.id, { branch: branchSelect.value, division: divisionSelect.value }, messageNode);
+  });
+  divisionSelect.addEventListener("change", () => updateManagedUser(user.id, { division: divisionSelect.value }, messageNode));
+
+  for (const button of els.userDetailContent.querySelectorAll("[data-open-task-detail]")) {
+    button.addEventListener("click", () => openTaskDetail(button.dataset.openTaskDetail));
+  }
+
+  const toggleButton = els.userDetailContent.querySelector("[data-toggle-user-active]");
+  if (toggleButton) {
+    toggleButton.addEventListener("click", () => {
+      const nextActive = user.active === false;
+      if (!confirmManagedUserChange(user, { active: nextActive })) return;
+      updateManagedUser(user.id, { active: nextActive }, messageNode);
+    });
+  }
 }
 
 function renderTasksView() {
@@ -1699,6 +1875,28 @@ function taskMatchesSearch(task, search) {
 
 function taskViewProjectId() {
   return canReviewPortfolio() ? (els.taskProjectFilter.value || "all") : app.profile?.project_id || "";
+}
+
+function setupInlineAddToggle(toggleId, formId) {
+  const toggle = document.querySelector(`#${toggleId}`);
+  const form = document.querySelector(`#${formId}`);
+  const fields = form?.querySelector(".inline-add-fields");
+  if (!toggle || !fields) return;
+  toggle.addEventListener("click", () => {
+    const isOpen = !fields.classList.contains("hidden");
+    fields.classList.toggle("hidden", isOpen);
+    toggle.setAttribute("aria-expanded", String(!isOpen));
+    if (!isOpen) fields.querySelector("input, select, textarea")?.focus();
+  });
+}
+
+function setupInlineAddToggles() {
+  setupInlineAddToggle("managerFormToggle", "managerForm");
+  setupInlineAddToggle("approvalChainFormToggle", "approvalChainForm");
+  setupInlineAddToggle("domainFormToggle", "domainForm");
+  setupInlineAddToggle("branchFormToggle", "branchForm");
+  setupInlineAddToggle("divisionFormToggle", "divisionForm");
+  setupInlineAddToggle("calendarDayFormToggle", "calendarDayForm");
 }
 
 function configureTaskQuickAdd() {
@@ -2795,7 +2993,7 @@ function renderTaskLine(line, { locked, projectTasks, variant }) {
 function renderAddTaskButton(dayIndex, locked) {
   const wrapper = document.createElement("div");
   wrapper.className = "add-task-line";
-  wrapper.innerHTML = `<button class="button small-button" type="button" ${locked ? "disabled" : ""}>Add ${weekdays[dayIndex]} Task</button>`;
+  wrapper.innerHTML = `<button class="icon-button" type="button" aria-label="Add ${escapeHtml(weekdays[dayIndex])} task" title="Add ${escapeHtml(weekdays[dayIndex])} task" ${locked ? "disabled" : ""}>+</button>`;
   wrapper.querySelector("button").addEventListener("click", () => addTaskLine(dayIndex));
   return wrapper;
 }
@@ -3169,7 +3367,7 @@ function buildQualityChecks(rows) {
 }
 
 function qualityPanelHtml(quality) {
-  const statusClass = quality.tone === "error" ? "rejected" : quality.tone === "warning" ? "submitted" : "approved";
+  const statusClass = quality.tone === "error" ? "rejected" : quality.tone === "warning" ? "warning" : "approved";
   return `
     <div class="quality-head ${escapeHtml(quality.tone)}">
       <div>
@@ -4322,7 +4520,7 @@ function renderReviewCard(report, profile, days, audits = [], adjustments = []) 
         <p class="helper">${escapeHtml([profile?.email, projectLabel(project), `${formatHours(total)}h`].filter(Boolean).join(" - "))}</p>
       </div>
       <div class="review-status-stack">
-        ${openAdjustment ? `<span class="status-pill submitted">reopen requested</span>` : ""}
+        ${openAdjustment ? `<span class="status-pill warning">reopen requested</span>` : ""}
         ${stale ? `<span class="status-pill rejected">${submittedAgeInDays(report)} days waiting</span>` : ""}
         <span class="status-pill ${escapeHtml(report.status)}">${escapeHtml(formatReportStatus(report.status))}</span>
       </div>
@@ -5249,8 +5447,16 @@ function renderAdminAuditList() {
     return;
   }
 
+  const search = normalizeLookup(els.adminAuditSearch?.value || "");
+  const items = search ? app.adminAudit.filter((item) => adminAuditMatchesSearch(item, search)) : app.adminAudit;
+
+  if (!items.length) {
+    els.adminAuditList.innerHTML = `<li class="admin-item"><span>No admin changes match this search.</span></li>`;
+    return;
+  }
+
   els.adminAuditList.innerHTML = "";
-  for (const item of app.adminAudit) {
+  for (const item of items) {
     const row = document.createElement("li");
     row.className = "admin-item";
     row.innerHTML = `
@@ -5261,6 +5467,16 @@ function renderAdminAuditList() {
     `;
     els.adminAuditList.append(row);
   }
+}
+
+function adminAuditMatchesSearch(item, search) {
+  const values = [
+    item.actor_email,
+    formatAdminAuditAction(item.action),
+    formatEntityType(item.entity_type),
+    item.entity_label,
+  ];
+  return normalizeLookup(values.filter(Boolean).join(" ")).includes(search);
 }
 
 async function exportAdminAuditLog() {
@@ -5491,7 +5707,7 @@ function renderUserAdminList() {
     const row = document.createElement("tr");
     row.className = `resource-register-row ${user.active === false ? "inactive" : "active"}`;
     row.innerHTML = `
-      <td><strong>${escapeHtml(user.full_name || user.email)}</strong></td>
+      <td><button class="task-name-link" type="button" data-open-user-detail="${escapeHtml(user.id)}">${escapeHtml(user.full_name || user.email)}</button></td>
       <td>${escapeHtml(user.email)}</td>
       <td><select data-user-field="role">
         <option value="resource">Resource</option>
@@ -5551,6 +5767,7 @@ function renderUserAdminList() {
       if (!confirmManagedUserChange(user, { active: nextActive })) return;
       updateManagedUser(user.id, { active: nextActive }, statusNode);
     });
+    row.querySelector("[data-open-user-detail]").addEventListener("click", () => openUserDetail(user.id));
 
     tbody.append(row);
   }
@@ -5674,7 +5891,13 @@ async function updateManagedUser(userId, patch, statusNode = null) {
   setMessage(els.adminMessage, "User updated.");
   setRowStatus(statusNode, "Saved");
   await loadAndRenderAdminAudit();
-  window.setTimeout(renderUserAdminList, 700);
+  window.setTimeout(() => {
+    if (app.activeAppView === "userDetail" && app.activeUserDetailId === userId) {
+      renderUserDetailView();
+    } else {
+      renderUserAdminList();
+    }
+  }, 700);
 }
 
 function setRowStatus(node, message, isError = false) {
@@ -6191,6 +6414,12 @@ async function finishAdminSave(error, form, successMessage, auditEvent = null) {
   }
 
   form.reset();
+  const inlineFields = form.querySelector(".inline-add-fields");
+  const inlineToggle = form.querySelector(".inline-add-toggle");
+  if (inlineFields && inlineToggle) {
+    inlineFields.classList.add("hidden");
+    inlineToggle.setAttribute("aria-expanded", "false");
+  }
   if (form === els.approvalChainForm) {
     if (app.adminProjectFocus !== "all") els.approvalChainProject.value = app.adminProjectFocus;
     populateApprovalChainBranches();

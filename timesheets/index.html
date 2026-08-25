@@ -337,6 +337,17 @@
           <div id="projectDetailContent"></div>
         </section>
 
+        <section id="userDetailView" class="panel hidden">
+          <div class="panel-head">
+            <div>
+              <div id="userDetailBreadcrumb" class="breadcrumb"></div>
+              <h2>User Details</h2>
+              <p class="helper">Edit this user's profile and see their task assignment history.</p>
+            </div>
+          </div>
+          <div id="userDetailContent"></div>
+        </section>
+
         <section id="notificationsView" class="panel hidden">
           <div class="panel-head">
             <div>
@@ -455,6 +466,10 @@
                   <p class="helper">Recent setup and access changes made by Portfolio Managers.</p>
                 </div>
                 <div class="toolbar">
+                  <label class="field inline-filter">
+                    <span>Search</span>
+                    <input id="adminAuditSearch" type="search" placeholder="actor, action, entity">
+                  </label>
                   <button id="refreshAdminAudit" class="button small-button" type="button">Refresh</button>
                   <button id="exportAdminAudit" class="button small-button" type="button">Export CSV</button>
                 </div>
@@ -463,67 +478,97 @@
             </section>
 
             <form id="managerForm" class="admin-card" data-admin-section="managers">
-              <h3>Resource Managers</h3>
-              <label class="field"><span>Project</span><select id="adminManagerProject" required></select></label>
-              <label class="field"><span>Manager name</span><input id="adminManagerName" type="text" required></label>
-              <label class="field"><span>Manager email</span><input id="adminManagerEmail" type="email" required></label>
-              <button class="button primary" type="submit">Add Manager</button>
+              <div class="admin-card-head">
+                <h3>Resource Managers</h3>
+                <button id="managerFormToggle" class="icon-button inline-add-toggle" type="button" aria-label="Add resource manager" aria-expanded="false">+</button>
+              </div>
+              <div class="inline-add-fields hidden">
+                <label class="field"><span>Project</span><select id="adminManagerProject" required></select></label>
+                <label class="field"><span>Manager name</span><input id="adminManagerName" type="text" required></label>
+                <label class="field"><span>Manager email</span><input id="adminManagerEmail" type="email" required></label>
+                <button class="button primary" type="submit">Add Manager</button>
+              </div>
               <ul id="managerList" class="admin-list"></ul>
             </form>
 
             <form id="approvalChainForm" class="admin-card wide-card" data-admin-section="approvals">
-              <h3>Approval Chains</h3>
-              <div class="profile-grid tight-grid">
-                <label class="field"><span>Chain name</span><input id="approvalChainName" type="text" placeholder="BENCON Technology Controls" required></label>
-                <label class="field"><span>Project</span><select id="approvalChainProject"></select></label>
-                <label class="field"><span>Branch</span><select id="approvalChainBranch"></select></label>
-                <label class="field"><span>Division</span><select id="approvalChainDivision"></select></label>
-                <label class="field"><span>Primary approver</span><select id="approvalChainPrimary" required></select></label>
-                <label class="field"><span>Backup approver</span><select id="approvalChainBackup"></select></label>
-                <label class="field"><span>Final approver</span><select id="approvalChainFinal"></select></label>
-                <label class="field checkbox-field"><span>Final approval</span><div><input id="approvalChainRequireFinal" type="checkbox"> Require final approver</div></label>
+              <div class="admin-card-head">
+                <h3>Approval Chains</h3>
+                <button id="approvalChainFormToggle" class="icon-button inline-add-toggle" type="button" aria-label="Add approval chain" aria-expanded="false">+</button>
               </div>
-              <button class="button primary" type="submit">Add Chain</button>
+              <div class="inline-add-fields hidden">
+                <div class="profile-grid tight-grid">
+                  <label class="field"><span>Chain name</span><input id="approvalChainName" type="text" placeholder="BENCON Technology Controls" required></label>
+                  <label class="field"><span>Project</span><select id="approvalChainProject"></select></label>
+                  <label class="field"><span>Branch</span><select id="approvalChainBranch"></select></label>
+                  <label class="field"><span>Division</span><select id="approvalChainDivision"></select></label>
+                  <label class="field"><span>Primary approver</span><select id="approvalChainPrimary" required></select></label>
+                  <label class="field"><span>Backup approver</span><select id="approvalChainBackup"></select></label>
+                  <label class="field"><span>Final approver</span><select id="approvalChainFinal"></select></label>
+                  <label class="field checkbox-field"><span>Final approval</span><div><input id="approvalChainRequireFinal" type="checkbox"> Require final approver</div></label>
+                </div>
+                <button class="button primary" type="submit">Add Chain</button>
+              </div>
               <ul id="approvalChainList" class="admin-list"></ul>
             </form>
 
             <form id="domainForm" class="admin-card" data-admin-section="organization">
-              <h3>Allowed Domains</h3>
-              <label class="field"><span>Email domain</span><input id="allowedDomain" type="text" placeholder="calstrs.com" required></label>
-              <button class="button primary" type="submit">Add Domain</button>
+              <div class="admin-card-head">
+                <h3>Allowed Domains</h3>
+                <button id="domainFormToggle" class="icon-button inline-add-toggle" type="button" aria-label="Add allowed domain" aria-expanded="false">+</button>
+              </div>
+              <div class="inline-add-fields hidden">
+                <label class="field"><span>Email domain</span><input id="allowedDomain" type="text" placeholder="calstrs.com" required></label>
+                <button class="button primary" type="submit">Add Domain</button>
+              </div>
               <ul id="domainList" class="admin-list"></ul>
             </form>
 
             <form id="branchForm" class="admin-card" data-admin-section="organization">
-              <h3>Branches</h3>
-              <label class="field"><span>Branch name</span><input id="adminBranchName" type="text" required></label>
-              <button class="button primary" type="submit">Add Branch</button>
+              <div class="admin-card-head">
+                <h3>Branches</h3>
+                <button id="branchFormToggle" class="icon-button inline-add-toggle" type="button" aria-label="Add branch" aria-expanded="false">+</button>
+              </div>
+              <div class="inline-add-fields hidden">
+                <label class="field"><span>Branch name</span><input id="adminBranchName" type="text" required></label>
+                <button class="button primary" type="submit">Add Branch</button>
+              </div>
               <ul id="branchList" class="admin-list"></ul>
             </form>
 
             <form id="divisionForm" class="admin-card" data-admin-section="organization">
-              <h3>Divisions</h3>
-              <label class="field"><span>Branch</span><select id="adminDivisionBranch" required></select></label>
-              <label class="field"><span>Division name</span><input id="adminDivisionName" type="text" required></label>
-              <button class="button primary" type="submit">Add Division</button>
+              <div class="admin-card-head">
+                <h3>Divisions</h3>
+                <button id="divisionFormToggle" class="icon-button inline-add-toggle" type="button" aria-label="Add division" aria-expanded="false">+</button>
+              </div>
+              <div class="inline-add-fields hidden">
+                <label class="field"><span>Branch</span><select id="adminDivisionBranch" required></select></label>
+                <label class="field"><span>Division name</span><input id="adminDivisionName" type="text" required></label>
+                <button class="button primary" type="submit">Add Division</button>
+              </div>
               <ul id="divisionList" class="admin-list"></ul>
             </form>
 
             <form id="calendarDayForm" class="admin-card wide-card" data-admin-section="calendar">
-              <h3>Business Calendar</h3>
-              <div class="profile-grid tight-grid">
-                <label class="field"><span>Date</span><input id="calendarDate" type="date" required></label>
-                <label class="field"><span>Type</span><select id="calendarType" required>
-                  <option value="holiday">Holiday</option>
-                  <option value="pto">PTO</option>
-                  <option value="non_working">Non-working day</option>
-                </select></label>
-                <label class="field"><span>Label</span><input id="calendarLabel" type="text" placeholder="Labor Day" required></label>
-                <label class="field"><span>Project scope</span><select id="calendarProject"></select></label>
-                <label class="field"><span>Branch scope</span><select id="calendarBranch"></select></label>
-                <label class="field"><span>Division scope</span><select id="calendarDivision"></select></label>
+              <div class="admin-card-head">
+                <h3>Business Calendar</h3>
+                <button id="calendarDayFormToggle" class="icon-button inline-add-toggle" type="button" aria-label="Add calendar day" aria-expanded="false">+</button>
               </div>
-              <button class="button primary" type="submit">Add Calendar Day</button>
+              <div class="inline-add-fields hidden">
+                <div class="profile-grid tight-grid">
+                  <label class="field"><span>Date</span><input id="calendarDate" type="date" required></label>
+                  <label class="field"><span>Type</span><select id="calendarType" required>
+                    <option value="holiday">Holiday</option>
+                    <option value="pto">PTO</option>
+                    <option value="non_working">Non-working day</option>
+                  </select></label>
+                  <label class="field"><span>Label</span><input id="calendarLabel" type="text" placeholder="Labor Day" required></label>
+                  <label class="field"><span>Project scope</span><select id="calendarProject"></select></label>
+                  <label class="field"><span>Branch scope</span><select id="calendarBranch"></select></label>
+                  <label class="field"><span>Division scope</span><select id="calendarDivision"></select></label>
+                </div>
+                <button class="button primary" type="submit">Add Calendar Day</button>
+              </div>
               <ul id="calendarDayList" class="admin-list calendar-list"></ul>
             </form>
 
