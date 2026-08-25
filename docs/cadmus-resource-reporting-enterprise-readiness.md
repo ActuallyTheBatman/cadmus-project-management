@@ -50,13 +50,15 @@ Current behavior:
 - Submitted and approved reports are locked from normal resource editing.
 - Rejected reports can be corrected and resubmitted.
 - Managers can approve, final approve, send back with comments, and bulk approve clean submitted reports.
+- Resources can request an adjustment for an approved week.
+- Reviewers can approve an adjustment request, which reopens the week through the sent-back correction flow.
+- Portfolio Managers can configure holidays, PTO, and non-working days in the business calendar.
+- Workflow notification records are queued for submissions, review decisions, and adjustment events.
 
 Recommended next workflow hardening:
 
 - move workflow settings into an admin-managed database table when per-project/per-organization policies are required
-- add explicit reopen/adjustment flow for approved periods
-- add holiday/PTO/non-working day treatment
-- add notification jobs for missing, submitted, approved, and rejected states
+- connect notification queue records to an email, Teams, or webhook sender
 - define retention and archive rules for old labor records
 
 ## Reporting
@@ -110,6 +112,14 @@ Recommended:
 - Export schema after each production migration.
 - Keep `supabase-timesheets-schema.sql` current with the live database.
 - Test restore into a non-production project before relying on the process.
+- See [Backup And Restore Plan](backup-restore-plan.md) for the current free-tier restore approach.
+
+## Handoff Documents
+
+- [Security Policy](../SECURITY.md)
+- [RLS Policy Summary](rls-policy-summary.md)
+- [Backup And Restore Plan](backup-restore-plan.md)
+- [Environment Strategy](environment-strategy.md)
 
 ## Onboarding Checklist
 

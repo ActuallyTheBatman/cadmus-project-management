@@ -8,6 +8,13 @@ The timesheet and portfolio reporting app lives at `/timesheets/`. It is a stati
 
 Enterprise handoff notes are maintained in [docs/cadmus-resource-reporting-enterprise-readiness.md](docs/cadmus-resource-reporting-enterprise-readiness.md).
 
+Supporting operations documents:
+
+- [Security policy](SECURITY.md)
+- [RLS policy summary](docs/rls-policy-summary.md)
+- [Backup and restore plan](docs/backup-restore-plan.md)
+- [Environment strategy](docs/environment-strategy.md)
+
 ## Deployment
 
 GitHub Pages should serve this repository from the root of the default branch.
