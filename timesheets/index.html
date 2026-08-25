@@ -13,9 +13,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Libre+Baskerville:wght@700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/timesheets.css?v=20260824-executive-reporting">
+  <link rel="stylesheet" href="/assets/timesheets.css?v=20260824-app-navigation">
   <script src="/assets/timesheets-config.js?v=20260824-manager-admin-capability"></script>
-  <script type="module" src="/assets/timesheets.js?v=20260824-executive-reporting"></script>
+  <script type="module" src="/assets/timesheets.js?v=20260824-app-navigation"></script>
 </head>
 <body>
   <nav class="nav" aria-label="Primary navigation">
@@ -60,6 +60,14 @@
             <button id="themeToggle" class="button" type="button">Light Mode</button>
             <button id="signOut" class="button danger" type="button">Sign Out</button>
           </div>
+        </div>
+
+        <div id="appNav" class="app-nav hidden" aria-label="Resource reporting sections">
+          <button class="app-nav-button" type="button" data-app-view="dashboard">Dashboard</button>
+          <button class="app-nav-button" type="button" data-app-view="timesheet">Timesheet</button>
+          <button class="app-nav-button" type="button" data-app-view="reviews">Reviews</button>
+          <button class="app-nav-button" type="button" data-app-view="reports">Reports</button>
+          <button class="app-nav-button" type="button" data-app-view="admin">Admin</button>
         </div>
 
         <section id="authView" class="auth-panel">
@@ -131,6 +139,17 @@
           </form>
         </section>
 
+        <section id="dashboardView" class="panel hidden">
+          <div class="panel-head">
+            <div>
+              <h2>Dashboard</h2>
+              <p class="helper">A focused command center for the current reporting week.</p>
+            </div>
+            <div id="dashboardActions" class="toolbar"></div>
+          </div>
+          <div id="dashboardContent" class="portfolio-dashboard"></div>
+        </section>
+
         <section id="appView" class="workspace hidden">
           <aside class="panel context-panel">
             <div class="panel-head">
@@ -199,8 +218,8 @@
         <section id="portfolioView" class="panel portfolio-panel hidden">
           <div class="panel-head">
             <div>
-              <h2>Portfolio Operations</h2>
-              <p class="helper">Track submission coverage, approval backlog, missing reports, and weekly project load.</p>
+              <h2 id="portfolioPanelTitle">Portfolio Operations</h2>
+              <p id="portfolioPanelHelper" class="helper">Track submission coverage, approval backlog, missing reports, and weekly project load.</p>
             </div>
               <div class="toolbar">
               <label class="field inline-filter">

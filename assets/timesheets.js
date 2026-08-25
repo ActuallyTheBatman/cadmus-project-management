@@ -42,6 +42,7 @@ const app = {
   pendingInvite: null,
   adminProjectFocus: "all",
   passwordRecovery: false,
+  activeAppView: "dashboard",
   portfolioReminderTargets: {
     missing: [],
     approvals: [],
@@ -61,6 +62,10 @@ const els = {
   setupNotice: document.querySelector("#setupNotice"),
   authView: document.querySelector("#authView"),
   profileView: document.querySelector("#profileView"),
+  appNav: document.querySelector("#appNav"),
+  dashboardView: document.querySelector("#dashboardView"),
+  dashboardActions: document.querySelector("#dashboardActions"),
+  dashboardContent: document.querySelector("#dashboardContent"),
   appView: document.querySelector("#appView"),
   portfolioView: document.querySelector("#portfolioView"),
   adminView: document.querySelector("#adminView"),
@@ -108,6 +113,8 @@ const els = {
   portfolioWeek: document.querySelector("#portfolioWeek"),
   refreshPortfolio: document.querySelector("#refreshPortfolio"),
   exportAudit: document.querySelector("#exportAudit"),
+  portfolioPanelTitle: document.querySelector("#portfolioPanelTitle"),
+  portfolioPanelHelper: document.querySelector("#portfolioPanelHelper"),
   portfolioDashboard: document.querySelector("#portfolioDashboard"),
   reviewQueueSummary: document.querySelector("#reviewQueueSummary"),
   portfolioList: document.querySelector("#portfolioList"),
@@ -354,6 +361,11 @@ function bindEvents() {
   els.resetPassword.addEventListener("click", sendPasswordReset);
   if (els.themeToggle) els.themeToggle.addEventListener("click", toggleTheme);
   els.profileForm.addEventListener("submit", saveProfile);
+  els.appNav.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-app-view]");
+    if (!button) return;
+    setActiveAppView(button.dataset.appView);
+  });
   els.profileProject.addEventListener("change", () => populateManagerSelect());
   els.profileBranch.addEventListener("change", () => populateDivisionSelect());
   els.signOut.addEventListener("click", () => app.supabase.auth.signOut());
@@ -560,30 +572,131 @@ async function renderForAuthState() {
 
   els.rolePill.textContent = roleLabel(app.profile.role);
   els.rolePill.classList.remove("hidden");
-  els.appView.classList.remove("hidden");
+  els.appNav.classList.remove("hidden");
   renderProfileSummary();
   await loadWeek();
 
   if (canReviewPortfolio()) {
-    els.portfolioView.classList.remove("hidden");
     if (!els.portfolioWeek.value) els.portfolioWeek.value = toDateInput(app.weekStart);
     populatePortfolioProjectFilter();
     await loadPortfolio();
   }
 
   if (isPortfolioManager()) {
-    els.adminView.classList.remove("hidden");
     await renderAdminConsole();
     setDefaultAdminExportWindow();
   }
+
+  await setActiveAppView(defaultAppView());
 }
 
 function hideAllViews() {
   els.authView.classList.add("hidden");
   els.profileView.classList.add("hidden");
+  els.appNav.classList.add("hidden");
+  els.dashboardView.classList.add("hidden");
   els.appView.classList.add("hidden");
   els.portfolioView.classList.add("hidden");
   els.adminView.classList.add("hidden");
+}
+
+function defaultAppView() {
+  return "dashboard";
+}
+
+function allowedAppViews() {
+  const views = ["dashboard", "timesheet"];
+  if (canReviewPortfolio()) views.push("reviews", "reports");
+  if (isPortfolioManager()) views.push("admin");
+  return views;
+}
+
+async function setActiveAppView(view) {
+  const allowed = allowedAppViews();
+  const nextView = allowed.includes(view) ? view : defaultAppView();
+  app.activeAppView = nextView;
+  updateAppNav();
+
+  els.dashboardView.classList.add("hidden");
+  els.appView.classList.add("hidden");
+  els.portfolioView.classList.add("hidden");
+  els.adminView.classList.add("hidden");
+
+  if (nextView === "dashboard") {
+    els.dashboardView.classList.remove("hidden");
+    await renderDashboard();
+    return;
+  }
+
+  if (nextView === "timesheet") {
+    els.appView.classList.remove("hidden");
+    return;
+  }
+
+  if (nextView === "reviews") {
+    els.portfolioView.classList.remove("hidden");
+    configurePortfolioMode("reviews");
+    if (els.portfolioStatus.value === "all" || els.portfolioStatus.value === "missing") els.portfolioStatus.value = "submitted";
+    await loadPortfolio();
+    return;
+  }
+
+  if (nextView === "reports") {
+    els.portfolioView.classList.remove("hidden");
+    configurePortfolioMode("reports");
+    await loadPortfolio();
+    return;
+  }
+
+  if (nextView === "admin") {
+    els.adminView.classList.remove("hidden");
+  }
+}
+
+function updateAppNav() {
+  const allowed = allowedAppViews();
+  for (const button of els.appNav.querySelectorAll("[data-app-view]")) {
+    const view = button.dataset.appView;
+    button.classList.toggle("hidden", !allowed.includes(view));
+    button.classList.toggle("active", view === app.activeAppView);
+    button.setAttribute("aria-current", view === app.activeAppView ? "page" : "false");
+  }
+}
+
+async function renderDashboard() {
+  els.dashboardActions.innerHTML = `
+    <button class="button small-button" type="button" data-open-view="timesheet">Open Timesheet</button>
+    ${canReviewPortfolio() ? `<button class="button small-button" type="button" data-open-view="reviews">Review Queue</button>` : ""}
+  `;
+  for (const button of els.dashboardActions.querySelectorAll("[data-open-view]")) {
+    button.addEventListener("click", () => setActiveAppView(button.dataset.openView));
+  }
+
+  if (canReviewPortfolio()) {
+    if (!els.portfolioWeek.value) els.portfolioWeek.value = toDateInput(app.weekStart);
+    await loadPortfolioDashboard(els.dashboardContent);
+    return;
+  }
+
+  const status = app.report?.status || "draft";
+  const totalHours = app.dailyReports.reduce((sum, day) => sum + Number(day.hours || 0), 0);
+  const dueDate = formatShortDate(addDays(app.weekStart, 4));
+  els.dashboardContent.innerHTML = `
+    <div class="ops-summary-head">
+      <div>
+        <h3>This Week</h3>
+        <p>${escapeHtml(projectLabel(getProject(app.profile?.project_id)))} - week of ${escapeHtml(formatShortDate(app.weekStart))}</p>
+      </div>
+      <span class="status-pill ${escapeHtml(status)}">${escapeHtml(formatReportStatus(status))}</span>
+    </div>
+    <div class="ops-metric-grid resource-dashboard-grid">
+      ${opsMetric("Status", formatReportStatus(status), "Current weekly report state")}
+      ${opsMetric("Total Hours", `${formatHours(totalHours)}h`, "Saved task-line hours")}
+      ${opsMetric("Due", dueDate, "Standard Friday deadline")}
+      ${opsMetric("Manager", getManager(app.profile?.manager_id)?.manager_name || "-", "Assigned reviewer")}
+    </div>
+    ${app.reportAudits.length ? renderAuditTimeline(app.reportAudits, 5) : `<div class="empty-state"><p>No report history yet for this week.</p></div>`}
+  `;
 }
 
 async function loadReferenceData() {
@@ -1609,6 +1722,17 @@ async function loadPortfolio() {
   }
 }
 
+function configurePortfolioMode(mode) {
+  const isReviews = mode === "reviews";
+  els.portfolioPanelTitle.textContent = isReviews ? "Reviews" : "Reports";
+  els.portfolioPanelHelper.textContent = isReviews
+    ? "Work submitted reports, approve clean weeks, and send reports back with comments."
+    : "Filter report records, review missing or late submissions, and export operating history.";
+  els.portfolioDashboard.classList.add("hidden");
+  els.reviewQueueSummary.classList.toggle("hidden", !isReviews);
+  els.exportAudit.classList.toggle("hidden", isReviews);
+}
+
 function renderReviewQueueSummary(reports, daysByReport) {
   const statusCounts = countBy(reports, "status");
   const submitted = reports.filter((report) => report.status === "submitted");
@@ -1786,7 +1910,7 @@ function showPortfolioNotice(message, isError = false) {
   els.portfolioList.prepend(notice);
 }
 
-async function loadPortfolioDashboard() {
+async function loadPortfolioDashboard(target = els.portfolioDashboard) {
   const selectedWeek = portfolioSelectedWeek();
   const selectedProjectId = els.portfolioProject.value || "all";
   let profilesQuery = app.supabase
@@ -1801,7 +1925,7 @@ async function loadPortfolioDashboard() {
 
   const { data: profiles, error: profileError } = await profilesQuery;
   if (profileError) {
-    renderPortfolioDashboardError(profileError.message);
+    renderPortfolioDashboardError(profileError.message, target);
     return;
   }
 
@@ -1816,7 +1940,7 @@ async function loadPortfolioDashboard() {
       profiles: [],
       reports: [],
       days: [],
-    });
+    }, target);
     return;
   }
 
@@ -1833,7 +1957,7 @@ async function loadPortfolioDashboard() {
 
   const { data: reports, error: reportError } = await reportQuery;
   if (reportError) {
-    renderPortfolioDashboardError(reportError.message);
+    renderPortfolioDashboardError(reportError.message, target);
     return;
   }
 
@@ -1846,7 +1970,7 @@ async function loadPortfolioDashboard() {
       .in("weekly_report_id", reportIds);
 
     if (dayError) {
-      renderPortfolioDashboardError(dayError.message);
+      renderPortfolioDashboardError(dayError.message, target);
       return;
     }
 
@@ -1859,14 +1983,14 @@ async function loadPortfolioDashboard() {
     profiles: scopedProfiles,
     reports: reports || [],
     days,
-  });
+  }, target);
 }
 
-function renderPortfolioDashboardError(message) {
-  els.portfolioDashboard.innerHTML = `<div class="notice"><p>${escapeHtml(message)}</p></div>`;
+function renderPortfolioDashboardError(message, target = els.portfolioDashboard) {
+  target.innerHTML = `<div class="notice"><p>${escapeHtml(message)}</p></div>`;
 }
 
-function renderPortfolioDashboard({ selectedWeek, selectedProjectId, profiles, reports, days }) {
+function renderPortfolioDashboard({ selectedWeek, selectedProjectId, profiles, reports, days }, target = els.portfolioDashboard) {
   const reportByUser = new Map(reports.map((report) => [report.user_id, report]));
   const daysByReport = groupBy(days, "weekly_report_id");
   const missingProfiles = profiles.filter((profile) => !reportByUser.has(profile.id) || ["draft", "rejected"].includes(reportByUser.get(profile.id)?.status));
@@ -1924,7 +2048,7 @@ function renderPortfolioDashboard({ selectedWeek, selectedProjectId, profiles, r
       .map((report) => buildApprovalReminderTarget(report, profileById.get(report.user_id), reportHours.get(report.id) || 0)),
   };
 
-  els.portfolioDashboard.innerHTML = `
+  target.innerHTML = `
     <div class="ops-summary-head">
       <div>
         <h3>Operations Summary</h3>
@@ -1954,8 +2078,8 @@ function renderPortfolioDashboard({ selectedWeek, selectedProjectId, profiles, r
     </div>
   `;
 
-  els.portfolioDashboard.querySelector("[data-export-ops-summary]")?.addEventListener("click", exportOperationsSummary);
-  for (const button of els.portfolioDashboard.querySelectorAll("[data-export-reminders]")) {
+  target.querySelector("[data-export-ops-summary]")?.addEventListener("click", exportOperationsSummary);
+  for (const button of target.querySelectorAll("[data-export-reminders]")) {
     button.addEventListener("click", () => exportReminderTargets(button.dataset.exportReminders));
   }
 }
@@ -2954,11 +3078,11 @@ function missingProfileFields(profile) {
 function focusPortfolioMissing() {
   els.portfolioStatus.value = "missing";
   els.portfolioWeek.value = toDateInput(app.weekStart);
-  loadPortfolio();
-  els.portfolioView.scrollIntoView({ behavior: "smooth", block: "start" });
+  setActiveAppView("reports");
 }
 
 function focusUserExceptions(status = "active") {
+  setActiveAppView("admin");
   els.adminUserStatus.value = status;
   els.adminUserBranch.value = "all";
   populateAdminUserDivisions();
