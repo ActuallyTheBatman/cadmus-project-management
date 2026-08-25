@@ -80,6 +80,8 @@ const app = {
   activeProjectDetailId: "",
   activeUserDetailId: "",
   userDetailAssignments: [],
+  editingApprovalChainId: "",
+  editingCalendarDayId: "",
   taskQuickAddOpen: false,
   projectQuickAddOpen: false,
   projectResourceCounts: new Map(),
@@ -5509,6 +5511,113 @@ function filterByFocusedProject(items) {
   return items.filter((item) => item.project_id === app.adminProjectFocus || item.id === app.adminProjectFocus);
 }
 
+function optionsHtml(items, valueFn, labelFn, selectedValue, placeholderLabel, placeholderValue) {
+  const opts = [`<option value="${escapeHtml(placeholderValue)}"${selectedValue === placeholderValue ? " selected" : ""}>${escapeHtml(placeholderLabel)}</option>`];
+  for (const item of items) {
+    const value = valueFn(item);
+    opts.push(`<option value="${escapeHtml(value)}"${value === selectedValue ? " selected" : ""}>${escapeHtml(labelFn(item))}</option>`);
+  }
+  return opts.join("");
+}
+
+function approvalChainManagersForProject(projectId) {
+  return app.managers.filter((manager) => !projectId || manager.project_id === projectId);
+}
+
+function approvalChainEditRowHtml(chain) {
+  const managers = approvalChainManagersForProject(chain.project_id || "");
+  const branchDivisions = chain.branch ? app.divisions.filter((division) => division.branch_id === app.branches.find((branch) => branch.name === chain.branch)?.id) : app.divisions;
+  return `
+    <div class="admin-item-edit-grid">
+      <label class="field"><span>Chain name</span><input type="text" data-field="name" value="${escapeHtml(chain.name || "")}" required></label>
+      <label class="field"><span>Project</span><select data-field="project_id">${optionsHtml(app.projects, (p) => p.id, (p) => projectLabel(p), chain.project_id || "", "Any project", "")}</select></label>
+      <label class="field"><span>Branch</span><select data-field="branch">${optionsHtml(app.branches, (b) => b.name, (b) => b.name, chain.branch || "", "Any branch", "")}</select></label>
+      <label class="field"><span>Division</span><select data-field="division">${optionsHtml(branchDivisions, (d) => d.name, (d) => d.name, chain.division || "", "Any division", "")}</select></label>
+      <label class="field"><span>Primary approver</span><select data-field="primary_manager_id">${optionsHtml(managers, (m) => m.id, (m) => `${m.manager_name} - ${m.manager_email}`, chain.primary_manager_id || "", managers.length ? "Select primary" : "No managers configured", "")}</select></label>
+      <label class="field"><span>Backup approver</span><select data-field="backup_manager_id">${optionsHtml(managers, (m) => m.id, (m) => `${m.manager_name} - ${m.manager_email}`, chain.backup_manager_id || "", "No backup", "")}</select></label>
+      <label class="field"><span>Final approver</span><select data-field="final_approver_id">${optionsHtml(managers, (m) => m.id, (m) => `${m.manager_name} - ${m.manager_email}`, chain.final_approver_id || "", "No final approver", "")}</select></label>
+      <label class="field checkbox-field"><span>Final approval</span><div><input type="checkbox" data-field="require_final_approval"${chain.require_final_approval ? " checked" : ""}> Require final approver</div></label>
+    </div>
+    <div class="admin-item-edit-actions">
+      <button class="button primary small-button" type="button" data-save-chain>Save</button>
+      <button class="button small-button" type="button" data-cancel-chain>Cancel</button>
+    </div>
+  `;
+}
+
+function bindApprovalChainEditRow(row, chain) {
+  const projectSelect = row.querySelector('[data-field="project_id"]');
+  const branchSelect = row.querySelector('[data-field="branch"]');
+  const divisionSelect = row.querySelector('[data-field="division"]');
+  const primarySelect = row.querySelector('[data-field="primary_manager_id"]');
+  const backupSelect = row.querySelector('[data-field="backup_manager_id"]');
+  const finalSelect = row.querySelector('[data-field="final_approver_id"]');
+
+  projectSelect.addEventListener("change", () => {
+    const managers = approvalChainManagersForProject(projectSelect.value);
+    const current = { primary: primarySelect.value, backup: backupSelect.value, final: finalSelect.value };
+    primarySelect.innerHTML = optionsHtml(managers, (m) => m.id, (m) => `${m.manager_name} - ${m.manager_email}`, current.primary, managers.length ? "Select primary" : "No managers configured", "");
+    backupSelect.innerHTML = optionsHtml(managers, (m) => m.id, (m) => `${m.manager_name} - ${m.manager_email}`, current.backup, "No backup", "");
+    finalSelect.innerHTML = optionsHtml(managers, (m) => m.id, (m) => `${m.manager_name} - ${m.manager_email}`, current.final, "No final approver", "");
+  });
+
+  branchSelect.addEventListener("change", () => {
+    const selectedBranch = app.branches.find((branch) => branch.name === branchSelect.value);
+    const divisions = selectedBranch ? app.divisions.filter((division) => division.branch_id === selectedBranch.id) : app.divisions;
+    divisionSelect.innerHTML = optionsHtml(divisions, (d) => d.name, (d) => d.name, "", "Any division", "");
+  });
+
+  row.querySelector("[data-cancel-chain]").addEventListener("click", () => {
+    app.editingApprovalChainId = "";
+    renderApprovalChainAdminList();
+  });
+
+  row.querySelector("[data-save-chain]").addEventListener("click", () => {
+    const payload = {
+      name: row.querySelector('[data-field="name"]').value.trim(),
+      project_id: projectSelect.value || null,
+      branch: branchSelect.value || null,
+      division: divisionSelect.value || null,
+      primary_manager_id: primarySelect.value,
+      backup_manager_id: backupSelect.value || null,
+      final_approver_id: finalSelect.value || null,
+      require_final_approval: row.querySelector('[data-field="require_final_approval"]').checked,
+    };
+
+    if (!payload.name || !payload.primary_manager_id) {
+      setMessage(els.adminMessage, "Chain name and primary approver are required.", true);
+      return;
+    }
+
+    if (payload.require_final_approval && !payload.final_approver_id) {
+      setMessage(els.adminMessage, "Choose a final approver or turn off final approval.", true);
+      return;
+    }
+
+    updateApprovalChain(chain.id, payload);
+  });
+}
+
+async function updateApprovalChain(id, payload) {
+  setMessage(els.adminMessage, "Saving approval chain...");
+  const { error } = await app.supabase.from("timesheet_approval_chains").update(payload).eq("id", id);
+
+  if (error) {
+    setMessage(els.adminMessage, error.message, true);
+    return;
+  }
+
+  await logAdminChange("updated", "approval_chain", id, payload.name, {
+    ...payload,
+    project: projectLabel(getProject(payload.project_id)),
+    route: approvalRouteLabel(payload),
+  });
+  app.editingApprovalChainId = "";
+  await loadReferenceData();
+  if (app.profile?.role === "admin") await renderAdminConsole();
+  setMessage(els.adminMessage, "Approval chain saved.");
+}
+
 function renderApprovalChainAdminList() {
   const chains = filterApprovalChainsByFocusedProject(app.approvalChains);
   if (!chains.length) {
@@ -5519,16 +5628,29 @@ function renderApprovalChainAdminList() {
   els.approvalChainList.innerHTML = "";
   for (const chain of chains) {
     const row = document.createElement("li");
-    row.className = "admin-item";
-    row.innerHTML = `
-      <div>
-        <strong>${escapeHtml(chain.name)}</strong>
-        <span>${escapeHtml(approvalChainDetail(chain))}</span>
-        <span>${escapeHtml(approvalRouteLabel(chain))}</span>
-      </div>
-      <button class="button danger small-button" type="button">Remove</button>
-    `;
-    row.querySelector("button").addEventListener("click", () => deactivateAdminItem("timesheet_approval_chains", chain.id, "Approval chain removed."));
+    if (app.editingApprovalChainId === chain.id) {
+      row.className = "admin-item admin-item-stacked editing";
+      row.innerHTML = approvalChainEditRowHtml(chain);
+      bindApprovalChainEditRow(row, chain);
+    } else {
+      row.className = "admin-item";
+      row.innerHTML = `
+        <div>
+          <strong>${escapeHtml(chain.name)}</strong>
+          <span>${escapeHtml(approvalChainDetail(chain))}</span>
+          <span>${escapeHtml(approvalRouteLabel(chain))}</span>
+        </div>
+        <div class="admin-item-actions">
+          <button class="button small-button" type="button" data-edit-chain>Edit</button>
+          <button class="button danger small-button" type="button" data-remove-chain>Remove</button>
+        </div>
+      `;
+      row.querySelector("[data-remove-chain]").addEventListener("click", () => deactivateAdminItem("timesheet_approval_chains", chain.id, "Approval chain removed."));
+      row.querySelector("[data-edit-chain]").addEventListener("click", () => {
+        app.editingApprovalChainId = chain.id;
+        renderApprovalChainAdminList();
+      });
+    }
     els.approvalChainList.append(row);
   }
 }
@@ -5555,6 +5677,84 @@ function renderDomainAdminList() {
   }
 }
 
+const CALENDAR_DAY_TYPE_OPTIONS = [
+  { value: "holiday", label: "Holiday" },
+  { value: "pto", label: "PTO" },
+  { value: "non_working", label: "Non-working day" },
+];
+
+function calendarDayEditRowHtml(day) {
+  const branchDivisions = day.branch ? app.divisions.filter((division) => division.branch_id === app.branches.find((branch) => branch.name === day.branch)?.id) : app.divisions;
+  const typeOptions = CALENDAR_DAY_TYPE_OPTIONS.map((opt) => `<option value="${opt.value}"${opt.value === day.day_type ? " selected" : ""}>${opt.label}</option>`).join("");
+  return `
+    <div class="admin-item-edit-grid">
+      <label class="field"><span>Date</span><input type="date" data-field="work_date" value="${escapeHtml(day.work_date || "")}" required></label>
+      <label class="field"><span>Type</span><select data-field="day_type" required>${typeOptions}</select></label>
+      <label class="field"><span>Label</span><input type="text" data-field="label" value="${escapeHtml(day.label || "")}" required></label>
+      <label class="field"><span>Project scope</span><select data-field="project_id">${optionsHtml(app.projects, (p) => p.id, (p) => projectLabel(p), day.project_id || "", "All projects", "")}</select></label>
+      <label class="field"><span>Branch scope</span><select data-field="branch">${optionsHtml(app.branches, (b) => b.name, (b) => b.name, day.branch || "", "All branches", "")}</select></label>
+      <label class="field"><span>Division scope</span><select data-field="division">${optionsHtml(branchDivisions, (d) => d.name, (d) => d.name, day.division || "", "All divisions", "")}</select></label>
+    </div>
+    <div class="admin-item-edit-actions">
+      <button class="button primary small-button" type="button" data-save-calendar-day>Save</button>
+      <button class="button small-button" type="button" data-cancel-calendar-day>Cancel</button>
+    </div>
+  `;
+}
+
+function bindCalendarDayEditRow(row, day) {
+  const branchSelect = row.querySelector('[data-field="branch"]');
+  const divisionSelect = row.querySelector('[data-field="division"]');
+
+  branchSelect.addEventListener("change", () => {
+    const selectedBranch = app.branches.find((branch) => branch.name === branchSelect.value);
+    const divisions = selectedBranch ? app.divisions.filter((division) => division.branch_id === selectedBranch.id) : app.divisions;
+    divisionSelect.innerHTML = optionsHtml(divisions, (d) => d.name, (d) => d.name, "", "All divisions", "");
+  });
+
+  row.querySelector("[data-cancel-calendar-day]").addEventListener("click", () => {
+    app.editingCalendarDayId = "";
+    renderCalendarAdminList();
+  });
+
+  row.querySelector("[data-save-calendar-day]").addEventListener("click", () => {
+    const payload = {
+      work_date: row.querySelector('[data-field="work_date"]').value,
+      day_type: row.querySelector('[data-field="day_type"]').value,
+      label: row.querySelector('[data-field="label"]').value.trim(),
+      project_id: row.querySelector('[data-field="project_id"]').value || null,
+      branch: branchSelect.value || null,
+      division: divisionSelect.value || null,
+    };
+
+    if (!payload.work_date || !payload.day_type || !payload.label) {
+      setMessage(els.adminMessage, "Date, type, and label are required.", true);
+      return;
+    }
+
+    updateCalendarDay(day.id, payload);
+  });
+}
+
+async function updateCalendarDay(id, payload) {
+  setMessage(els.adminMessage, "Saving calendar day...");
+  const { error } = await app.supabase.from("timesheet_calendar_days").update(payload).eq("id", id);
+
+  if (error) {
+    setMessage(els.adminMessage, error.message, true);
+    return;
+  }
+
+  await logAdminChange("updated", "calendar_day", id, `${payload.work_date} - ${payload.label}`, {
+    ...payload,
+    project: payload.project_id ? projectLabel(getProject(payload.project_id)) : "All projects",
+  });
+  app.editingCalendarDayId = "";
+  await loadReferenceData();
+  if (app.profile?.role === "admin") await renderAdminConsole();
+  setMessage(els.adminMessage, "Calendar day saved.");
+}
+
 function renderCalendarAdminList() {
   if (!app.calendarDays.length) {
     els.calendarDayList.innerHTML = `<li class="admin-item"><span>No holidays, PTO days, or non-working days configured.</span></li>`;
@@ -5565,15 +5765,28 @@ function renderCalendarAdminList() {
   els.calendarDayList.innerHTML = "";
   for (const day of days) {
     const row = document.createElement("li");
-    row.className = "admin-item";
-    row.innerHTML = `
-      <div>
-        <strong>${escapeHtml(`${formatShortDate(day.work_date)} - ${day.label}`)}</strong>
-        <span>${escapeHtml([calendarDayTypeLabel(day.day_type), day.project_id ? projectLabel(getProject(day.project_id)) : "All projects", day.branch || "All branches", day.division || "All divisions"].join(" - "))}</span>
-      </div>
-      <button class="button danger small-button" type="button">Remove</button>
-    `;
-    row.querySelector("button").addEventListener("click", () => deactivateAdminItem("timesheet_calendar_days", day.id, "Calendar day removed."));
+    if (app.editingCalendarDayId === day.id) {
+      row.className = "admin-item admin-item-stacked editing";
+      row.innerHTML = calendarDayEditRowHtml(day);
+      bindCalendarDayEditRow(row, day);
+    } else {
+      row.className = "admin-item";
+      row.innerHTML = `
+        <div>
+          <strong>${escapeHtml(`${formatShortDate(day.work_date)} - ${day.label}`)}</strong>
+          <span>${escapeHtml([calendarDayTypeLabel(day.day_type), day.project_id ? projectLabel(getProject(day.project_id)) : "All projects", day.branch || "All branches", day.division || "All divisions"].join(" - "))}</span>
+        </div>
+        <div class="admin-item-actions">
+          <button class="button small-button" type="button" data-edit-calendar-day>Edit</button>
+          <button class="button danger small-button" type="button" data-remove-calendar-day>Remove</button>
+        </div>
+      `;
+      row.querySelector("[data-remove-calendar-day]").addEventListener("click", () => deactivateAdminItem("timesheet_calendar_days", day.id, "Calendar day removed."));
+      row.querySelector("[data-edit-calendar-day]").addEventListener("click", () => {
+        app.editingCalendarDayId = day.id;
+        renderCalendarAdminList();
+      });
+    }
     els.calendarDayList.append(row);
   }
 }
