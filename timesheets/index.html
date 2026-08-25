@@ -13,9 +13,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Libre+Baskerville:wght@700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/timesheets.css?v=20260824-enterprise-hardening">
-  <script src="/assets/timesheets-config.js?v=20260824-enterprise-hardening"></script>
-  <script type="module" src="/assets/timesheets.js?v=20260824-enterprise-hardening"></script>
+  <link rel="stylesheet" href="/assets/timesheets.css?v=20260824-workflow-hardening">
+  <script src="/assets/timesheets-config.js?v=20260824-workflow-hardening"></script>
+  <script type="module" src="/assets/timesheets.js?v=20260824-workflow-hardening"></script>
 </head>
 <body>
   <nav class="nav" aria-label="Primary navigation">
@@ -272,6 +272,7 @@
             <button class="section-tab" type="button" data-admin-section-target="users">Users</button>
             <button class="section-tab" type="button" data-admin-section-target="invitations">Invitations</button>
             <button class="section-tab" type="button" data-admin-section-target="organization">Organization</button>
+            <button class="section-tab" type="button" data-admin-section-target="calendar">Calendar</button>
             <button class="section-tab" type="button" data-admin-section-target="projects">Projects</button>
             <button class="section-tab" type="button" data-admin-section-target="approvals">Approval Chains</button>
             <button class="section-tab" type="button" data-admin-section-target="exports">Exports</button>
@@ -362,6 +363,24 @@
               <label class="field"><span>Division name</span><input id="adminDivisionName" type="text" required></label>
               <button class="button primary" type="submit">Add Division</button>
               <ul id="divisionList" class="admin-list"></ul>
+            </form>
+
+            <form id="calendarDayForm" class="admin-card wide-card" data-admin-section="calendar">
+              <h3>Business Calendar</h3>
+              <div class="profile-grid tight-grid">
+                <label class="field"><span>Date</span><input id="calendarDate" type="date" required></label>
+                <label class="field"><span>Type</span><select id="calendarType" required>
+                  <option value="holiday">Holiday</option>
+                  <option value="pto">PTO</option>
+                  <option value="non_working">Non-working day</option>
+                </select></label>
+                <label class="field"><span>Label</span><input id="calendarLabel" type="text" placeholder="Labor Day" required></label>
+                <label class="field"><span>Project scope</span><select id="calendarProject"></select></label>
+                <label class="field"><span>Branch scope</span><select id="calendarBranch"></select></label>
+                <label class="field"><span>Division scope</span><select id="calendarDivision"></select></label>
+              </div>
+              <button class="button primary" type="submit">Add Calendar Day</button>
+              <ul id="calendarDayList" class="admin-list calendar-list"></ul>
             </form>
 
             <form id="taskForm" class="admin-card" data-admin-section="projects">

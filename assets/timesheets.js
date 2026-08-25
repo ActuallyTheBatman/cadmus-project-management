@@ -42,8 +42,10 @@ const app = {
   tasks: [],
   approvalChains: [],
   allowedDomains: [],
+  calendarDays: [],
   adminProfiles: [],
   adminAudit: [],
+  adjustmentRequests: [],
   pendingInvite: null,
   adminProjectFocus: "all",
   activeAdminSection: "overview",
@@ -133,6 +135,7 @@ const els = {
   domainForm: document.querySelector("#domainForm"),
   branchForm: document.querySelector("#branchForm"),
   divisionForm: document.querySelector("#divisionForm"),
+  calendarDayForm: document.querySelector("#calendarDayForm"),
   taskForm: document.querySelector("#taskForm"),
   adminExportForm: document.querySelector("#adminExportForm"),
   inviteForm: document.querySelector("#inviteForm"),
@@ -164,6 +167,12 @@ const els = {
   adminBranchName: document.querySelector("#adminBranchName"),
   adminDivisionBranch: document.querySelector("#adminDivisionBranch"),
   adminDivisionName: document.querySelector("#adminDivisionName"),
+  calendarDate: document.querySelector("#calendarDate"),
+  calendarType: document.querySelector("#calendarType"),
+  calendarLabel: document.querySelector("#calendarLabel"),
+  calendarProject: document.querySelector("#calendarProject"),
+  calendarBranch: document.querySelector("#calendarBranch"),
+  calendarDivision: document.querySelector("#calendarDivision"),
   adminTaskProject: document.querySelector("#adminTaskProject"),
   adminTaskName: document.querySelector("#adminTaskName"),
   adminTaskCode: document.querySelector("#adminTaskCode"),
@@ -193,6 +202,7 @@ const els = {
   domainList: document.querySelector("#domainList"),
   branchList: document.querySelector("#branchList"),
   divisionList: document.querySelector("#divisionList"),
+  calendarDayList: document.querySelector("#calendarDayList"),
   taskList: document.querySelector("#taskList"),
   userList: document.querySelector("#userList"),
   adminMessage: document.querySelector("#adminMessage"),
@@ -426,6 +436,8 @@ function bindEvents() {
   els.domainForm.addEventListener("submit", addAllowedDomain);
   els.branchForm.addEventListener("submit", addBranch);
   els.divisionForm.addEventListener("submit", addDivision);
+  els.calendarDayForm.addEventListener("submit", addCalendarDay);
+  els.calendarBranch.addEventListener("change", populateCalendarDivisions);
   els.taskForm.addEventListener("submit", addTask);
   els.adminExportForm.addEventListener("submit", exportAdminWork);
   els.adminApprovedExport.addEventListener("click", exportApprovedTime);
@@ -736,6 +748,7 @@ async function loadReferenceData() {
     { data: tasks, error: taskError },
     { data: approvalChains, error: approvalChainError },
     { data: allowedDomains, error: allowedDomainError },
+    { data: calendarDays, error: calendarDayError },
   ] = await Promise.all([
     app.supabase.from("timesheet_projects").select("id, name, code, client, reporting_formats").eq("active", true).order("name"),
     app.supabase.from("timesheet_project_managers").select("id, project_id, manager_name, manager_email").eq("active", true).order("manager_name"),
@@ -744,6 +757,7 @@ async function loadReferenceData() {
     app.supabase.from("timesheet_tasks").select("id, project_id, name, code").eq("active", true).order("name"),
     app.supabase.from("timesheet_approval_chains").select("id, name, project_id, branch, division, primary_manager_id, backup_manager_id, final_approver_id, require_final_approval, active").eq("active", true).order("name"),
     app.supabase.from("timesheet_allowed_domains").select("domain, active").eq("active", true).order("domain"),
+    app.supabase.from("timesheet_calendar_days").select("id, work_date, label, day_type, project_id, branch, division, active").eq("active", true).order("work_date"),
   ]);
 
   if (projectError) setMessage(els.profileMessage, `Project load failed: ${projectError.message}`, true);
@@ -753,6 +767,7 @@ async function loadReferenceData() {
   if (taskError) setMessage(els.profileMessage, `Task load failed: ${taskError.message}`, true);
   if (approvalChainError) setMessage(els.profileMessage, `Approval chain load failed: ${approvalChainError.message}`, true);
   if (allowedDomainError) setMessage(els.profileMessage, `Domain allowlist load failed: ${allowedDomainError.message}`, true);
+  if (calendarDayError) setMessage(els.profileMessage, `Calendar load failed: ${calendarDayError.message}`, true);
 
   app.projects = projects || [];
   app.managers = managers || [];
@@ -761,6 +776,7 @@ async function loadReferenceData() {
   app.tasks = tasks || [];
   app.approvalChains = approvalChains || [];
   app.allowedDomains = allowedDomains || [];
+  app.calendarDays = calendarDays || [];
 }
 
 async function loadProfile() {
@@ -979,6 +995,7 @@ async function loadWeek() {
   app.report = report || null;
   if (!app.report) {
     app.reportAudits = [];
+    app.adjustmentRequests = [];
     app.dailyReports = buildBlankDailyReports(null);
     renderDailyReports();
     setMessage(els.appMessage, "");
@@ -988,6 +1005,7 @@ async function loadWeek() {
   const [
     { data: days, error: daysError },
     { data: audits, error: auditError },
+    { data: adjustmentRequests, error: adjustmentError },
   ] = await Promise.all([
     app.supabase
       .from("timesheet_daily_reports")
@@ -998,6 +1016,11 @@ async function loadWeek() {
     app.supabase
       .from("timesheet_report_audit")
       .select("actor_email, action, notes, details, created_at")
+      .eq("weekly_report_id", app.report.id)
+      .order("created_at", { ascending: false }),
+    app.supabase
+      .from("timesheet_adjustment_requests")
+      .select("id, weekly_report_id, status, reason, requester_email, reviewer_email, review_notes, created_at, reviewed_at")
       .eq("weekly_report_id", app.report.id)
       .order("created_at", { ascending: false }),
   ]);
@@ -1012,7 +1035,13 @@ async function loadWeek() {
     return;
   }
 
+  if (adjustmentError) {
+    setMessage(els.appMessage, `Adjustment history failed: ${adjustmentError.message}`, true);
+    return;
+  }
+
   app.reportAudits = audits || [];
+  app.adjustmentRequests = adjustmentRequests || [];
   app.dailyReports = mergeDailyReports(days || []);
   renderDailyReports();
   setMessage(els.appMessage, "");
@@ -1104,9 +1133,80 @@ function renderReportLifecycle({ locked }) {
       <span class="status-pill ${escapeHtml(status)}">${escapeHtml(formatReportStatus(status))}</span>
     </div>
     ${app.report?.manager_notes ? `<div class="review-note"><span>Latest review comment</span><p>${escapeHtml(app.report.manager_notes)}</p></div>` : ""}
+    ${renderAdjustmentSummary()}
     ${app.reportAudits.length ? renderAuditTimeline(app.reportAudits, 8) : ""}
   `;
+  const requestButton = panel.querySelector("[data-request-adjustment]");
+  requestButton?.addEventListener("click", requestAdjustment);
   els.dailyGrid.append(panel);
+}
+
+function renderAdjustmentSummary() {
+  if (!app.report || app.report.status !== "approved") return "";
+  const latest = app.adjustmentRequests[0];
+  const hasOpenRequest = latest?.status === "requested";
+  return `
+    <div class="review-note adjustment-note">
+      <span>Adjustment request</span>
+      <p>${escapeHtml(latest ? adjustmentRequestSummary(latest) : "Approved weeks are locked. Request an adjustment if this labor record needs to be reopened.")}</p>
+      <button class="button small-button" type="button" data-request-adjustment ${hasOpenRequest ? "disabled" : ""}>Request Adjustment</button>
+    </div>
+  `;
+}
+
+function adjustmentRequestSummary(request) {
+  const status = titleCase(String(request.status || "requested").replaceAll("_", " "));
+  const date = request.reviewed_at || request.created_at;
+  const reviewer = request.reviewer_email ? ` by ${request.reviewer_email}` : "";
+  const note = request.review_notes ? ` Review: ${request.review_notes}` : "";
+  return `${status}${reviewer}${date ? ` on ${formatShortDate(date)}` : ""}. Reason: ${request.reason || "No reason entered."}${note}`;
+}
+
+async function requestAdjustment() {
+  if (!app.report || app.report.status !== "approved") return;
+  const reason = window.prompt("What needs to be adjusted on this approved week?");
+  if (!reason || reason.trim().length < 8) {
+    setMessage(els.appMessage, "Add a short reason before requesting an adjustment.", true);
+    return;
+  }
+
+  setMessage(els.appMessage, "Sending adjustment request...");
+  const payload = {
+    weekly_report_id: app.report.id,
+    user_id: app.user.id,
+    project_id: app.report.project_id || app.profile.project_id,
+    manager_id: app.report.manager_id || app.profile.manager_id,
+    reason: reason.trim(),
+    requester_email: app.user.email,
+  };
+  const { data, error } = await app.supabase
+    .from("timesheet_adjustment_requests")
+    .insert(payload)
+    .select("id, weekly_report_id, status, reason, requester_email, reviewer_email, review_notes, created_at, reviewed_at")
+    .single();
+
+  if (error) {
+    setMessage(els.appMessage, `Adjustment request failed: ${error.message}`, true);
+    return;
+  }
+
+  app.adjustmentRequests = [data, ...app.adjustmentRequests];
+  await logTimesheetAudit(app.report.id, "adjustment_requested", reason, {
+    week_start: app.report.week_start,
+    project: projectLabel(getProject(app.report.project_id)),
+    to_status: "approved",
+  });
+  await queueNotification({
+    eventType: "adjustment_requested",
+    recipientEmail: getManager(app.report.manager_id)?.manager_email || app.user.email,
+    recipientRole: "reviewer",
+    report: app.report,
+    subject: `Adjustment requested for ${formatShortDate(app.report.week_start)}`,
+    body: `${app.user.email} requested an adjustment: ${reason.trim()}`,
+    details: { request_id: data.id, reason: reason.trim() },
+  });
+  setMessage(els.appMessage, "Adjustment request sent.");
+  renderDailyReports();
 }
 
 function renderFormatSelector(enabledFormats) {
@@ -1123,6 +1223,7 @@ function renderDailyCards({ locked, projectTasks }) {
   for (let dayIndex = 0; dayIndex < weekdays.length; dayIndex += 1) {
     const dayLines = getLinesForDay(dayIndex);
     const dayTotal = dayLines.reduce((sum, line) => sum + Number(line.hours || 0), 0);
+    const calendarDay = calendarDayForDate(toDateInput(addDays(app.weekStart, dayIndex)));
     const card = document.createElement("article");
     card.className = "day-card";
     card.dataset.dayIndex = String(dayIndex);
@@ -1131,6 +1232,7 @@ function renderDailyCards({ locked, projectTasks }) {
         <div>
           <h3>${weekdays[dayIndex]}</h3>
           <time>${formatShortDate(toDateInput(addDays(app.weekStart, dayIndex)))}</time>
+          ${calendarDay ? calendarBadge(calendarDay) : ""}
         </div>
         <span class="status-pill">${formatHours(dayTotal)}h</span>
       </header>
@@ -1159,6 +1261,7 @@ function renderWeeklyGrid({ locked }) {
 
   for (let dayIndex = 0; dayIndex < weekdays.length; dayIndex += 1) {
     const dayLines = getLinesForDay(dayIndex);
+    const calendarDay = calendarDayForDate(toDateInput(addDays(app.weekStart, dayIndex)));
     let first = true;
     for (const day of dayLines) {
       const selectedTask = getTask(day.task_id);
@@ -1167,6 +1270,7 @@ function renderWeeklyGrid({ locked }) {
         <div class="weekly-grid-day">
           <div class="weekly-grid-day-title">
             ${first ? `<strong>${weekdays[dayIndex]}</strong><span>${formatShortDate(day.work_date)}</span>` : `<span>Task ${Number(day.line_index || 0) + 1}</span>`}
+            ${first && calendarDay ? calendarBadge(calendarDay) : ""}
           </div>
         </div>
         <label class="field compact-field task-line" data-day-index="${dayIndex}" data-line-key="${escapeHtml(lineKey)}" data-existing-id="${escapeHtml(day.id || "")}">
@@ -1223,6 +1327,7 @@ function renderWorkLog({ locked }) {
       <div class="work-log-date">
         <strong>${weekdays[day.day_index]}</strong>
         <span>${formatShortDate(day.work_date)}</span>
+        ${calendarDayForDate(day.work_date) ? calendarBadge(calendarDayForDate(day.work_date)) : ""}
       </div>
       <label class="field"><span>Task</span><input data-field="task_search" type="search" list="taskOptions" value="${escapeHtml(taskLabel(selectedTask))}"></label>
       <label class="field hours-field"><span>Hours</span><input data-field="hours" type="number" min="0" max="24" step="0.25" value="${Number(day.hours || 0)}"></label>
@@ -1450,6 +1555,15 @@ async function saveWeek(targetStatus) {
 
     app.report = submittedReport;
     await logTimesheetAudit(report.id, "submitted", "", auditDetailsForReport(submittedReport, dailyPayload.rows));
+    await queueNotification({
+      eventType: "submitted",
+      recipientEmail: getManager(submittedReport.manager_id)?.manager_email || "",
+      recipientRole: "reviewer",
+      report: submittedReport,
+      subject: `Timesheet submitted for ${formatShortDate(submittedReport.week_start)}`,
+      body: `${app.user.email} submitted a timesheet for ${formatShortDate(submittedReport.week_start)}.`,
+      details: auditDetailsForReport(submittedReport, dailyPayload.rows),
+    });
   } else {
     app.report = report;
     await logTimesheetAudit(report.id, "draft_saved", "", auditDetailsForReport(report, dailyPayload.rows));
@@ -1575,6 +1689,34 @@ function renderQualityPanel(existingQuality = null) {
   els.qualityPanel.innerHTML = qualityPanelHtml(quality);
 }
 
+function calendarDayForDate(dateValue, profile = app.profile) {
+  const matches = app.calendarDays.filter((day) => {
+    if (day.work_date !== dateValue || day.active === false) return false;
+    if (day.project_id && day.project_id !== profile?.project_id) return false;
+    if (day.branch && day.branch !== profile?.branch) return false;
+    if (day.division && day.division !== profile?.division) return false;
+    return true;
+  });
+  return matches.sort(calendarScopeWeight)[0] || null;
+}
+
+function calendarScopeWeight(a, b) {
+  const score = (day) => Number(Boolean(day.project_id)) + Number(Boolean(day.branch)) + Number(Boolean(day.division));
+  return score(b) - score(a);
+}
+
+function calendarBadge(day) {
+  return `<span class="calendar-badge ${escapeHtml(day.day_type)}">${escapeHtml(calendarDayTypeLabel(day.day_type))}: ${escapeHtml(day.label)}</span>`;
+}
+
+function calendarDayTypeLabel(type) {
+  return {
+    holiday: "Holiday",
+    pto: "PTO",
+    non_working: "Non-working",
+  }[type] || "Calendar";
+}
+
 function buildQualityChecks(rows) {
   const items = [];
   const activeRows = rows.filter((row) => Number(row.hours || 0) > 0);
@@ -1598,6 +1740,14 @@ function buildQualityChecks(rows) {
     }
     if (row.blockers && !row.next_steps) {
       items.push({ level: "warning", title: `${day}: blocker needs next step`, detail: "Add what happens next so managers can act on the blocker." });
+    }
+    const calendarDay = calendarDayForDate(row.work_date);
+    if (calendarDay) {
+      items.push({
+        level: "warning",
+        title: `${day}: ${calendarDayTypeLabel(calendarDay.day_type)} - ${calendarDay.label}`,
+        detail: "This date is marked on the business calendar. Confirm the hours are intentional before submitting.",
+      });
     }
   }
 
@@ -1737,21 +1887,23 @@ async function loadPortfolio() {
 
   const reportIds = visibleReports.map((report) => report.id);
   const userIds = [...new Set(visibleReports.map((report) => report.user_id))];
-  const [{ data: profiles }, { data: days }, { data: audits }] = await Promise.all([
+  const [{ data: profiles }, { data: days }, { data: audits }, { data: adjustments }] = await Promise.all([
     app.supabase.from("timesheet_profiles").select("id, full_name, email, company, branch, division, active").in("id", userIds),
     app.supabase.from("timesheet_daily_reports").select("weekly_report_id, day_index, line_index, work_date, task_id, hours, accomplishments, blockers, next_steps").in("weekly_report_id", reportIds).order("day_index").order("line_index"),
     app.supabase.from("timesheet_report_audit").select("weekly_report_id, actor_email, action, notes, details, created_at").in("weekly_report_id", reportIds).order("created_at", { ascending: false }),
+    app.supabase.from("timesheet_adjustment_requests").select("id, weekly_report_id, status, reason, requester_email, reviewer_email, review_notes, created_at, reviewed_at").in("weekly_report_id", reportIds).order("created_at", { ascending: false }),
   ]);
 
   const profileMap = new Map((profiles || []).map((profile) => [profile.id, profile]));
   const daysByReport = groupBy(days || [], "weekly_report_id");
   const auditsByReport = groupBy(audits || [], "weekly_report_id");
+  const adjustmentsByReport = groupBy(adjustments || [], "weekly_report_id");
   app.reviewQueue = { reports: visibleReports, daysByReport };
   renderReviewQueueSummary(visibleReports, daysByReport);
   els.portfolioList.innerHTML = "";
 
   for (const report of visibleReports) {
-    els.portfolioList.append(renderReviewCard(report, profileMap.get(report.user_id), daysByReport.get(report.id) || [], auditsByReport.get(report.id) || []));
+    els.portfolioList.append(renderReviewCard(report, profileMap.get(report.user_id), daysByReport.get(report.id) || [], auditsByReport.get(report.id) || [], adjustmentsByReport.get(report.id) || []));
   }
 }
 
@@ -2587,11 +2739,12 @@ async function loadMissingTimesheets() {
   }
 }
 
-function renderReviewCard(report, profile, days, audits = []) {
+function renderReviewCard(report, profile, days, audits = [], adjustments = []) {
   const project = getProject(report.project_id);
   const approvalRoute = approvalRouteFromReport(report, profile);
   const total = days.reduce((sum, day) => sum + Number(day.hours || 0), 0);
   const stale = isStaleSubmittedReport(report);
+  const openAdjustment = adjustments.find((request) => request.status === "requested");
   const card = document.createElement("article");
   card.className = `review-card${stale ? " stale-review-card" : ""}`;
   card.innerHTML = `
@@ -2620,8 +2773,32 @@ function renderReviewCard(report, profile, days, audits = []) {
     <div class="review-days">
       ${days.map(renderReviewDay).join("")}
     </div>
+    ${adjustments.length ? renderAdjustmentRequests(adjustments) : ""}
     ${audits.length ? renderAuditTimeline(audits, 6) : ""}
   `;
+
+  if (openAdjustment && canReviewPortfolio()) {
+    const actions = document.createElement("div");
+    actions.className = "review-actions adjustment-actions";
+    const notes = document.createElement("textarea");
+    notes.className = "review-notes";
+    notes.placeholder = "Adjustment decision comments";
+    const approve = document.createElement("button");
+    approve.className = "button primary";
+    approve.type = "button";
+    approve.textContent = "Reopen Week";
+    approve.addEventListener("click", () => resolveAdjustmentRequest(openAdjustment, report, "approved", notes.value));
+    const reject = document.createElement("button");
+    reject.className = "button danger";
+    reject.type = "button";
+    reject.textContent = "Reject Request";
+    reject.addEventListener("click", () => resolveAdjustmentRequest(openAdjustment, report, "rejected", notes.value));
+    const buttons = document.createElement("div");
+    buttons.className = "toolbar";
+    buttons.append(approve, reject);
+    actions.append(notes, buttons);
+    card.append(actions);
+  }
 
   if (["submitted", "pending_final", "rejected"].includes(report.status) && canReviewPortfolio()) {
     const actions = document.createElement("div");
@@ -2649,6 +2826,21 @@ function renderReviewCard(report, profile, days, audits = []) {
   }
 
   return card;
+}
+
+function renderAdjustmentRequests(adjustments) {
+  return `
+    <div class="audit-list adjustment-list" aria-label="Adjustment requests">
+      ${adjustments.map((request) => `
+        <div class="audit-event">
+          <strong>${escapeHtml(titleCase(String(request.status || "requested")))} adjustment</strong>
+          <span>${escapeHtml([request.requester_email, formatShortDate(request.created_at)].filter(Boolean).join(" - "))}</span>
+          <p>${escapeHtml(request.reason || "")}</p>
+          ${request.review_notes ? `<p>Decision: ${escapeHtml(request.review_notes)}</p>` : ""}
+        </div>
+      `).join("")}
+    </div>
+  `;
 }
 
 function isStaleSubmittedReport(report) {
@@ -2762,7 +2954,106 @@ async function reviewReport(reportId, status, notes = "") {
     final_required: approvalRoute.requireFinal,
     notes_required: status === "rejected",
   });
+  await queueNotification({
+    eventType: nextStatus === "pending_final" ? "final_requested" : status,
+    recipientEmail: profile?.email || "",
+    recipientRole: "resource",
+    report,
+    subject: `Timesheet ${formatReportStatus(nextStatus).toLowerCase()} for ${formatShortDate(report?.week_start)}`,
+    body: reviewNotes || `Your timesheet status changed to ${formatReportStatus(nextStatus)}.`,
+    details: {
+      from_status: report?.status || "submitted",
+      to_status: nextStatus,
+      reviewer: app.user.email,
+    },
+  });
   await loadPortfolio();
+}
+
+async function resolveAdjustmentRequest(request, report, decision, notes = "") {
+  const trimmedNotes = notes.trim();
+  if (decision === "rejected" && trimmedNotes.length < 8) {
+    els.portfolioList.insertAdjacentHTML("afterbegin", `<div class="notice"><p>Decision comments are required when rejecting an adjustment request.</p></div>`);
+    return;
+  }
+
+  const { error: requestError } = await app.supabase
+    .from("timesheet_adjustment_requests")
+    .update({
+      status: decision,
+      reviewer_id: app.user.id,
+      reviewer_email: app.user.email,
+      review_notes: trimmedNotes || null,
+      reviewed_at: new Date().toISOString(),
+    })
+    .eq("id", request.id)
+    .eq("status", "requested");
+
+  if (requestError) {
+    els.portfolioList.insertAdjacentHTML("afterbegin", `<div class="notice"><p>${escapeHtml(requestError.message)}</p></div>`);
+    return;
+  }
+
+  const nextStatus = decision === "approved" ? "rejected" : report.status;
+  const auditAction = decision === "approved" ? "adjustment_approved" : "adjustment_rejected";
+  const reviewNotes = decision === "approved"
+    ? [trimmedNotes, `Adjustment approved: ${request.reason}`].filter(Boolean).join(" ")
+    : trimmedNotes;
+
+  if (decision === "approved") {
+    const { error: reportError } = await app.supabase
+      .from("timesheet_weekly_reports")
+      .update({
+        status: "rejected",
+        manager_notes: reviewNotes,
+        reviewed_by: app.user.id,
+        reviewer_email: app.user.email,
+        reviewed_at: new Date().toISOString(),
+      })
+      .eq("id", report.id);
+
+    if (reportError) {
+      els.portfolioList.insertAdjacentHTML("afterbegin", `<div class="notice"><p>${escapeHtml(reportError.message)}</p></div>`);
+      return;
+    }
+  }
+
+  await logTimesheetAudit(report.id, auditAction, reviewNotes || request.reason, {
+    from_status: report.status,
+    to_status: nextStatus,
+    reviewer: app.user.email,
+    request_id: request.id,
+    adjustment_reason: request.reason,
+  });
+  await queueNotification({
+    eventType: auditAction,
+    recipientEmail: request.requester_email || "",
+    recipientRole: "resource",
+    report,
+    subject: decision === "approved" ? `Week reopened for ${formatShortDate(report.week_start)}` : `Adjustment request rejected for ${formatShortDate(report.week_start)}`,
+    body: decision === "approved"
+      ? `Your approved week was reopened for adjustment. ${reviewNotes}`
+      : `Your adjustment request was rejected. ${reviewNotes}`,
+    details: { request_id: request.id, decision, review_notes: reviewNotes },
+  });
+  await loadPortfolio();
+}
+
+async function queueNotification({ eventType, recipientEmail, recipientRole = "", report, subject, body, details = {} }) {
+  if (!recipientEmail || !report?.id) return;
+  await app.supabase.from("timesheet_notification_queue").insert({
+    event_type: eventType,
+    recipient_email: recipientEmail,
+    recipient_role: recipientRole,
+    weekly_report_id: report.id,
+    user_id: report.user_id || null,
+    project_id: report.project_id || null,
+    actor_id: app.user.id,
+    actor_email: app.user.email,
+    subject,
+    body,
+    details,
+  });
 }
 
 async function approveCleanSubmittedReports() {
@@ -2877,9 +3168,9 @@ function populateAdminSelects() {
   populateProjectSelectElement(els.adminProjectFocus, "All active projects", "all");
   els.adminProjectFocus.value = app.adminProjectFocus;
 
-  const projectSelects = [els.adminManagerProject, els.adminTaskProject, els.inviteProject, els.approvalChainProject];
+  const projectSelects = [els.adminManagerProject, els.adminTaskProject, els.inviteProject, els.approvalChainProject, els.calendarProject];
   for (const select of projectSelects) {
-    populateProjectSelectElement(select, select === els.approvalChainProject ? "Any project" : "Select project", "");
+    populateProjectSelectElement(select, select === els.approvalChainProject || select === els.calendarProject ? "Any project" : "Select project", "");
     if (app.adminProjectFocus !== "all") select.value = app.adminProjectFocus;
   }
 
@@ -2900,6 +3191,7 @@ function populateAdminSelects() {
   populateInviteManagers();
   populateApprovalChainBranches();
   populateApprovalChainApprovers();
+  populateCalendarBranches();
 }
 
 function populatePortfolioProjectFilter() {
@@ -2924,6 +3216,31 @@ function populateAdminExportDivisions() {
   for (const division of divisions) {
     els.adminExportDivision.append(new Option(division.name, division.name));
   }
+}
+
+function populateCalendarBranches() {
+  const current = els.calendarBranch.value || "";
+  els.calendarBranch.innerHTML = "";
+  els.calendarBranch.append(new Option("Any branch", ""));
+  for (const branch of app.branches) {
+    els.calendarBranch.append(new Option(branch.name, branch.name));
+  }
+  els.calendarBranch.value = app.branches.some((branch) => branch.name === current) ? current : "";
+  populateCalendarDivisions();
+}
+
+function populateCalendarDivisions() {
+  const selectedBranch = app.branches.find((branch) => branch.name === els.calendarBranch.value);
+  const current = els.calendarDivision.value || "";
+  const divisions = selectedBranch
+    ? app.divisions.filter((division) => division.branch_id === selectedBranch.id)
+    : app.divisions;
+  els.calendarDivision.innerHTML = "";
+  els.calendarDivision.append(new Option("Any division", ""));
+  for (const division of divisions) {
+    els.calendarDivision.append(new Option(division.name, division.name));
+  }
+  els.calendarDivision.value = divisions.some((division) => division.name === current) ? current : "";
 }
 
 function populateAdminUserFilters() {
@@ -3048,6 +3365,7 @@ function renderAdminLists() {
   renderProjectAdminList();
   renderApprovalChainAdminList();
   renderDomainAdminList();
+  renderCalendarAdminList();
   const managers = filterByFocusedProject(app.managers);
   const tasks = filterByFocusedProject(app.tasks);
   renderManagerAdminList(managers);
@@ -3481,6 +3799,29 @@ function renderDomainAdminList() {
     `;
     row.querySelector("button").addEventListener("click", () => deactivateAllowedDomain(item.domain));
     els.domainList.append(row);
+  }
+}
+
+function renderCalendarAdminList() {
+  if (!app.calendarDays.length) {
+    els.calendarDayList.innerHTML = `<li class="admin-item"><span>No holidays, PTO days, or non-working days configured.</span></li>`;
+    return;
+  }
+
+  const days = [...app.calendarDays].sort((a, b) => a.work_date.localeCompare(b.work_date));
+  els.calendarDayList.innerHTML = "";
+  for (const day of days) {
+    const row = document.createElement("li");
+    row.className = "admin-item";
+    row.innerHTML = `
+      <div>
+        <strong>${escapeHtml(`${formatShortDate(day.work_date)} - ${day.label}`)}</strong>
+        <span>${escapeHtml([calendarDayTypeLabel(day.day_type), day.project_id ? projectLabel(getProject(day.project_id)) : "All projects", day.branch || "All branches", day.division || "All divisions"].join(" - "))}</span>
+      </div>
+      <button class="button danger small-button" type="button">Remove</button>
+    `;
+    row.querySelector("button").addEventListener("click", () => deactivateAdminItem("timesheet_calendar_days", day.id, "Calendar day removed."));
+    els.calendarDayList.append(row);
   }
 }
 
@@ -3953,6 +4294,37 @@ async function addDivision(event) {
   });
 }
 
+async function addCalendarDay(event) {
+  event.preventDefault();
+  setMessage(els.adminMessage, "Adding calendar day...");
+  const payload = {
+    work_date: els.calendarDate.value,
+    day_type: els.calendarType.value,
+    label: els.calendarLabel.value.trim(),
+    project_id: els.calendarProject.value || null,
+    branch: els.calendarBranch.value || null,
+    division: els.calendarDivision.value || null,
+    active: true,
+    created_by: app.user.id,
+  };
+
+  if (!payload.work_date || !payload.day_type || !payload.label) {
+    setMessage(els.adminMessage, "Date, type, and label are required.", true);
+    return;
+  }
+
+  const { error } = await app.supabase.from("timesheet_calendar_days").insert(payload);
+  await finishAdminSave(error, els.calendarDayForm, "Calendar day saved.", {
+    action: "created",
+    entityType: "calendar_day",
+    entityLabel: `${payload.work_date} - ${payload.label}`,
+    details: {
+      ...payload,
+      project: payload.project_id ? projectLabel(getProject(payload.project_id)) : "All projects",
+    },
+  });
+}
+
 async function addTask(event) {
   event.preventDefault();
   setMessage(els.adminMessage, "Adding task...");
@@ -4259,6 +4631,11 @@ function adminAuditTargetForTable(table, id) {
       entityType: "task",
       item: app.tasks.find((task) => task.id === id),
       labelFor: (item) => taskLabel(item),
+    },
+    timesheet_calendar_days: {
+      entityType: "calendar_day",
+      item: app.calendarDays.find((day) => day.id === id),
+      labelFor: (item) => item ? `${item.work_date} - ${item.label}` : "",
     },
   };
   const target = targets[table] || {};
@@ -4754,6 +5131,9 @@ function formatAuditAction(action) {
     final_requested: "Sent to final approval",
     approved: "Approved",
     rejected: "Sent back",
+    adjustment_requested: "Adjustment requested",
+    adjustment_approved: "Adjustment approved",
+    adjustment_rejected: "Adjustment rejected",
   }[action] || action || "Updated";
 }
 

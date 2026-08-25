@@ -192,7 +192,7 @@ create table if not exists public.timesheet_report_audit (
   weekly_report_id uuid not null references public.timesheet_weekly_reports(id) on delete cascade,
   actor_id uuid references auth.users(id) on delete set null,
   actor_email text,
-  action text not null check (action in ('draft_saved', 'submitted', 'withdrawn', 'final_requested', 'approved', 'rejected')),
+  action text not null check (action in ('draft_saved', 'submitted', 'withdrawn', 'final_requested', 'approved', 'rejected', 'adjustment_requested', 'adjustment_approved', 'adjustment_rejected')),
   notes text,
   details jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
@@ -206,7 +206,7 @@ alter table public.timesheet_report_audit
 
 alter table public.timesheet_report_audit
   add constraint timesheet_report_audit_action_check
-  check (action in ('draft_saved', 'submitted', 'withdrawn', 'final_requested', 'approved', 'rejected'));
+  check (action in ('draft_saved', 'submitted', 'withdrawn', 'final_requested', 'approved', 'rejected', 'adjustment_requested', 'adjustment_approved', 'adjustment_rejected'));
 
 create table if not exists public.timesheet_admin_audit (
   id uuid primary key default gen_random_uuid(),
@@ -218,6 +218,55 @@ create table if not exists public.timesheet_admin_audit (
   entity_label text,
   details jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
+);
+
+create table if not exists public.timesheet_calendar_days (
+  id uuid primary key default gen_random_uuid(),
+  work_date date not null,
+  label text not null,
+  day_type text not null check (day_type in ('holiday', 'pto', 'non_working')),
+  project_id uuid references public.timesheet_projects(id) on delete cascade,
+  branch text,
+  division text,
+  active boolean not null default true,
+  created_by uuid references auth.users(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.timesheet_adjustment_requests (
+  id uuid primary key default gen_random_uuid(),
+  weekly_report_id uuid not null references public.timesheet_weekly_reports(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  project_id uuid references public.timesheet_projects(id) on delete set null,
+  manager_id uuid references public.timesheet_project_managers(id) on delete set null,
+  status text not null default 'requested' check (status in ('requested', 'approved', 'rejected', 'cancelled')),
+  reason text not null,
+  requester_email text,
+  reviewer_id uuid references auth.users(id) on delete set null,
+  reviewer_email text,
+  review_notes text,
+  created_at timestamptz not null default now(),
+  reviewed_at timestamptz,
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.timesheet_notification_queue (
+  id uuid primary key default gen_random_uuid(),
+  event_type text not null,
+  recipient_email text not null,
+  recipient_role text,
+  weekly_report_id uuid references public.timesheet_weekly_reports(id) on delete cascade,
+  user_id uuid references auth.users(id) on delete set null,
+  project_id uuid references public.timesheet_projects(id) on delete set null,
+  actor_id uuid references auth.users(id) on delete set null,
+  actor_email text,
+  status text not null default 'queued' check (status in ('queued', 'sent', 'skipped', 'failed')),
+  subject text not null,
+  body text not null,
+  details jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  sent_at timestamptz
 );
 
 alter table public.timesheet_daily_reports
@@ -319,8 +368,59 @@ create index if not exists timesheet_admin_audit_actor_id_idx
 create index if not exists timesheet_admin_audit_entity_idx
   on public.timesheet_admin_audit (entity_type, entity_id);
 
+create unique index if not exists timesheet_calendar_days_scope_idx
+  on public.timesheet_calendar_days (
+    work_date,
+    day_type,
+    coalesce(project_id, '00000000-0000-0000-0000-000000000000'::uuid),
+    coalesce(branch, ''),
+    coalesce(division, '')
+  );
+
+create index if not exists timesheet_calendar_days_active_date_idx
+  on public.timesheet_calendar_days (active, work_date);
+
+create index if not exists timesheet_calendar_days_project_id_idx
+  on public.timesheet_calendar_days (project_id);
+
+create index if not exists timesheet_calendar_days_created_by_idx
+  on public.timesheet_calendar_days (created_by);
+
+create index if not exists timesheet_adjustment_requests_report_idx
+  on public.timesheet_adjustment_requests (weekly_report_id, status, created_at desc);
+
+create index if not exists timesheet_adjustment_requests_user_idx
+  on public.timesheet_adjustment_requests (user_id, status, created_at desc);
+
+create index if not exists timesheet_adjustment_requests_project_id_idx
+  on public.timesheet_adjustment_requests (project_id);
+
+create index if not exists timesheet_adjustment_requests_manager_id_idx
+  on public.timesheet_adjustment_requests (manager_id);
+
+create index if not exists timesheet_adjustment_requests_reviewer_id_idx
+  on public.timesheet_adjustment_requests (reviewer_id);
+
+create index if not exists timesheet_notification_queue_status_idx
+  on public.timesheet_notification_queue (status, created_at);
+
+create index if not exists timesheet_notification_queue_report_idx
+  on public.timesheet_notification_queue (weekly_report_id, event_type);
+
+create index if not exists timesheet_notification_queue_user_id_idx
+  on public.timesheet_notification_queue (user_id);
+
+create index if not exists timesheet_notification_queue_project_id_idx
+  on public.timesheet_notification_queue (project_id);
+
+create index if not exists timesheet_notification_queue_actor_id_idx
+  on public.timesheet_notification_queue (actor_id);
+
 create index if not exists timesheet_allowed_domains_active_idx
   on public.timesheet_allowed_domains (active, domain);
+
+create index if not exists timesheet_allowed_domains_created_by_idx
+  on public.timesheet_allowed_domains (created_by);
 
 create index if not exists timesheet_daily_reports_task_id_idx
   on public.timesheet_daily_reports (task_id);
@@ -449,6 +549,18 @@ before update on public.timesheet_approval_chains
 for each row
 execute function public.set_timesheet_updated_at();
 
+drop trigger if exists set_timesheet_calendar_days_updated_at on public.timesheet_calendar_days;
+create trigger set_timesheet_calendar_days_updated_at
+before update on public.timesheet_calendar_days
+for each row
+execute function public.set_timesheet_updated_at();
+
+drop trigger if exists set_timesheet_adjustment_requests_updated_at on public.timesheet_adjustment_requests;
+create trigger set_timesheet_adjustment_requests_updated_at
+before update on public.timesheet_adjustment_requests
+for each row
+execute function public.set_timesheet_updated_at();
+
 revoke execute on function public.set_timesheet_updated_at() from public, anon, authenticated;
 revoke execute on function public.set_timesheet_profile_role() from public, anon, authenticated;
 
@@ -467,6 +579,9 @@ alter table public.timesheet_weekly_reports enable row level security;
 alter table public.timesheet_daily_reports enable row level security;
 alter table public.timesheet_report_audit enable row level security;
 alter table public.timesheet_admin_audit enable row level security;
+alter table public.timesheet_calendar_days enable row level security;
+alter table public.timesheet_adjustment_requests enable row level security;
+alter table public.timesheet_notification_queue enable row level security;
 
 drop policy if exists "Authenticated users can read active projects" on public.timesheet_projects;
 create policy "Authenticated users can read active projects"
@@ -974,6 +1089,194 @@ with check (
   timesheet_private.current_user_role() = 'admin'
   and auth.uid() = actor_id
 );
+
+drop policy if exists "Authenticated users can read active calendar days" on public.timesheet_calendar_days;
+create policy "Authenticated users can read active calendar days"
+on public.timesheet_calendar_days
+for select
+to authenticated
+using (active = true);
+
+drop policy if exists "Admins can manage calendar days" on public.timesheet_calendar_days;
+create policy "Admins can manage calendar days"
+on public.timesheet_calendar_days
+for all
+to authenticated
+using (timesheet_private.current_user_role() = 'admin')
+with check (timesheet_private.current_user_role() = 'admin');
+
+drop policy if exists "Users and reviewers can read adjustment requests" on public.timesheet_adjustment_requests;
+create policy "Users and reviewers can read adjustment requests"
+on public.timesheet_adjustment_requests
+for select
+to authenticated
+using (
+  auth.uid() = user_id
+  or timesheet_private.current_user_role() = 'admin'
+  or exists (
+    select 1
+    from public.timesheet_weekly_reports w
+    where w.id = timesheet_adjustment_requests.weekly_report_id
+      and (
+        w.user_id = auth.uid()
+        or (
+          timesheet_private.current_user_role() = 'manager'
+          and exists (
+            select 1
+            from public.timesheet_project_managers m
+            where m.id = w.manager_id
+              and lower(m.manager_email) = lower(timesheet_private.current_user_email())
+          )
+        )
+        or (
+          timesheet_private.current_user_role() = 'manager'
+          and exists (
+            select 1
+            from public.timesheet_approval_chains c
+            join public.timesheet_project_managers m
+              on m.id in (c.primary_manager_id, c.backup_manager_id, c.final_approver_id)
+            where c.id = w.approval_chain_id
+              and lower(m.manager_email) = lower(timesheet_private.current_user_email())
+          )
+        )
+      )
+  )
+);
+
+drop policy if exists "Users can create their own adjustment requests" on public.timesheet_adjustment_requests;
+create policy "Users can create their own adjustment requests"
+on public.timesheet_adjustment_requests
+for insert
+to authenticated
+with check (
+  auth.uid() = user_id
+  and status = 'requested'
+  and exists (
+    select 1
+    from public.timesheet_weekly_reports w
+    where w.id = weekly_report_id
+      and w.user_id = auth.uid()
+      and w.status = 'approved'
+  )
+);
+
+drop policy if exists "Users can cancel their own open adjustment requests" on public.timesheet_adjustment_requests;
+create policy "Users can cancel their own open adjustment requests"
+on public.timesheet_adjustment_requests
+for update
+to authenticated
+using (auth.uid() = user_id and status = 'requested')
+with check (auth.uid() = user_id and status = 'cancelled');
+
+drop policy if exists "Reviewers can resolve adjustment requests" on public.timesheet_adjustment_requests;
+create policy "Reviewers can resolve adjustment requests"
+on public.timesheet_adjustment_requests
+for update
+to authenticated
+using (
+  status = 'requested'
+  and (
+    timesheet_private.current_user_role() = 'admin'
+    or exists (
+      select 1
+      from public.timesheet_weekly_reports w
+      where w.id = timesheet_adjustment_requests.weekly_report_id
+        and (
+          (
+            timesheet_private.current_user_role() = 'manager'
+            and exists (
+              select 1
+              from public.timesheet_project_managers m
+              where m.id = w.manager_id
+                and lower(m.manager_email) = lower(timesheet_private.current_user_email())
+            )
+          )
+          or (
+            timesheet_private.current_user_role() = 'manager'
+            and exists (
+              select 1
+              from public.timesheet_approval_chains c
+              join public.timesheet_project_managers m
+                on m.id in (c.primary_manager_id, c.backup_manager_id, c.final_approver_id)
+              where c.id = w.approval_chain_id
+                and lower(m.manager_email) = lower(timesheet_private.current_user_email())
+            )
+          )
+        )
+    )
+  )
+)
+with check (
+  status in ('approved', 'rejected')
+  and reviewer_id = auth.uid()
+);
+
+drop policy if exists "Users and reviewers can read notification records" on public.timesheet_notification_queue;
+create policy "Users and reviewers can read notification records"
+on public.timesheet_notification_queue
+for select
+to authenticated
+using (
+  user_id = auth.uid()
+  or lower(recipient_email) = lower(timesheet_private.current_user_email())
+  or timesheet_private.current_user_role() = 'admin'
+  or exists (
+    select 1
+    from public.timesheet_weekly_reports w
+    where w.id = timesheet_notification_queue.weekly_report_id
+      and (
+        w.user_id = auth.uid()
+        or (
+          timesheet_private.current_user_role() = 'manager'
+          and exists (
+            select 1
+            from public.timesheet_project_managers m
+            where m.id = w.manager_id
+              and lower(m.manager_email) = lower(timesheet_private.current_user_email())
+          )
+        )
+      )
+  )
+);
+
+drop policy if exists "Users and reviewers can create notification records" on public.timesheet_notification_queue;
+create policy "Users and reviewers can create notification records"
+on public.timesheet_notification_queue
+for insert
+to authenticated
+with check (
+  actor_id = auth.uid()
+  and status = 'queued'
+  and (
+    user_id = auth.uid()
+    or timesheet_private.current_user_role() = 'admin'
+    or exists (
+      select 1
+      from public.timesheet_weekly_reports w
+      where w.id = timesheet_notification_queue.weekly_report_id
+        and (
+          w.user_id = auth.uid()
+          or (
+            timesheet_private.current_user_role() = 'manager'
+            and exists (
+              select 1
+              from public.timesheet_project_managers m
+              where m.id = w.manager_id
+                and lower(m.manager_email) = lower(timesheet_private.current_user_email())
+            )
+          )
+        )
+    )
+  )
+);
+
+drop policy if exists "Admins can manage notification records" on public.timesheet_notification_queue;
+create policy "Admins can manage notification records"
+on public.timesheet_notification_queue
+for all
+to authenticated
+using (timesheet_private.current_user_role() = 'admin')
+with check (timesheet_private.current_user_role() = 'admin');
 
 drop function if exists public.current_user_role();
 drop function if exists public.current_user_email();

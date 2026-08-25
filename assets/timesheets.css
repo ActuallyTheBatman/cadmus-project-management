@@ -1219,6 +1219,48 @@ body.light-mode .user-chip {
   line-height: 1.4;
 }
 
+.calendar-badge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  margin-top: 6px;
+  border: 1px solid rgba(242, 217, 138, 0.28);
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: rgba(242, 217, 138, 0.08);
+  color: rgba(242, 217, 138, 0.95);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.calendar-badge.pto {
+  border-color: rgba(92, 197, 168, 0.28);
+  background: rgba(92, 197, 168, 0.08);
+  color: rgba(126, 232, 202, 0.95);
+}
+
+.calendar-badge.non_working {
+  border-color: rgba(255, 113, 95, 0.28);
+  background: rgba(255, 113, 95, 0.08);
+  color: rgba(255, 176, 164, 0.95);
+}
+
+body.light-mode .calendar-badge {
+  background: rgba(184, 135, 31, 0.14);
+  color: #5f430d;
+}
+
+body.light-mode .calendar-badge.pto {
+  background: rgba(30, 128, 100, 0.12);
+  color: #17614d;
+}
+
+body.light-mode .calendar-badge.non_working {
+  background: rgba(188, 54, 39, 0.12);
+  color: #8b2d23;
+}
+
 .admin-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
