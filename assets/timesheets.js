@@ -165,6 +165,7 @@ const els = {
   adminExportEnd: document.querySelector("#adminExportEnd"),
   adminApprovedExport: document.querySelector("#adminApprovedExport"),
   userFilterForm: document.querySelector("#userFilterForm"),
+  adminUserSearch: document.querySelector("#adminUserSearch"),
   adminUserBranch: document.querySelector("#adminUserBranch"),
   adminUserDivision: document.querySelector("#adminUserDivision"),
   adminUserProject: document.querySelector("#adminUserProject"),
@@ -416,6 +417,7 @@ function bindEvents() {
   els.exportAdminAudit.addEventListener("click", exportAdminAuditLog);
   els.adminExportBranch.addEventListener("change", populateAdminExportDivisions);
   els.userFilterForm.addEventListener("submit", (event) => event.preventDefault());
+  els.adminUserSearch.addEventListener("input", renderUserAdminList);
   els.adminUserBranch.addEventListener("change", () => {
     populateAdminUserDivisions();
     renderUserAdminList();
@@ -3138,6 +3140,7 @@ function focusPortfolioMissing() {
 function focusUserExceptions(status = "active") {
   setActiveAppView("admin");
   setActiveAdminSection("users");
+  els.adminUserSearch.value = "";
   els.adminUserStatus.value = status;
   els.adminUserBranch.value = "all";
   populateAdminUserDivisions();
@@ -3373,12 +3376,14 @@ function renderAdminList(container, items, titleFor, detailFor, removeAction) {
 }
 
 function renderUserAdminList() {
+  const search = normalizeLookup(els.adminUserSearch.value);
   const branch = els.adminUserBranch.value || "all";
   const division = els.adminUserDivision.value || "all";
   const projectId = els.adminUserProject.value || "all";
   const status = els.adminUserStatus.value || "active";
   let users = [...app.adminProfiles];
 
+  if (search) users = users.filter((user) => userMatchesAdminSearch(user, search));
   if (branch !== "all") users = users.filter((user) => user.branch === branch);
   if (division !== "all") users = users.filter((user) => user.division === division);
   if (projectId !== "all") users = users.filter((user) => user.project_id === projectId);
@@ -3386,7 +3391,7 @@ function renderUserAdminList() {
   if (status === "inactive") users = users.filter((user) => user.active === false);
 
   if (!users.length) {
-    els.userList.innerHTML = `<li class="admin-item"><span>No users match this view.</span></li>`;
+    els.userList.innerHTML = `<li class="admin-item"><span>${escapeHtml(search ? "No users match this search and filter set." : "No users match this view.")}</span></li>`;
     return;
   }
 
@@ -3462,6 +3467,24 @@ function renderUserAdminList() {
 
     els.userList.append(row);
   }
+}
+
+function userMatchesAdminSearch(user, search) {
+  const project = getProject(user.project_id);
+  const manager = getManager(user.manager_id);
+  const values = [
+    user.full_name,
+    user.email,
+    roleLabel(user.role),
+    user.active === false ? "inactive" : "active",
+    user.branch,
+    user.division,
+    projectLabel(project),
+    project?.code,
+    manager?.manager_name,
+    manager?.manager_email,
+  ];
+  return normalizeLookup(values.filter(Boolean).join(" ")).includes(search);
 }
 
 function confirmManagedUserChange(user, patch) {
