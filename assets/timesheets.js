@@ -80,6 +80,10 @@ const els = {
   dashboardActions: document.querySelector("#dashboardActions"),
   dashboardContent: document.querySelector("#dashboardContent"),
   appView: document.querySelector("#appView"),
+  tasksView: document.querySelector("#tasksView"),
+  taskProjectFilter: document.querySelector("#taskProjectFilter"),
+  taskSearch: document.querySelector("#taskSearch"),
+  taskViewContent: document.querySelector("#taskViewContent"),
   portfolioView: document.querySelector("#portfolioView"),
   adminView: document.querySelector("#adminView"),
   authForm: document.querySelector("#authForm"),
@@ -417,6 +421,8 @@ function bindEvents() {
     if (!button) return;
     setActiveReportSection(button.dataset.reportSectionTarget);
   });
+  els.taskProjectFilter.addEventListener("change", renderTasksView);
+  els.taskSearch.addEventListener("input", renderTasksView);
   els.profileProject.addEventListener("change", () => populateManagerSelect());
   els.profileBranch.addEventListener("change", () => populateDivisionSelect());
   els.signOut.addEventListener("click", () => app.supabase.auth.signOut());
@@ -640,6 +646,7 @@ async function renderForAuthState({ showLoading = false } = {}) {
     renderProfileSummary();
     await loadWeek();
     if (renderId !== app.renderNonce) return;
+    populateTaskProjectFilter();
 
     if (canReviewPortfolio()) {
       if (!els.portfolioWeek.value) els.portfolioWeek.value = toDateInput(app.weekStart);
@@ -663,6 +670,7 @@ function hideAllViews() {
   els.appNav.classList.add("hidden");
   els.dashboardView.classList.add("hidden");
   els.appView.classList.add("hidden");
+  els.tasksView.classList.add("hidden");
   els.portfolioView.classList.add("hidden");
   els.adminView.classList.add("hidden");
 }
@@ -678,7 +686,7 @@ function defaultAppView() {
 }
 
 function allowedAppViews() {
-  const views = ["dashboard", "timesheet"];
+  const views = ["dashboard", "timesheet", "tasks"];
   if (canReviewPortfolio()) views.push("reviews", "reports");
   if (isPortfolioManager()) views.push("admin");
   return views;
@@ -692,6 +700,7 @@ async function setActiveAppView(view) {
 
   els.dashboardView.classList.add("hidden");
   els.appView.classList.add("hidden");
+  els.tasksView.classList.add("hidden");
   els.portfolioView.classList.add("hidden");
   els.adminView.classList.add("hidden");
 
@@ -703,6 +712,13 @@ async function setActiveAppView(view) {
 
   if (nextView === "timesheet") {
     els.appView.classList.remove("hidden");
+    return;
+  }
+
+  if (nextView === "tasks") {
+    els.tasksView.classList.remove("hidden");
+    populateTaskProjectFilter();
+    renderTasksView();
     return;
   }
 
@@ -742,6 +758,7 @@ function updateAppNav() {
 async function renderDashboard() {
   els.dashboardActions.innerHTML = `
     <button class="button small-button" type="button" data-open-view="timesheet">Open Timesheet</button>
+    <button class="button small-button" type="button" data-open-view="tasks">Tasks</button>
     ${canReviewPortfolio() ? `<button class="button small-button" type="button" data-open-view="reviews">Review Queue</button>` : ""}
   `;
   for (const button of els.dashboardActions.querySelectorAll("[data-open-view]")) {
@@ -794,7 +811,7 @@ function resourceNextAction(status, totalHours) {
   return { label: "Start This Week", detail: "Add project task lines as work happens. The dashboard will update as the week fills in.", action: "Enter Time", view: "timesheet", tone: "draft" };
 }
 
-function commandPanel({ label, detail, action, view, tone = "draft" }) {
+function commandPanel({ label, detail, action, view, tone = "draft", reportSection = "" }) {
   return `
     <div class="command-panel ${escapeHtml(tone)}">
       <div>
@@ -802,15 +819,158 @@ function commandPanel({ label, detail, action, view, tone = "draft" }) {
         <strong>${escapeHtml(label)}</strong>
         <p>${escapeHtml(detail)}</p>
       </div>
-      <button class="button primary" type="button" data-command-view="${escapeHtml(view)}">${escapeHtml(action)}</button>
+      <button class="button primary" type="button" data-command-view="${escapeHtml(view)}" ${reportSection ? `data-command-report-section="${escapeHtml(reportSection)}"` : ""}>${escapeHtml(action)}</button>
     </div>
   `;
 }
 
 function bindCommandPanelActions(container) {
   for (const button of container.querySelectorAll("[data-command-view]")) {
-    button.addEventListener("click", () => setActiveAppView(button.dataset.commandView));
+    button.addEventListener("click", () => {
+      if (button.dataset.commandReportSection) app.activeReportSection = button.dataset.commandReportSection;
+      setActiveAppView(button.dataset.commandView);
+    });
   }
+}
+
+function renderTasksView() {
+  const selectedProjectId = canReviewPortfolio() ? (els.taskProjectFilter.value || "all") : app.profile?.project_id;
+  const search = normalizeLookup(els.taskSearch.value);
+  const scopedTasks = app.tasks
+    .filter((task) => selectedProjectId === "all" || task.project_id === selectedProjectId)
+    .filter((task) => !search || taskMatchesSearch(task, search))
+    .sort(compareTimelineTasks);
+  const allScopedTasks = app.tasks.filter((task) => selectedProjectId === "all" || task.project_id === selectedProjectId);
+  const dated = scopedTasks.filter((task) => task.planned_start_date && task.planned_finish_date);
+  const missingDates = scopedTasks.filter((task) => !task.planned_start_date || !task.planned_finish_date);
+  const inProgress = scopedTasks.filter((task) => taskPlanningStatus(task).key === "in_progress");
+  const currentWeekHours = currentWeekTaskHoursMap();
+  const scopeLabel = selectedProjectId === "all" ? "All projects" : projectLabel(getProject(selectedProjectId));
+
+  if (!allScopedTasks.length) {
+    const emptyAction = isPortfolioManager()
+      ? { label: "No Tasks Configured", detail: "Add task codes in Admin Console so resources can charge time against planned work.", action: "Open Admin", view: "admin", tone: "rejected" }
+      : { label: "No Tasks Configured", detail: "This project does not have active task codes yet. A Portfolio Manager needs to add them before time can be charged cleanly.", action: "Open Timesheet", view: "timesheet", tone: "rejected" };
+    els.taskViewContent.innerHTML = `
+      ${commandPanel(emptyAction)}
+      <div class="empty-state"><p>No active tasks are configured for ${escapeHtml(scopeLabel)}.</p></div>
+    `;
+    bindCommandPanelActions(els.taskViewContent);
+    return;
+  }
+
+  els.taskViewContent.innerHTML = `
+    ${commandPanel(taskViewNextAction(scopedTasks, allScopedTasks))}
+    <div class="ops-summary-head">
+      <div>
+        <h3>Task Board</h3>
+        <p>${escapeHtml(scopeLabel)} - ${scopedTasks.length} of ${allScopedTasks.length} task${allScopedTasks.length === 1 ? "" : "s"} shown</p>
+      </div>
+      <div class="ops-actions">
+        <span class="status-pill submitted">${dated.length} dated</span>
+        <span class="status-pill ${missingDates.length ? "rejected" : "approved"}">${missingDates.length ? `${missingDates.length} missing dates` : "schedule ready"}</span>
+      </div>
+    </div>
+    <div class="ops-metric-grid task-metrics">
+      ${opsMetric("Tasks", scopedTasks.length, "Visible task records")}
+      ${opsMetric("In Progress", inProgress.length, "Active against today's date", inProgress.length ? "info" : "")}
+      ${opsMetric("Missing Dates", missingDates.length, "Need start or finish", missingDates.length ? "danger" : "success")}
+      ${opsMetric("This Week", `${formatHours([...currentWeekHours.values()].reduce((sum, hours) => sum + hours, 0))}h`, "Your saved current-week task hours", "warning")}
+    </div>
+    ${scopedTasks.length ? `<div class="task-board">${scopedTasks.map((task) => taskBoardCard(task, currentWeekHours.get(task.id) || 0)).join("")}</div>` : `<div class="empty-state"><p>No tasks match that search.</p></div>`}
+  `;
+  bindCommandPanelActions(els.taskViewContent);
+}
+
+function taskViewNextAction(scopedTasks, allScopedTasks) {
+  if (!scopedTasks.length && allScopedTasks.length) {
+    return { label: "No Search Results", detail: "Clear the search to return to the active task board.", action: "Open Timesheet", view: "timesheet", tone: "draft" };
+  }
+  const missingDates = scopedTasks.filter((task) => !task.planned_start_date || !task.planned_finish_date);
+  if (missingDates.length) {
+    return isPortfolioManager()
+      ? { label: "Planning Data Needed", detail: `${missingDates.length} task${missingDates.length === 1 ? "" : "s"} need planned dates before the timeline is fully useful.`, action: "Open Admin", view: "admin", tone: "rejected" }
+      : { label: "Planning Data Needed", detail: `${missingDates.length} task${missingDates.length === 1 ? "" : "s"} still need planned dates from a Portfolio Manager.`, action: "Enter Time", view: "timesheet", tone: "rejected" };
+  }
+  const activeTasks = scopedTasks.filter((task) => taskPlanningStatus(task).key === "in_progress");
+  if (activeTasks.length) {
+    return { label: "Tasks In Progress", detail: `${activeTasks.length} task${activeTasks.length === 1 ? " is" : "s are"} currently inside the planned work window.`, action: "Enter Time", view: "timesheet", tone: "submitted" };
+  }
+  return canReviewPortfolio()
+    ? { label: "Task Plan Ready", detail: "Task planning data is complete for this view. Use the Project Timeline report for overlap analysis.", action: "View Timeline", view: "reports", reportSection: "timeline", tone: "approved" }
+    : { label: "Task Plan Ready", detail: "Task planning data is complete for your assigned project.", action: "Enter Time", view: "timesheet", tone: "approved" };
+}
+
+function taskBoardCard(task, currentWeekHours) {
+  const status = taskPlanningStatus(task);
+  const project = getProject(task.project_id);
+  return `
+    <article class="task-card ${escapeHtml(status.key)}">
+      <div class="task-card-head">
+        <div>
+          <span>${escapeHtml(projectLabel(project))}</span>
+          <strong>${escapeHtml(taskLabel(task))}</strong>
+        </div>
+        <span class="status-pill ${escapeHtml(status.tone)}">${escapeHtml(status.label)}</span>
+      </div>
+      <div class="task-card-meta">
+        <span>${escapeHtml(taskDateLabel(task))}</span>
+        <span>${escapeHtml(taskDurationLabel(task))}</span>
+        <span>${escapeHtml(formatHours(currentWeekHours))}h this week</span>
+      </div>
+      ${project?.sponsor ? `<p>Sponsor: ${escapeHtml(project.sponsor)}</p>` : ""}
+      ${project?.notes ? `<p>${escapeHtml(project.notes)}</p>` : ""}
+    </article>
+  `;
+}
+
+function taskPlanningStatus(task) {
+  if (!task.planned_start_date || !task.planned_finish_date) return { key: "missing_dates", label: "Missing Dates", tone: "rejected" };
+  const start = parseLocalDate(task.planned_start_date);
+  const finish = parseLocalDate(task.planned_finish_date);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (finish < start) return { key: "date_issue", label: "Check Dates", tone: "rejected" };
+  if (finish < today) return { key: "complete", label: "Complete", tone: "approved" };
+  if (start > today) return { key: "scheduled", label: "Scheduled", tone: "submitted" };
+  return { key: "in_progress", label: "In Progress", tone: "submitted" };
+}
+
+function taskDateLabel(task) {
+  if (task.planned_start_date && task.planned_finish_date) {
+    return `${formatShortDate(task.planned_start_date)} to ${formatShortDate(task.planned_finish_date)}`;
+  }
+  if (task.planned_start_date) return `Starts ${formatShortDate(task.planned_start_date)}`;
+  if (task.planned_finish_date) return `Finishes ${formatShortDate(task.planned_finish_date)}`;
+  return "No planned dates";
+}
+
+function taskDurationLabel(task) {
+  if (!task.planned_start_date || !task.planned_finish_date) return "Duration not set";
+  const days = dayDiff(task.planned_start_date, task.planned_finish_date) + 1;
+  return days > 0 ? `${days} day${days === 1 ? "" : "s"}` : "Date issue";
+}
+
+function currentWeekTaskHoursMap() {
+  const totals = new Map();
+  if (!app.report || app.report.project_id !== app.profile?.project_id) return totals;
+  for (const day of app.dailyReports) {
+    if (!day.task_id) continue;
+    totals.set(day.task_id, (totals.get(day.task_id) || 0) + Number(day.hours || 0));
+  }
+  return totals;
+}
+
+function taskMatchesSearch(task, search) {
+  const project = getProject(task.project_id);
+  const values = [
+    task.name,
+    task.code,
+    taskDateLabel(task),
+    projectLabel(project),
+    projectSummary(project),
+  ];
+  return normalizeLookup(values.filter(Boolean).join(" ")).includes(search);
 }
 
 async function loadReferenceData() {
@@ -3488,6 +3648,24 @@ function populatePortfolioProjectFilter() {
   const current = els.portfolioProject.value || "all";
   populateProjectSelectElement(els.portfolioProject, "All projects", "all");
   els.portfolioProject.value = app.projects.some((project) => project.id === current) ? current : "all";
+}
+
+function populateTaskProjectFilter() {
+  const current = els.taskProjectFilter.value || app.profile?.project_id || "all";
+  els.taskProjectFilter.innerHTML = "";
+
+  if (canReviewPortfolio()) {
+    els.taskProjectFilter.append(new Option("All projects", "all"));
+    for (const project of app.projects) {
+      els.taskProjectFilter.append(new Option(projectLabel(project), project.id));
+    }
+    els.taskProjectFilter.value = app.projects.some((project) => project.id === current) ? current : "all";
+    return;
+  }
+
+  const project = getProject(app.profile?.project_id);
+  els.taskProjectFilter.append(new Option(projectLabel(project), app.profile?.project_id || ""));
+  els.taskProjectFilter.value = app.profile?.project_id || "";
 }
 
 function populateProjectSelectElement(select, placeholder, placeholderValue) {
