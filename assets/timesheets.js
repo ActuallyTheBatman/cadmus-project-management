@@ -65,6 +65,7 @@ const app = {
   report: null,
   reportAudits: [],
   dailyReports: [],
+  notifications: [],
   reportFormat: "weekly_grid",
   weekStart: startOfWeek(new Date()),
 };
@@ -84,6 +85,13 @@ const els = {
   taskProjectFilter: document.querySelector("#taskProjectFilter"),
   taskSearch: document.querySelector("#taskSearch"),
   taskViewContent: document.querySelector("#taskViewContent"),
+  notificationsView: document.querySelector("#notificationsView"),
+  notificationStatusFilter: document.querySelector("#notificationStatusFilter"),
+  notificationTypeFilter: document.querySelector("#notificationTypeFilter"),
+  notificationSearch: document.querySelector("#notificationSearch"),
+  refreshNotifications: document.querySelector("#refreshNotifications"),
+  exportNotifications: document.querySelector("#exportNotifications"),
+  notificationsContent: document.querySelector("#notificationsContent"),
   portfolioView: document.querySelector("#portfolioView"),
   adminView: document.querySelector("#adminView"),
   authForm: document.querySelector("#authForm"),
@@ -423,6 +431,11 @@ function bindEvents() {
   });
   els.taskProjectFilter.addEventListener("change", renderTasksView);
   els.taskSearch.addEventListener("input", renderTasksView);
+  els.notificationStatusFilter.addEventListener("change", loadNotificationsView);
+  els.notificationTypeFilter.addEventListener("change", loadNotificationsView);
+  els.notificationSearch.addEventListener("input", renderNotificationsView);
+  els.refreshNotifications.addEventListener("click", loadNotificationsView);
+  els.exportNotifications.addEventListener("click", exportNotifications);
   els.profileProject.addEventListener("change", () => populateManagerSelect());
   els.profileBranch.addEventListener("change", () => populateDivisionSelect());
   els.signOut.addEventListener("click", () => app.supabase.auth.signOut());
@@ -671,6 +684,7 @@ function hideAllViews() {
   els.dashboardView.classList.add("hidden");
   els.appView.classList.add("hidden");
   els.tasksView.classList.add("hidden");
+  els.notificationsView.classList.add("hidden");
   els.portfolioView.classList.add("hidden");
   els.adminView.classList.add("hidden");
 }
@@ -686,7 +700,7 @@ function defaultAppView() {
 }
 
 function allowedAppViews() {
-  const views = ["dashboard", "timesheet", "tasks"];
+  const views = ["dashboard", "timesheet", "tasks", "notifications"];
   if (canReviewPortfolio()) views.push("reviews", "reports");
   if (isPortfolioManager()) views.push("admin");
   return views;
@@ -701,6 +715,7 @@ async function setActiveAppView(view) {
   els.dashboardView.classList.add("hidden");
   els.appView.classList.add("hidden");
   els.tasksView.classList.add("hidden");
+  els.notificationsView.classList.add("hidden");
   els.portfolioView.classList.add("hidden");
   els.adminView.classList.add("hidden");
 
@@ -719,6 +734,12 @@ async function setActiveAppView(view) {
     els.tasksView.classList.remove("hidden");
     populateTaskProjectFilter();
     renderTasksView();
+    return;
+  }
+
+  if (nextView === "notifications") {
+    els.notificationsView.classList.remove("hidden");
+    await loadNotificationsView();
     return;
   }
 
@@ -759,6 +780,7 @@ async function renderDashboard() {
   els.dashboardActions.innerHTML = `
     <button class="button small-button" type="button" data-open-view="timesheet">Open Timesheet</button>
     <button class="button small-button" type="button" data-open-view="tasks">Tasks</button>
+    <button class="button small-button" type="button" data-open-view="notifications">Notifications</button>
     ${canReviewPortfolio() ? `<button class="button small-button" type="button" data-open-view="reviews">Review Queue</button>` : ""}
   `;
   for (const button of els.dashboardActions.querySelectorAll("[data-open-view]")) {
@@ -811,7 +833,7 @@ function resourceNextAction(status, totalHours) {
   return { label: "Start This Week", detail: "Add project task lines as work happens. The dashboard will update as the week fills in.", action: "Enter Time", view: "timesheet", tone: "draft" };
 }
 
-function commandPanel({ label, detail, action, view, tone = "draft", reportSection = "" }) {
+function commandPanel({ label, detail, action, view, tone = "draft", reportSection = "", commandAction = "" }) {
   return `
     <div class="command-panel ${escapeHtml(tone)}">
       <div>
@@ -819,7 +841,7 @@ function commandPanel({ label, detail, action, view, tone = "draft", reportSecti
         <strong>${escapeHtml(label)}</strong>
         <p>${escapeHtml(detail)}</p>
       </div>
-      <button class="button primary" type="button" data-command-view="${escapeHtml(view)}" ${reportSection ? `data-command-report-section="${escapeHtml(reportSection)}"` : ""}>${escapeHtml(action)}</button>
+      <button class="button primary" type="button" data-command-view="${escapeHtml(view)}" ${reportSection ? `data-command-report-section="${escapeHtml(reportSection)}"` : ""} ${commandAction ? `data-command-action="${escapeHtml(commandAction)}"` : ""}>${escapeHtml(action)}</button>
     </div>
   `;
 }
@@ -827,6 +849,10 @@ function commandPanel({ label, detail, action, view, tone = "draft", reportSecti
 function bindCommandPanelActions(container) {
   for (const button of container.querySelectorAll("[data-command-view]")) {
     button.addEventListener("click", () => {
+      if (button.dataset.commandAction === "export-notifications") {
+        exportNotifications();
+        return;
+      }
       if (button.dataset.commandReportSection) app.activeReportSection = button.dataset.commandReportSection;
       setActiveAppView(button.dataset.commandView);
     });
@@ -971,6 +997,183 @@ function taskMatchesSearch(task, search) {
     projectSummary(project),
   ];
   return normalizeLookup(values.filter(Boolean).join(" ")).includes(search);
+}
+
+async function loadNotificationsView() {
+  if (!app.user) return;
+  els.notificationsContent.innerHTML = `<div class="empty-state"><p>Loading notifications...</p></div>`;
+
+  let query = app.supabase
+    .from("timesheet_notification_queue")
+    .select("id, event_type, recipient_email, recipient_role, weekly_report_id, user_id, project_id, actor_email, status, subject, body, details, created_at, sent_at")
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  if (!canReviewPortfolio()) {
+    query = query.eq("recipient_email", app.user.email);
+  }
+
+  if (els.notificationStatusFilter.value !== "all") {
+    query = query.eq("status", els.notificationStatusFilter.value);
+  }
+
+  if (els.notificationTypeFilter.value !== "all") {
+    query = query.eq("event_type", els.notificationTypeFilter.value);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    app.notifications = [];
+    els.notificationsContent.innerHTML = `<div class="empty-state"><p>${escapeHtml(error.message)}</p></div>`;
+    return;
+  }
+
+  app.notifications = data || [];
+  renderNotificationsView();
+}
+
+function renderNotificationsView() {
+  const search = normalizeLookup(els.notificationSearch.value);
+  const visible = app.notifications.filter((item) => !search || notificationMatchesSearch(item, search));
+  const statusCounts = countBy(app.notifications, "status");
+  const queued = statusCounts.queued || 0;
+  const failed = statusCounts.failed || 0;
+  const sent = statusCounts.sent || 0;
+  const skipped = statusCounts.skipped || 0;
+
+  els.notificationsContent.innerHTML = `
+    ${commandPanel(notificationNextAction({ queued, failed, visible }))}
+    <div class="ops-summary-head">
+      <div>
+        <h3>Notification Center</h3>
+        <p>${escapeHtml(visible.length)} of ${escapeHtml(app.notifications.length)} records shown from the latest queue activity.</p>
+      </div>
+      <div class="ops-actions">
+        <span class="status-pill submitted">${queued} queued</span>
+        <span class="status-pill ${failed ? "rejected" : "approved"}">${failed ? `${failed} failed` : "no failures"}</span>
+      </div>
+    </div>
+    <div class="ops-metric-grid notification-metrics">
+      ${opsMetric("Queued", queued, "Generated but not marked sent", queued ? "warning" : "")}
+      ${opsMetric("Sent", sent, "Marked sent", sent ? "success" : "")}
+      ${opsMetric("Failed", failed, "Needs follow-up", failed ? "danger" : "success")}
+      ${opsMetric("Skipped", skipped, "No delivery needed")}
+    </div>
+    ${visible.length ? `<div class="notification-list">${visible.map(notificationCard).join("")}</div>` : `<div class="empty-state"><p>No notification records match this view.</p></div>`}
+  `;
+  bindCommandPanelActions(els.notificationsContent);
+}
+
+function notificationNextAction({ queued, failed, visible }) {
+  if (failed) {
+    return { label: "Delivery Follow-Up Needed", detail: `${failed} notification${failed === 1 ? "" : "s"} are marked failed. Export the queue and follow up manually.`, action: "Export CSV", view: "notifications", commandAction: "export-notifications", tone: "rejected" };
+  }
+  if (queued) {
+    return { label: "Queued Notifications", detail: `${queued} workflow message${queued === 1 ? "" : "s"} have been generated and are waiting for a delivery process or manual follow-up.`, action: "Export CSV", view: "notifications", commandAction: "export-notifications", tone: "submitted" };
+  }
+  if (visible.length) {
+    return canReviewPortfolio()
+      ? { label: "Notification History", detail: "Recent workflow messages are available for audit and support review.", action: "Open Reports", view: "reports", tone: "approved" }
+      : { label: "Notification History", detail: "Recent workflow messages are available for your submitted and reviewed weeks.", action: "Open Timesheet", view: "timesheet", tone: "approved" };
+  }
+  return { label: "No Notifications Yet", detail: "Submissions, reviews, reminders, and adjustment actions will appear here as the workflow runs.", action: "Open Timesheet", view: "timesheet", tone: "draft" };
+}
+
+function notificationCard(item) {
+  const project = getProject(item.project_id);
+  const statusTone = notificationStatusTone(item.status);
+  return `
+    <article class="notification-card ${escapeHtml(statusTone)}">
+      <div class="notification-card-head">
+        <div>
+          <span>${escapeHtml(formatNotificationType(item.event_type))}</span>
+          <strong>${escapeHtml(item.subject || "Notification")}</strong>
+        </div>
+        <span class="status-pill ${escapeHtml(statusTone)}">${escapeHtml(formatNotificationStatus(item.status))}</span>
+      </div>
+      <p>${escapeHtml(item.body || "No message body recorded.")}</p>
+      <div class="task-card-meta">
+        <span>${escapeHtml(item.recipient_email || "No recipient")}</span>
+        <span>${escapeHtml(projectLabel(project))}</span>
+        <span>${escapeHtml(formatShortDate(item.created_at))}</span>
+        ${item.sent_at ? `<span>Sent ${escapeHtml(formatShortDate(item.sent_at))}</span>` : ""}
+      </div>
+      ${item.actor_email ? `<p>Actor: ${escapeHtml(item.actor_email)}</p>` : ""}
+    </article>
+  `;
+}
+
+function notificationMatchesSearch(item, search) {
+  const project = getProject(item.project_id);
+  const values = [
+    item.event_type,
+    item.status,
+    item.recipient_email,
+    item.recipient_role,
+    item.actor_email,
+    item.subject,
+    item.body,
+    projectLabel(project),
+  ];
+  return normalizeLookup(values.filter(Boolean).join(" ")).includes(search);
+}
+
+function exportNotifications() {
+  const search = normalizeLookup(els.notificationSearch.value);
+  const visible = app.notifications.filter((item) => !search || notificationMatchesSearch(item, search));
+  if (!visible.length) {
+    setMessage(els.appMessage, "No notification records match this view.");
+    return;
+  }
+
+  const rows = [["Created", "Status", "Type", "Recipient", "Recipient Role", "Project", "Actor", "Subject", "Body", "Sent At", "Details"]];
+  for (const item of visible) {
+    rows.push([
+      item.created_at || "",
+      formatNotificationStatus(item.status),
+      formatNotificationType(item.event_type),
+      item.recipient_email || "",
+      item.recipient_role || "",
+      projectLabel(getProject(item.project_id)),
+      item.actor_email || "",
+      item.subject || "",
+      item.body || "",
+      item.sent_at || "",
+      JSON.stringify(item.details || {}),
+    ]);
+  }
+
+  const scope = [
+    els.notificationStatusFilter.value,
+    els.notificationTypeFilter.value,
+    search ? "searched" : "all",
+  ].map(slugify).join("-");
+  downloadCsv(rows.map((row) => row.map(csvCell).join(",")).join("\n"), `cadmus-notifications-${scope}-${toDateInput(new Date())}.csv`);
+}
+
+function formatNotificationType(type) {
+  return {
+    submitted: "Submitted",
+    approved: "Approved",
+    rejected: "Rejected",
+    final_requested: "Final Approval",
+    adjustment_requested: "Adjustment Requested",
+    adjustment_approved: "Adjustment Approved",
+    adjustment_rejected: "Adjustment Rejected",
+  }[type] || titleCase(String(type || "notification").replaceAll("_", " "));
+}
+
+function formatNotificationStatus(status) {
+  return titleCase(String(status || "queued").replaceAll("_", " "));
+}
+
+function notificationStatusTone(status) {
+  return {
+    sent: "approved",
+    failed: "rejected",
+    skipped: "draft",
+    queued: "submitted",
+  }[status] || "submitted";
 }
 
 async function loadReferenceData() {
