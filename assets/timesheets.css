@@ -1781,6 +1781,28 @@ body.light-mode .user-chip {
   cursor: pointer;
 }
 
+.inline-add-toggle {
+  width: 24px;
+  height: 24px;
+  min-height: 0;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+  margin-left: 8px;
+  vertical-align: middle;
+  transform: translateY(-2px);
+}
+
+.inline-add-toggle[aria-expanded="true"] {
+  background: var(--brass-soft);
+  color: var(--ink);
+  border-color: transparent;
+}
+
+.task-quick-add {
+  margin-top: 10px;
+}
+
 .task-resource-results {
   display: grid;
   gap: 8px;

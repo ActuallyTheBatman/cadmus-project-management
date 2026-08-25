@@ -77,6 +77,7 @@ const app = {
   taskResources: [],
   userTaskAssignments: [],
   activeTaskAssignmentTaskId: "",
+  taskQuickAddOpen: false,
   reportFormat: "weekly_grid",
   weekStart: startOfWeek(new Date()),
 };
@@ -97,6 +98,8 @@ const els = {
   taskSearch: document.querySelector("#taskSearch"),
   taskQuickAddForm: document.querySelector("#taskQuickAddForm"),
   taskQuickProject: document.querySelector("#taskQuickProject"),
+  taskQuickAddToggle: document.querySelector("#taskQuickAddToggle"),
+  taskQuickAddCancel: document.querySelector("#taskQuickAddCancel"),
   taskQuickName: document.querySelector("#taskQuickName"),
   taskQuickCode: document.querySelector("#taskQuickCode"),
   taskQuickStart: document.querySelector("#taskQuickStart"),
@@ -450,6 +453,16 @@ function bindEvents() {
   els.taskProjectFilter.addEventListener("change", loadTaskViewData);
   els.taskSearch.addEventListener("input", renderTasksView);
   els.taskQuickAddForm.addEventListener("submit", addTaskFromTaskView);
+  els.taskQuickAddToggle.addEventListener("click", () => {
+    app.taskQuickAddOpen = !app.taskQuickAddOpen;
+    configureTaskQuickAdd();
+    if (app.taskQuickAddOpen) els.taskQuickName.focus();
+  });
+  els.taskQuickAddCancel.addEventListener("click", () => {
+    els.taskQuickAddForm.reset();
+    app.taskQuickAddOpen = false;
+    configureTaskQuickAdd();
+  });
   els.notificationStatusFilter.addEventListener("change", loadNotificationsView);
   els.notificationTypeFilter.addEventListener("change", loadNotificationsView);
   els.notificationSearch.addEventListener("input", renderNotificationsView);
@@ -1252,7 +1265,10 @@ function taskViewProjectId() {
 
 function configureTaskQuickAdd() {
   const canManage = canManageTaskProject(taskViewProjectId());
-  els.taskQuickAddForm.classList.toggle("hidden", !canManage);
+  els.taskQuickAddToggle.classList.toggle("hidden", !canManage);
+  if (!canManage) app.taskQuickAddOpen = false;
+  els.taskQuickAddToggle.setAttribute("aria-expanded", String(app.taskQuickAddOpen));
+  els.taskQuickAddForm.classList.toggle("hidden", !canManage || !app.taskQuickAddOpen);
   if (!canManage) return;
   const current = els.taskQuickProject.value || (taskViewProjectId() !== "all" ? taskViewProjectId() : "");
   els.taskQuickProject.innerHTML = "";
@@ -1325,6 +1341,7 @@ async function addTaskFromTaskView(event) {
 
   await logAdminChange("created", "task", null, taskLabel(payload), { ...payload, source: "task_register" });
   els.taskQuickAddForm.reset();
+  app.taskQuickAddOpen = false;
   await loadReferenceData();
   populateTaskProjectFilter();
   els.taskProjectFilter.value = payload.project_id;

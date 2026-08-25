@@ -242,7 +242,7 @@
         <section id="tasksView" class="panel hidden">
           <div class="panel-head">
             <div>
-              <h2>Tasks</h2>
+              <h2>Tasks <button id="taskQuickAddToggle" class="icon-button inline-add-toggle" type="button" aria-label="Add task" aria-expanded="false">+</button></h2>
               <p class="helper">Maintain task dates, assignments, and current-week work by project.</p>
             </div>
             <div class="toolbar">
@@ -263,7 +263,10 @@
             <label class="field"><span>Start</span><input id="taskQuickStart" type="date"></label>
             <label class="field"><span>Finish</span><input id="taskQuickFinish" type="date"></label>
             <label class="field"><span>Order</span><input id="taskQuickOrder" type="number" min="0" step="1"></label>
-            <button class="button primary" type="submit">Add Task</button>
+            <div class="toolbar">
+              <button class="button primary" type="submit">Add Task</button>
+              <button id="taskQuickAddCancel" class="button" type="button">Cancel</button>
+            </div>
           </form>
           <div id="taskViewContent" class="portfolio-dashboard"></div>
         </section>
