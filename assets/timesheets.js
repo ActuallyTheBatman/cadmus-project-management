@@ -52,6 +52,7 @@ const app = {
   activeReportSection: "operations",
   passwordRecovery: false,
   activeAppView: "dashboard",
+  adjustmentPanelOpen: false,
   portfolioReminderTargets: {
     missing: [],
     approvals: [],
@@ -112,6 +113,9 @@ const els = {
   reportFormatTitle: document.querySelector("#reportFormatTitle"),
   dailyGrid: document.querySelector("#dailyGrid"),
   qualityPanel: document.querySelector("#qualityPanel"),
+  adjustmentRequestPanel: document.querySelector("#adjustmentRequestPanel"),
+  adjustmentReason: document.querySelector("#adjustmentReason"),
+  cancelAdjustmentRequest: document.querySelector("#cancelAdjustmentRequest"),
   appMessage: document.querySelector("#appMessage"),
   totalHours: document.querySelector("#totalHours"),
   reportStatus: document.querySelector("#reportStatus"),
@@ -187,6 +191,7 @@ const els = {
   adminUserDivision: document.querySelector("#adminUserDivision"),
   adminUserProject: document.querySelector("#adminUserProject"),
   adminUserStatus: document.querySelector("#adminUserStatus"),
+  adminUserCount: document.querySelector("#adminUserCount"),
   inviteEmails: document.querySelector("#inviteEmails"),
   inviteCsv: document.querySelector("#inviteCsv"),
   validateInviteImport: document.querySelector("#validateInviteImport"),
@@ -411,6 +416,8 @@ function bindEvents() {
   els.submitWeek.addEventListener("click", () => saveWeek("submitted"));
   els.withdrawWeek.addEventListener("click", withdrawWeek);
   els.exportCsv.addEventListener("click", exportCsv);
+  els.adjustmentRequestPanel.addEventListener("submit", requestAdjustment);
+  els.cancelAdjustmentRequest.addEventListener("click", closeAdjustmentPanel);
   els.reportFormat.addEventListener("change", () => {
     app.reportFormat = els.reportFormat.value;
     renderDailyReports();
@@ -1080,6 +1087,7 @@ function mergeDailyReports(days) {
 function renderDailyReports() {
   const locked = app.report && ["submitted", "pending_final", "approved"].includes(app.report.status);
   const canWithdraw = app.report?.status === "submitted";
+  if (app.report?.status !== "approved") app.adjustmentPanelOpen = false;
   const enabledFormats = ["weekly_grid"];
   app.reportFormat = "weekly_grid";
   renderFormatSelector(enabledFormats);
@@ -1108,6 +1116,7 @@ function renderDailyReports() {
   els.withdrawWeek.disabled = !canWithdraw;
   updateTotalsFromDom();
   renderQualityPanel();
+  renderAdjustmentPanel();
 }
 
 function renderReportLifecycle({ locked }) {
@@ -1119,7 +1128,7 @@ function renderReportLifecycle({ locked }) {
   panel.className = "report-lifecycle";
   const status = app.report?.status || "draft";
   const lockText = status === "approved"
-    ? "Approved weeks are locked. Contact a Portfolio Manager if an adjustment is required."
+    ? "Approved weeks are locked. Request a reopen when an adjustment is required."
     : status === "pending_final"
       ? "This week has primary approval and is waiting for final approval."
     : "Submitted weeks are locked while they are waiting for review. Withdraw to make changes before approval.";
@@ -1132,13 +1141,15 @@ function renderReportLifecycle({ locked }) {
       </div>
       <span class="status-pill ${escapeHtml(status)}">${escapeHtml(formatReportStatus(status))}</span>
     </div>
+    ${renderLifecycleSteps(status)}
     ${app.report?.manager_notes ? `<div class="review-note"><span>Latest review comment</span><p>${escapeHtml(app.report.manager_notes)}</p></div>` : ""}
     ${renderAdjustmentSummary()}
     ${app.reportAudits.length ? renderAuditTimeline(app.reportAudits, 8) : ""}
   `;
   const requestButton = panel.querySelector("[data-request-adjustment]");
-  requestButton?.addEventListener("click", requestAdjustment);
+  requestButton?.addEventListener("click", openAdjustmentPanel);
   els.dailyGrid.append(panel);
+  renderAdjustmentPanel();
 }
 
 function renderAdjustmentSummary() {
@@ -1149,7 +1160,27 @@ function renderAdjustmentSummary() {
     <div class="review-note adjustment-note">
       <span>Adjustment request</span>
       <p>${escapeHtml(latest ? adjustmentRequestSummary(latest) : "Approved weeks are locked. Request an adjustment if this labor record needs to be reopened.")}</p>
-      <button class="button small-button" type="button" data-request-adjustment ${hasOpenRequest ? "disabled" : ""}>Request Adjustment</button>
+      <button class="button small-button" type="button" data-request-adjustment ${hasOpenRequest ? "disabled" : ""}>Request Reopen</button>
+    </div>
+  `;
+}
+
+function renderLifecycleSteps(status) {
+  const steps = [
+    { key: "draft", label: "Draft" },
+    { key: "submitted", label: "Needs Review" },
+    { key: "pending_final", label: "Final Approval" },
+    { key: "approved", label: "Approved" },
+  ];
+  const activeIndex = status === "rejected" ? 0 : Math.max(0, steps.findIndex((step) => step.key === status));
+  return `
+    <div class="lifecycle-steps" aria-label="Timesheet status">
+      ${steps.map((step, index) => `
+        <div class="lifecycle-step ${index < activeIndex ? "complete" : ""} ${index === activeIndex ? "current" : ""}">
+          <span>${index + 1}</span>
+          <strong>${escapeHtml(step.label)}</strong>
+        </div>
+      `).join("")}
     </div>
   `;
 }
@@ -1162,11 +1193,31 @@ function adjustmentRequestSummary(request) {
   return `${status}${reviewer}${date ? ` on ${formatShortDate(date)}` : ""}. Reason: ${request.reason || "No reason entered."}${note}`;
 }
 
-async function requestAdjustment() {
+function openAdjustmentPanel() {
+  app.adjustmentPanelOpen = true;
+  renderAdjustmentPanel();
+  els.adjustmentReason.focus();
+}
+
+function closeAdjustmentPanel() {
+  app.adjustmentPanelOpen = false;
+  els.adjustmentReason.value = "";
+  renderAdjustmentPanel();
+}
+
+function renderAdjustmentPanel() {
+  if (!els.adjustmentRequestPanel) return;
+  const canRequest = app.report?.status === "approved" && !app.adjustmentRequests.some((request) => request.status === "requested");
+  els.adjustmentRequestPanel.classList.toggle("hidden", !app.adjustmentPanelOpen || !canRequest);
+}
+
+async function requestAdjustment(event) {
+  event.preventDefault();
   if (!app.report || app.report.status !== "approved") return;
-  const reason = window.prompt("What needs to be adjusted on this approved week?");
+  const reason = els.adjustmentReason.value;
   if (!reason || reason.trim().length < 8) {
     setMessage(els.appMessage, "Add a short reason before requesting an adjustment.", true);
+    els.adjustmentReason.focus();
     return;
   }
 
@@ -1206,6 +1257,7 @@ async function requestAdjustment() {
     details: { request_id: data.id, reason: reason.trim() },
   });
   setMessage(els.appMessage, "Adjustment request sent.");
+  closeAdjustmentPanel();
   renderDailyReports();
 }
 
@@ -2746,14 +2798,15 @@ function renderReviewCard(report, profile, days, audits = [], adjustments = []) 
   const stale = isStaleSubmittedReport(report);
   const openAdjustment = adjustments.find((request) => request.status === "requested");
   const card = document.createElement("article");
-  card.className = `review-card${stale ? " stale-review-card" : ""}`;
+  card.className = `review-card${stale ? " stale-review-card" : ""}${openAdjustment ? " adjustment-review-card" : ""}`;
   card.innerHTML = `
     <div class="review-head">
       <div>
         <h3>${escapeHtml(profile?.full_name || "Unknown resource")}</h3>
-        <p class="helper">${escapeHtml(profile?.email || "")}</p>
+        <p class="helper">${escapeHtml([profile?.email, projectLabel(project), `${formatHours(total)}h`].filter(Boolean).join(" - "))}</p>
       </div>
       <div class="review-status-stack">
+        ${openAdjustment ? `<span class="status-pill submitted">reopen requested</span>` : ""}
         ${stale ? `<span class="status-pill rejected">${submittedAgeInDays(report)} days waiting</span>` : ""}
         <span class="status-pill ${escapeHtml(report.status)}">${escapeHtml(formatReportStatus(report.status))}</span>
       </div>
@@ -3866,6 +3919,9 @@ function renderUserAdminList() {
   if (projectId !== "all") users = users.filter((user) => user.project_id === projectId);
   if (status === "active") users = users.filter((user) => user.active !== false);
   if (status === "inactive") users = users.filter((user) => user.active === false);
+  if (els.adminUserCount) {
+    els.adminUserCount.textContent = `${users.length} of ${app.adminProfiles.length} users shown`;
+  }
 
   if (!users.length) {
     els.userList.innerHTML = `<li class="admin-item"><span>${escapeHtml(search ? "No users match this search and filter set." : "No users match this view.")}</span></li>`;

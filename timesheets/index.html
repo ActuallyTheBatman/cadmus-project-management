@@ -13,9 +13,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Libre+Baskerville:wght@700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/timesheets.css?v=20260824-workflow-hardening">
-  <script src="/assets/timesheets-config.js?v=20260824-workflow-hardening"></script>
-  <script type="module" src="/assets/timesheets.js?v=20260824-workflow-hardening"></script>
+  <link rel="stylesheet" href="/assets/timesheets.css?v=20260824-ux-polish">
+  <script src="/assets/timesheets-config.js?v=20260824-ux-polish"></script>
+  <script type="module" src="/assets/timesheets.js?v=20260824-ux-polish"></script>
 </head>
 <body>
   <nav class="nav" aria-label="Primary navigation">
@@ -209,6 +209,20 @@
             </div>
             <div id="dailyGrid" class="daily-grid"></div>
             <div id="qualityPanel" class="quality-panel"></div>
+            <form id="adjustmentRequestPanel" class="adjustment-request-panel hidden" aria-label="Request approved week adjustment">
+              <div>
+                <h3>Request Reopen</h3>
+                <p class="helper">Approved weeks are locked. Add the reason a reviewer should reopen this labor record.</p>
+              </div>
+              <label class="field">
+                <span>Adjustment reason</span>
+                <textarea id="adjustmentReason" placeholder="Describe what needs to change and why" required></textarea>
+              </label>
+              <div class="toolbar">
+                <button class="button primary" type="submit">Send Request</button>
+                <button id="cancelAdjustmentRequest" class="button" type="button">Cancel</button>
+              </div>
+            </form>
             <div class="panel-body">
               <div id="appMessage" class="message" role="status"></div>
             </div>
@@ -417,6 +431,7 @@
                   <option value="all">All</option>
                 </select></label>
               </div>
+              <div id="adminUserCount" class="admin-result-count">Showing active users</div>
               <ul id="userList" class="admin-list user-admin-list"></ul>
             </form>
 
@@ -453,6 +468,7 @@
   <footer>
     <div class="wrap footer-inner">
       <span>Cadmus Project Management LLC</span>
+      <span>Resource Reporting v0.9 | support: Garrett@cadmusprojects.com</span>
       <span>DVBE 2032694 | CMAS 4-25-10-1019 | PMP | SDVOSB</span>
     </div>
   </footer>

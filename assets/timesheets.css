@@ -98,7 +98,7 @@ body.light-mode .status-pill.rejected {
   background: rgba(186, 59, 47, 0.07);
 }
 
-body.light-mode :is(.auth-panel, .panel, .admin-card, .review-card, .daily-card, .ops-summary-head, .ops-metric, .ops-breakdown, .queue-head, .queue-metric, .exception-group, .quality-head, .report-lifecycle, .notice) {
+body.light-mode :is(.auth-panel, .panel, .admin-card, .review-card, .daily-card, .ops-summary-head, .ops-metric, .ops-breakdown, .queue-head, .queue-metric, .exception-group, .quality-head, .report-lifecycle, .adjustment-request-panel, .notice) {
   border-color: rgba(21, 24, 29, 0.14);
   background: rgba(255, 253, 248, 0.78);
 }
@@ -137,16 +137,26 @@ body.light-mode :is(input, select, textarea) {
   background: rgba(255, 253, 248, 0.9);
 }
 
-body.light-mode :is(.nav-links, .lead, .auth-panel p, .helper, .status-bar, .notice, .message, .profile-summary span, .task-line-head strong, .ops-summary-head p, .ops-metric p, .ops-breakdown p, .ops-chart-label, .queue-head p, .queue-metric p, .exception-head p, .exception-list span, .quality-head p, .quality-list span, .review-day p, .review-note p, .audit-list span, .audit-list p, .admin-card-head p, .admin-item, .import-preview li, .import-summary span, .empty-state, footer) {
+body.light-mode :is(.nav-links, .lead, .auth-panel p, .helper, .status-bar, .notice, .message, .profile-summary span, .task-line-head strong, .ops-summary-head p, .ops-metric p, .ops-breakdown p, .ops-chart-label, .queue-head p, .queue-metric p, .exception-head p, .exception-list span, .quality-head p, .quality-list span, .review-day p, .review-note p, .audit-list span, .audit-list p, .admin-card-head p, .admin-item, .admin-result-count, .import-preview li, .import-summary span, .empty-state, footer) {
   color: rgba(21, 24, 29, 0.68);
 }
 
-body.light-mode :is(.field span, .metric span, .weekly-grid-head, .review-meta span, .review-day span, .ops-metric span, .ops-breakdown h4, .queue-metric span, .review-note span, .admin-row-status, .exception-head h4, .small-button) {
+body.light-mode :is(.field span, .metric span, .weekly-grid-head, .review-meta span, .review-day span, .ops-metric span, .ops-breakdown h4, .queue-metric span, .review-note span, .admin-row-status, .exception-head h4, .lifecycle-step strong, .small-button) {
   color: rgba(21, 24, 29, 0.58);
 }
 
 body.light-mode :is(.profile-summary strong, .metric strong, .review-meta strong, .review-day strong, .ops-metric strong, .queue-metric strong, .exception-list strong, .quality-list strong, .admin-item strong, .import-summary strong) {
   color: var(--paper);
+}
+
+body.light-mode .lifecycle-step span {
+  color: var(--paper);
+  background: rgba(21, 24, 29, 0.08);
+}
+
+body.light-mode .lifecycle-step.complete span,
+body.light-mode .lifecycle-step.current span {
+  color: #15120b;
 }
 
 body.light-mode :is(.day-card time, .weekly-grid-day span, .work-log-date span, .ops-chart-label strong, .notice strong, .nav-links a:hover, .nav-links a[aria-current="page"]) {
@@ -1486,6 +1496,15 @@ body.light-mode .calendar-badge.non_working {
   gap: 14px;
 }
 
+.admin-result-count {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+  color: rgba(245, 241, 232, 0.62);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
 .admin-item-main {
   display: flex;
   align-items: center;
@@ -1544,6 +1563,11 @@ body.light-mode .calendar-badge.non_working {
 .stale-review-card {
   border-color: rgba(255, 113, 95, 0.38);
   background: rgba(255, 113, 95, 0.045);
+}
+
+.adjustment-review-card {
+  border-color: rgba(214, 168, 71, 0.42);
+  background: rgba(214, 168, 71, 0.045);
 }
 
 .review-head {
@@ -1611,6 +1635,21 @@ body.light-mode .calendar-badge.non_working {
   min-height: 72px;
 }
 
+.adjustment-request-panel {
+  display: grid;
+  gap: 12px;
+  margin: 0 18px 18px;
+  border: 1px solid rgba(214, 168, 71, 0.32);
+  border-radius: var(--radius);
+  padding: 16px;
+  background: rgba(214, 168, 71, 0.055);
+}
+
+.adjustment-request-panel h3 {
+  font-size: 14px;
+  text-transform: uppercase;
+}
+
 .report-lifecycle {
   display: grid;
   grid-column: 1 / -1;
@@ -1638,6 +1677,53 @@ body.light-mode .calendar-badge.non_working {
   color: rgba(245, 241, 232, 0.68);
   font-size: 13px;
   line-height: 1.45;
+}
+
+.lifecycle-steps {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.lifecycle-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
+.lifecycle-step span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(245, 241, 232, 0.08);
+  color: rgba(245, 241, 232, 0.62);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.lifecycle-step strong {
+  color: rgba(245, 241, 232, 0.66);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+
+.lifecycle-step.complete span,
+.lifecycle-step.current span {
+  background: linear-gradient(135deg, var(--brass-soft), var(--brass));
+  color: #15120b;
+}
+
+.lifecycle-step.current strong {
+  color: var(--paper);
 }
 
 .review-note {
@@ -1780,6 +1866,8 @@ footer {
   .queue-metric-grid,
   .review-meta,
   .review-days { grid-template-columns: 1fr; }
+
+  .lifecycle-steps { grid-template-columns: 1fr 1fr; }
 
   .weekly-grid-table {
     min-width: 760px;
