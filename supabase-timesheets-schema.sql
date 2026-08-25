@@ -111,6 +111,16 @@ create table if not exists public.timesheet_tasks (
   unique (project_id, name)
 );
 
+create table if not exists public.timesheet_task_assignments (
+  id uuid primary key default gen_random_uuid(),
+  task_id uuid not null references public.timesheet_tasks(id) on delete cascade,
+  user_id uuid not null references public.timesheet_profiles(id) on delete cascade,
+  assigned_by uuid references auth.users(id) on delete set null,
+  assigned_at timestamptz not null default now(),
+  active boolean not null default true,
+  unique (task_id, user_id)
+);
+
 create table if not exists public.timesheet_approval_chains (
   id uuid primary key default gen_random_uuid(),
   name text not null,
@@ -463,6 +473,12 @@ create index if not exists timesheet_tasks_project_schedule_idx
   on public.timesheet_tasks (project_id, planned_start_date, planned_finish_date)
   where active = true;
 
+create index if not exists timesheet_task_assignments_task_idx
+  on public.timesheet_task_assignments (task_id, active);
+
+create index if not exists timesheet_task_assignments_user_idx
+  on public.timesheet_task_assignments (user_id, active);
+
 create index if not exists timesheet_approval_chains_scope_idx
   on public.timesheet_approval_chains (project_id, branch, division, active);
 
@@ -610,6 +626,7 @@ alter table public.timesheet_invitations enable row level security;
 alter table public.timesheet_branches enable row level security;
 alter table public.timesheet_divisions enable row level security;
 alter table public.timesheet_tasks enable row level security;
+alter table public.timesheet_task_assignments enable row level security;
 alter table public.timesheet_approval_chains enable row level security;
 alter table public.timesheet_profiles enable row level security;
 alter table public.timesheet_entries enable row level security;
@@ -743,8 +760,79 @@ create policy "Admins can manage tasks"
 on public.timesheet_tasks
 for all
 to authenticated
-using (timesheet_private.current_user_role() = 'admin')
-with check (timesheet_private.current_user_role() = 'admin');
+using (
+  timesheet_private.current_user_role() = 'admin'
+  or (
+    timesheet_private.current_user_role() = 'manager'
+    and exists (
+      select 1
+      from public.timesheet_project_managers m
+      where m.project_id = timesheet_tasks.project_id
+        and lower(m.manager_email) = lower(timesheet_private.current_user_email())
+    )
+  )
+)
+with check (
+  timesheet_private.current_user_role() = 'admin'
+  or (
+    timesheet_private.current_user_role() = 'manager'
+    and exists (
+      select 1
+      from public.timesheet_project_managers m
+      where m.project_id = timesheet_tasks.project_id
+        and lower(m.manager_email) = lower(timesheet_private.current_user_email())
+    )
+  )
+);
+
+drop policy if exists "Users can read visible task assignments" on public.timesheet_task_assignments;
+create policy "Users can read visible task assignments"
+on public.timesheet_task_assignments
+for select
+to authenticated
+using (
+  active = true
+  and (
+    user_id = auth.uid()
+    or timesheet_private.current_user_role() = 'admin'
+    or exists (
+      select 1
+      from public.timesheet_tasks t
+      join public.timesheet_project_managers m
+        on m.project_id = t.project_id
+      where t.id = timesheet_task_assignments.task_id
+        and lower(m.manager_email) = lower(timesheet_private.current_user_email())
+    )
+  )
+);
+
+drop policy if exists "Managers can manage visible task assignments" on public.timesheet_task_assignments;
+create policy "Managers can manage visible task assignments"
+on public.timesheet_task_assignments
+for all
+to authenticated
+using (
+  timesheet_private.current_user_role() = 'admin'
+  or exists (
+    select 1
+    from public.timesheet_tasks t
+    join public.timesheet_project_managers m
+      on m.project_id = t.project_id
+    where t.id = timesheet_task_assignments.task_id
+      and lower(m.manager_email) = lower(timesheet_private.current_user_email())
+  )
+)
+with check (
+  timesheet_private.current_user_role() = 'admin'
+  or exists (
+    select 1
+    from public.timesheet_tasks t
+    join public.timesheet_project_managers m
+      on m.project_id = t.project_id
+    where t.id = timesheet_task_assignments.task_id
+      and lower(m.manager_email) = lower(timesheet_private.current_user_email())
+  )
+);
 
 drop policy if exists "Authenticated users can read active approval chains" on public.timesheet_approval_chains;
 create policy "Authenticated users can read active approval chains"

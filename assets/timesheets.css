@@ -98,7 +98,7 @@ body.light-mode .status-pill.rejected {
   background: rgba(186, 59, 47, 0.07);
 }
 
-body.light-mode :is(.auth-panel, .panel, .admin-card, .review-card, .daily-card, .loading-view, .command-panel, .task-card, .notification-card, .ops-summary-head, .ops-metric, .ops-breakdown, .queue-head, .queue-metric, .exception-group, .quality-head, .report-lifecycle, .adjustment-request-panel, .notice) {
+body.light-mode :is(.auth-panel, .panel, .admin-card, .review-card, .daily-card, .loading-view, .command-panel, .task-card, .notification-card, .task-register-scroll, .ops-summary-head, .ops-metric, .ops-breakdown, .queue-head, .queue-metric, .exception-group, .quality-head, .report-lifecycle, .adjustment-request-panel, .notice) {
   border-color: rgba(21, 24, 29, 0.14);
   background: rgba(255, 253, 248, 0.78);
 }
@@ -178,8 +178,22 @@ body.light-mode .task-card p,
 body.light-mode .notification-card p,
 body.light-mode .notification-card-head span,
 body.light-mode .task-card-meta span,
-body.light-mode .task-card-head span {
+body.light-mode .task-card-head span,
+body.light-mode .task-register th,
+body.light-mode .assigned-resource-list,
+body.light-mode .muted-chip {
   color: rgba(21, 24, 29, 0.68);
+}
+
+body.light-mode .task-register td {
+  border-color: rgba(21, 24, 29, 0.1);
+}
+
+body.light-mode .task-register input,
+body.light-mode .task-register select {
+  color: var(--paper);
+  border-color: rgba(21, 24, 29, 0.16);
+  background: rgba(21, 24, 29, 0.035);
 }
 
 body.light-mode .timeline-task-label span,
@@ -1537,6 +1551,124 @@ body.light-mode .user-chip {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.task-quick-add {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.1fr) minmax(200px, 1.4fr) 120px 150px 150px 110px auto;
+  gap: 10px;
+  align-items: end;
+  border-bottom: 1px solid var(--line);
+}
+
+.task-register-scroll {
+  overflow-x: auto;
+  border: 1px solid rgba(245, 241, 232, 0.12);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.task-register {
+  width: 100%;
+  min-width: 1160px;
+  border-collapse: collapse;
+}
+
+.task-register th,
+.task-register td {
+  border-bottom: 1px solid rgba(245, 241, 232, 0.1);
+  padding: 10px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.task-register th {
+  color: rgba(245, 241, 232, 0.58);
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.task-register td {
+  color: var(--paper);
+  font-size: 12px;
+}
+
+.task-register input,
+.task-register select {
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid rgba(245, 241, 232, 0.14);
+  border-radius: 6px;
+  padding: 0 9px;
+  color: var(--paper);
+  background: rgba(255, 255, 255, 0.026);
+  font: inherit;
+}
+
+.task-register input:disabled,
+.task-register select:disabled {
+  opacity: 0.72;
+}
+
+.task-register-row.has-error {
+  outline: 2px solid rgba(255, 113, 95, 0.52);
+  outline-offset: -2px;
+}
+
+.task-register-row.in_progress td:first-child {
+  border-left: 3px solid var(--sky);
+}
+
+.task-register-row.scheduled td:first-child {
+  border-left: 3px solid var(--brass-soft);
+}
+
+.task-register-row.complete td:first-child {
+  border-left: 3px solid var(--mint);
+}
+
+.task-register-row.missing_dates td:first-child,
+.task-register-row.date_issue td:first-child {
+  border-left: 3px solid var(--signal);
+}
+
+.task-assignment-editor {
+  display: grid;
+  gap: 10px;
+  border: 1px dashed rgba(245, 241, 232, 0.18);
+  border-radius: var(--radius);
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.024);
+}
+
+.task-assignment-editor strong {
+  color: var(--paper);
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.assigned-resource-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  color: rgba(245, 241, 232, 0.66);
+}
+
+.assigned-resource-list span,
+.assigned-resource-chip,
+.muted-chip {
+  border: 1px solid rgba(245, 241, 232, 0.12);
+  border-radius: 999px;
+  padding: 6px 8px;
+  color: rgba(245, 241, 232, 0.72);
+  background: rgba(255, 255, 255, 0.026);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.assigned-resource-chip {
+  cursor: pointer;
+}
+
 .task-board {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2376,6 +2508,7 @@ footer {
   }
 
   .task-board,
+  .task-quick-add,
   .task-metrics,
   .notification-metrics {
     grid-template-columns: 1fr;

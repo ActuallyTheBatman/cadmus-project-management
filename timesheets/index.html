@@ -13,9 +13,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Libre+Baskerville:wght@700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/timesheets.css?v=20260825-notifications-view">
-  <script src="/assets/timesheets-config.js?v=20260825-notifications-view"></script>
-  <script type="module" src="/assets/timesheets.js?v=20260825-notifications-view"></script>
+  <link rel="stylesheet" href="/assets/timesheets.css?v=20260825-task-register">
+  <script src="/assets/timesheets-config.js?v=20260825-task-register"></script>
+  <script type="module" src="/assets/timesheets.js?v=20260825-task-register"></script>
 </head>
 <body>
   <nav class="nav" aria-label="Primary navigation">
@@ -243,7 +243,7 @@
           <div class="panel-head">
             <div>
               <h2>Tasks</h2>
-              <p class="helper">Review task windows, missing planning data, and current-week hours by project.</p>
+              <p class="helper">Maintain task dates, assignments, and current-week work by project.</p>
             </div>
             <div class="toolbar">
               <label class="field inline-filter">
@@ -256,6 +256,15 @@
               </label>
             </div>
           </div>
+          <form id="taskQuickAddForm" class="panel-body task-quick-add hidden">
+            <label class="field"><span>Project</span><select id="taskQuickProject" required></select></label>
+            <label class="field"><span>Task name</span><input id="taskQuickName" type="text" required></label>
+            <label class="field"><span>Code</span><input id="taskQuickCode" type="text"></label>
+            <label class="field"><span>Start</span><input id="taskQuickStart" type="date"></label>
+            <label class="field"><span>Finish</span><input id="taskQuickFinish" type="date"></label>
+            <label class="field"><span>Order</span><input id="taskQuickOrder" type="number" min="0" step="1"></label>
+            <button class="button primary" type="submit">Add Task</button>
+          </form>
           <div id="taskViewContent" class="portfolio-dashboard"></div>
         </section>
 
