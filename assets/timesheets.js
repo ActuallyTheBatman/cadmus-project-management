@@ -1584,24 +1584,15 @@ function taskRegisterRows(task, currentWeekHours) {
   const status = taskPlanningStatus(task);
   const project = getProject(task.project_id);
   const assignments = assignmentsForTask(task.id);
-  const canManage = canManageTaskProject(task.project_id);
   return `
     <tr class="task-register-row ${escapeHtml(status.key)}" data-task-id="${escapeHtml(task.id)}">
       <td><button class="task-name-link" type="button" data-open-task-detail="${escapeHtml(task.id)}">${escapeHtml(task.name || "Untitled task")}</button></td>
-      <td><input data-task-field="code" type="text" value="${escapeHtml(task.code || "")}" ${canManage ? "" : "disabled"}></td>
-      <td>
-        <select data-task-field="project_id" ${canManage ? "" : "disabled"}>
-          ${taskProjectOptions(task.project_id)}
-        </select>
-      </td>
-      <td><input data-task-field="planned_start_date" type="date" value="${escapeHtml(task.planned_start_date || "")}" ${canManage ? "" : "disabled"}></td>
-      <td><input data-task-field="planned_finish_date" type="date" value="${escapeHtml(task.planned_finish_date || "")}" ${canManage ? "" : "disabled"}></td>
-      <td><input data-task-field="display_order" type="number" min="0" step="1" value="${escapeHtml(task.display_order ?? "")}" ${canManage ? "" : "disabled"}></td>
-      <td>
-        ${canManage
-          ? `<select data-task-field="task_status">${taskStatusOptionsHtml(task.task_status || "not_started")}</select>`
-          : `<span class="status-pill ${escapeHtml(status.tone)}">${escapeHtml(status.label)}</span>`}
-      </td>
+      <td>${escapeHtml(task.code || "-")}</td>
+      <td>${escapeHtml(project ? projectLabel(project) : "-")}</td>
+      <td>${escapeHtml(task.planned_start_date ? formatShortDate(task.planned_start_date) : "-")}</td>
+      <td>${escapeHtml(task.planned_finish_date ? formatShortDate(task.planned_finish_date) : "-")}</td>
+      <td>${escapeHtml(task.display_order ?? "-")}</td>
+      <td><span class="status-pill ${escapeHtml(status.tone)}">${escapeHtml(status.label)}</span></td>
       <td>
         <div class="assigned-resource-list">${assignedResourceLabels(assignments)}</div>
       </td>
@@ -1643,14 +1634,6 @@ function resourceSearchText(profile) {
 }
 
 function bindTaskRegisterActions() {
-  for (const row of els.taskViewContent.querySelectorAll(".task-register-row")) {
-    const task = getTask(row.dataset.taskId);
-    if (!task || !canManageTaskProject(task.project_id)) continue;
-    for (const field of row.querySelectorAll("[data-task-field]")) {
-      field.addEventListener("change", () => updateTaskFromRegister(task.id, row));
-    }
-  }
-
   for (const button of els.taskViewContent.querySelectorAll("[data-open-task-detail]")) {
     button.addEventListener("click", () => openTaskDetail(button.dataset.openTaskDetail));
   }
@@ -1981,38 +1964,6 @@ async function addTaskFromTaskView(event) {
   await loadReferenceData();
   populateTaskProjectFilter();
   els.taskProjectFilter.value = payload.project_id;
-  await loadTaskViewData();
-}
-
-async function updateTaskFromRegister(taskId, row) {
-  const field = (name) => row.querySelector(`[data-task-field="${name}"]`);
-  const task = getTask(taskId);
-  const payload = {
-    name: task?.name || "",
-    code: field("code").value.trim().toUpperCase() || null,
-    project_id: field("project_id").value,
-    planned_start_date: field("planned_start_date").value || null,
-    planned_finish_date: field("planned_finish_date").value || null,
-    display_order: field("display_order").value === "" ? null : Number(field("display_order").value),
-    task_status: field("task_status")?.value || "not_started",
-  };
-
-  if (!task || !canManageTaskProject(task.project_id) || !canManageTaskProject(payload.project_id) || !payload.name) return;
-  if (payload.planned_start_date && payload.planned_finish_date && parseLocalDate(payload.planned_finish_date) < parseLocalDate(payload.planned_start_date)) {
-    row.classList.add("has-error");
-    return;
-  }
-
-  const { error, statusColumnSkipped } = await updateTaskRecord(taskId, payload);
-  if (error) {
-    row.classList.add("has-error");
-    return;
-  }
-
-  Object.assign(task, payload);
-  row.classList.remove("has-error");
-  if (statusColumnSkipped) delete task.task_status;
-  await logAdminChange("updated", "task", taskId, taskLabel(task), { ...payload, source: "task_register" });
   await loadTaskViewData();
 }
 
