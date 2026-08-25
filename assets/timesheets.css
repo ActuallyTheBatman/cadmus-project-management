@@ -189,6 +189,26 @@ body.light-mode .task-register td {
   border-color: rgba(21, 24, 29, 0.1);
 }
 
+body.light-mode .task-name-link {
+  color: var(--paper);
+}
+
+body.light-mode .breadcrumb-crumb {
+  color: rgba(21, 24, 29, 0.55);
+}
+
+body.light-mode .breadcrumb-crumb:hover {
+  color: var(--paper);
+}
+
+body.light-mode .breadcrumb-current {
+  color: rgba(21, 24, 29, 0.82);
+}
+
+body.light-mode .breadcrumb-sep {
+  color: rgba(21, 24, 29, 0.3);
+}
+
 body.light-mode .task-register input,
 body.light-mode .task-register select {
   color: var(--paper);
@@ -202,22 +222,16 @@ body.light-mode :is(.assigned-resource-list span, .assigned-resource-chip, .mute
   background: rgba(255, 255, 255, 0.76);
 }
 
-body.light-mode .task-assignment-add {
-  border-color: rgba(23, 111, 168, 0.42);
-  color: #176fa8;
-  background: rgba(23, 111, 168, 0.08);
-}
-
-body.light-mode :is(.task-assignment-drawer, .task-resource-result) {
+body.light-mode .task-resource-result {
   border-color: rgba(21, 24, 29, 0.14);
   background: rgba(255, 253, 248, 0.98);
 }
 
-body.light-mode :is(.task-assignment-drawer-head strong, .task-resource-result strong, .task-assignment-drawer-section h3) {
+body.light-mode .task-resource-result strong {
   color: var(--paper);
 }
 
-body.light-mode :is(.task-assignment-drawer-head span, .task-assignment-drawer-head p, .task-resource-result span) {
+body.light-mode .task-resource-result span {
   color: rgba(21, 24, 29, 0.66);
 }
 
@@ -1664,6 +1678,76 @@ body.light-mode .user-chip {
   min-width: 1420px;
 }
 
+.project-register {
+  min-width: 1100px;
+}
+
+.task-name-link {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--paper);
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: rgba(245, 241, 232, 0.28);
+  text-underline-offset: 3px;
+}
+
+.task-name-link:hover {
+  text-decoration-color: currentColor;
+}
+
+.breadcrumb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+  font-size: 12px;
+}
+
+.breadcrumb:empty {
+  display: none;
+  margin: 0;
+}
+
+.breadcrumb-crumb {
+  border: none;
+  background: none;
+  padding: 0;
+  color: rgba(245, 241, 232, 0.6);
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+}
+
+.breadcrumb-crumb:hover {
+  text-decoration-color: currentColor;
+  color: var(--paper);
+}
+
+.breadcrumb-sep {
+  color: rgba(245, 241, 232, 0.35);
+  margin: 0 2px;
+}
+
+.breadcrumb-current {
+  color: rgba(245, 241, 232, 0.85);
+  font-weight: 700;
+}
+
+.task-detail-resources {
+  margin-top: 16px;
+}
+
+.task-detail-resources h3 {
+  margin-top: 0;
+}
+
 .resource-register-row.active td:first-child {
   border-left: 3px solid var(--mint);
 }
@@ -1676,98 +1760,6 @@ body.light-mode .user-chip {
   opacity: 0.72;
 }
 
-.task-assignment-control {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 230px;
-}
-
-.task-assignment-control .assigned-resource-list {
-  flex: 1;
-}
-
-.task-assignment-add {
-  display: inline-grid;
-  flex: 0 0 auto;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  border: 1px solid rgba(109, 168, 214, 0.46);
-  border-radius: 999px;
-  color: var(--sky);
-  background: rgba(109, 168, 214, 0.08);
-  font: inherit;
-  font-size: 18px;
-  font-weight: 900;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.task-assignment-add:hover,
-.task-assignment-add:focus-visible {
-  border-color: rgba(109, 168, 214, 0.72);
-  background: rgba(109, 168, 214, 0.14);
-}
-
-.task-assignment-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  background: rgba(0, 0, 0, 0.32);
-}
-
-.task-assignment-drawer {
-  position: fixed;
-  top: 0;
-  right: 0;
-  z-index: 61;
-  display: grid;
-  grid-template-rows: auto auto 1fr;
-  width: min(460px, 94vw);
-  height: 100vh;
-  border-left: 1px solid rgba(245, 241, 232, 0.16);
-  padding: 20px;
-  overflow-y: auto;
-  background: rgba(22, 26, 31, 0.98);
-  box-shadow: -24px 0 60px rgba(0, 0, 0, 0.34);
-}
-
-.task-assignment-drawer-head {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  padding-bottom: 18px;
-  border-bottom: 1px solid rgba(245, 241, 232, 0.12);
-}
-
-.task-assignment-drawer-head span,
-.task-assignment-drawer-section h3 {
-  color: rgba(245, 241, 232, 0.58);
-  font-size: 10px;
-  font-weight: 900;
-  text-transform: uppercase;
-}
-
-.task-assignment-drawer-head strong {
-  display: block;
-  margin-top: 6px;
-  color: var(--paper);
-  font-size: 17px;
-}
-
-.task-assignment-drawer-head p {
-  margin: 5px 0 0;
-  color: rgba(245, 241, 232, 0.62);
-  font-size: 12px;
-}
-
-.task-assignment-drawer-section {
-  display: grid;
-  gap: 12px;
-  padding: 18px 0;
-  border-bottom: 1px solid rgba(245, 241, 232, 0.1);
-}
 
 .icon-button {
   display: inline-grid;

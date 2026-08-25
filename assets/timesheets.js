@@ -76,8 +76,9 @@ const app = {
   taskAssignments: [],
   taskResources: [],
   userTaskAssignments: [],
-  activeTaskAssignmentTaskId: "",
+  activeTaskDetailId: "",
   taskQuickAddOpen: false,
+  projectResourceCounts: new Map(),
   reportFormat: "weekly_grid",
   weekStart: startOfWeek(new Date()),
 };
@@ -93,7 +94,16 @@ const els = {
   dashboardActions: document.querySelector("#dashboardActions"),
   dashboardContent: document.querySelector("#dashboardContent"),
   appView: document.querySelector("#appView"),
+  projectsView: document.querySelector("#projectsView"),
+  projectViewContent: document.querySelector("#projectViewContent"),
+  projectSearch: document.querySelector("#projectSearch"),
+  projectStatusFilter: document.querySelector("#projectStatusFilter"),
+  projectCount: document.querySelector("#projectCount"),
   tasksView: document.querySelector("#tasksView"),
+  tasksBreadcrumb: document.querySelector("#tasksBreadcrumb"),
+  taskDetailView: document.querySelector("#taskDetailView"),
+  taskDetailBreadcrumb: document.querySelector("#taskDetailBreadcrumb"),
+  taskDetailContent: document.querySelector("#taskDetailContent"),
   taskProjectFilter: document.querySelector("#taskProjectFilter"),
   taskSearch: document.querySelector("#taskSearch"),
   taskQuickAddForm: document.querySelector("#taskQuickAddForm"),
@@ -450,6 +460,8 @@ function bindEvents() {
     if (!button) return;
     setActiveReportSection(button.dataset.reportSectionTarget);
   });
+  els.projectSearch.addEventListener("input", renderProjectsView);
+  els.projectStatusFilter.addEventListener("change", renderProjectsView);
   els.taskProjectFilter.addEventListener("change", loadTaskViewData);
   els.taskSearch.addEventListener("input", renderTasksView);
   els.taskQuickAddForm.addEventListener("submit", addTaskFromTaskView);
@@ -715,7 +727,9 @@ function hideAllViews() {
   els.appNav.classList.add("hidden");
   els.dashboardView.classList.add("hidden");
   els.appView.classList.add("hidden");
+  els.projectsView.classList.add("hidden");
   els.tasksView.classList.add("hidden");
+  els.taskDetailView.classList.add("hidden");
   els.notificationsView.classList.add("hidden");
   els.portfolioView.classList.add("hidden");
   els.adminView.classList.add("hidden");
@@ -732,8 +746,8 @@ function defaultAppView() {
 }
 
 function allowedAppViews() {
-  const views = ["dashboard", "timesheet", "tasks", "notifications"];
-  if (canReviewPortfolio()) views.push("reviews", "reports");
+  const views = ["dashboard", "timesheet", "tasks", "taskDetail", "notifications"];
+  if (canReviewPortfolio()) views.push("projects", "reviews", "reports");
   if (isPortfolioManager()) views.push("admin");
   return views;
 }
@@ -746,7 +760,9 @@ async function setActiveAppView(view) {
 
   els.dashboardView.classList.add("hidden");
   els.appView.classList.add("hidden");
+  els.projectsView.classList.add("hidden");
   els.tasksView.classList.add("hidden");
+  els.taskDetailView.classList.add("hidden");
   els.notificationsView.classList.add("hidden");
   els.portfolioView.classList.add("hidden");
   els.adminView.classList.add("hidden");
@@ -762,10 +778,23 @@ async function setActiveAppView(view) {
     return;
   }
 
+  if (nextView === "projects") {
+    els.projectsView.classList.remove("hidden");
+    await loadProjectsViewData();
+    return;
+  }
+
   if (nextView === "tasks") {
     els.tasksView.classList.remove("hidden");
     populateTaskProjectFilter();
     await loadTaskViewData();
+    return;
+  }
+
+  if (nextView === "taskDetail") {
+    els.taskDetailView.classList.remove("hidden");
+    await loadTaskDetailData(app.activeTaskDetailId);
+    renderTaskDetailView();
     return;
   }
 
@@ -938,7 +967,145 @@ async function loadTaskViewData() {
   }
 }
 
+function renderBreadcrumb(items) {
+  const visible = items.filter(Boolean);
+  return `<nav class="breadcrumb" aria-label="Breadcrumb">${visible.map((item, index) => {
+    const isLast = index === visible.length - 1;
+    if (item.current || isLast) return `<span class="breadcrumb-current">${escapeHtml(item.label)}</span>`;
+    return `<button type="button" class="breadcrumb-crumb" data-breadcrumb-view="${escapeHtml(item.view)}" ${item.projectId ? `data-breadcrumb-project="${escapeHtml(item.projectId)}"` : ""}>${escapeHtml(item.label)}</button><span class="breadcrumb-sep">/</span>`;
+  }).join("")}</nav>`;
+}
+
+function bindBreadcrumbActions(container) {
+  if (!container) return;
+  for (const button of container.querySelectorAll("[data-breadcrumb-view]")) {
+    button.addEventListener("click", () => {
+      const view = button.dataset.breadcrumbView;
+      const projectId = button.dataset.breadcrumbProject;
+      if (view === "tasks" && projectId && canReviewPortfolio()) {
+        els.taskProjectFilter.value = projectId;
+      }
+      setActiveAppView(view);
+    });
+  }
+}
+
+function renderTasksBreadcrumb() {
+  if (!els.tasksBreadcrumb) return;
+  if (!canReviewPortfolio()) {
+    els.tasksBreadcrumb.innerHTML = "";
+    return;
+  }
+  const selectedProjectId = els.taskProjectFilter.value || "all";
+  els.tasksBreadcrumb.innerHTML = renderBreadcrumb([
+    { label: "Projects", view: "projects" },
+    { label: selectedProjectId === "all" ? "All Projects" : projectLabel(getProject(selectedProjectId)), current: true },
+  ]);
+  bindBreadcrumbActions(els.tasksBreadcrumb);
+}
+
+async function loadProjectsViewData() {
+  els.projectViewContent.innerHTML = `<div class="empty-state"><p>Loading projects...</p></div>`;
+  await loadProjectRegisterStats();
+  renderProjectsView();
+}
+
+async function loadProjectRegisterStats() {
+  app.projectResourceCounts = new Map();
+  const projectIds = app.projects.map((project) => project.id);
+  if (!projectIds.length) return;
+  const { data } = await app.supabase
+    .from("timesheet_profiles")
+    .select("project_id")
+    .eq("active", true)
+    .in("project_id", projectIds);
+  for (const row of data || []) {
+    if (!row.project_id) continue;
+    app.projectResourceCounts.set(row.project_id, (app.projectResourceCounts.get(row.project_id) || 0) + 1);
+  }
+}
+
+function renderProjectsView() {
+  if (!els.projectViewContent) return;
+  const search = normalizeLookup(els.projectSearch.value);
+  const status = els.projectStatusFilter.value || "active";
+  let projects = [...app.projects];
+  if (search) {
+    projects = projects.filter((project) =>
+      normalizeLookup([project.name, project.code, project.client, project.sponsor].filter(Boolean).join(" ")).includes(search));
+  }
+  if (status !== "all") projects = projects.filter((project) => (project.project_status || "active") === status);
+  projects.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+
+  if (els.projectCount) {
+    els.projectCount.textContent = `${projects.length} of ${app.projects.length} projects shown`;
+  }
+
+  if (!projects.length) {
+    els.projectViewContent.innerHTML = `<div class="empty-state"><p>No projects match that search and filter set.</p></div>`;
+    return;
+  }
+
+  els.projectViewContent.innerHTML = `
+    <div class="task-register-scroll">
+      <table class="task-register project-register">
+        <thead>
+          <tr>
+            <th>Project</th>
+            <th>Client</th>
+            <th>Status</th>
+            <th>Sponsor</th>
+            <th>Start</th>
+            <th>Finish</th>
+            <th>Tasks</th>
+            <th>Resources</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${projects.map(projectRegisterRow).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+  for (const button of els.projectViewContent.querySelectorAll("[data-open-project-tasks]")) {
+    button.addEventListener("click", () => openProjectTasks(button.dataset.openProjectTasks));
+  }
+}
+
+function projectRegisterRow(project) {
+  const taskCount = app.tasks.filter((task) => task.project_id === project.id).length;
+  const resourceCount = app.projectResourceCounts.get(project.id) || 0;
+  const status = projectStatusMeta(project.project_status);
+  return `
+    <tr class="task-register-row">
+      <td><button class="task-name-link" type="button" data-open-project-tasks="${escapeHtml(project.id)}">${escapeHtml(projectLabel(project))}</button></td>
+      <td>${escapeHtml(project.client || "-")}</td>
+      <td><span class="status-pill ${escapeHtml(status.tone)}">${escapeHtml(status.label)}</span></td>
+      <td>${escapeHtml(project.sponsor || "-")}</td>
+      <td>${escapeHtml(project.planned_start_date ? formatShortDate(project.planned_start_date) : "-")}</td>
+      <td>${escapeHtml(project.planned_finish_date ? formatShortDate(project.planned_finish_date) : "-")}</td>
+      <td>${escapeHtml(String(taskCount))}</td>
+      <td>${escapeHtml(String(resourceCount))}</td>
+    </tr>
+  `;
+}
+
+function projectStatusMeta(status) {
+  return {
+    active: { label: "Active", tone: "approved" },
+    planning: { label: "Planning", tone: "submitted" },
+    paused: { label: "Paused", tone: "rejected" },
+    closed: { label: "Closed", tone: "" },
+  }[status] || { label: titleCase(status || "Active"), tone: "" };
+}
+
+function openProjectTasks(projectId) {
+  if (canReviewPortfolio()) els.taskProjectFilter.value = projectId;
+  setActiveAppView("tasks");
+}
+
 function renderTasksView() {
+  renderTasksBreadcrumb();
   const selectedProjectId = canReviewPortfolio() ? (els.taskProjectFilter.value || "all") : app.profile?.project_id;
   const search = normalizeLookup(els.taskSearch.value);
   const scopedTasks = app.tasks
@@ -984,7 +1151,6 @@ function renderTasksView() {
       ${opsMetric("This Week", `${formatHours([...currentWeekHours.values()].reduce((sum, hours) => sum + hours, 0))}h`, "Your saved current-week task hours", "warning")}
     </div>
     ${scopedTasks.length ? taskRegisterTable(scopedTasks, currentWeekHours) : `<div class="empty-state"><p>No tasks match that search.</p></div>`}
-    ${taskAssignmentDrawer()}
   `;
   bindCommandPanelActions(els.taskViewContent);
   bindTaskRegisterActions();
@@ -1041,7 +1207,7 @@ function taskRegisterRows(task, currentWeekHours) {
   const canManage = canManageTaskProject(task.project_id);
   return `
     <tr class="task-register-row ${escapeHtml(status.key)}" data-task-id="${escapeHtml(task.id)}">
-      <td><input data-task-field="name" type="text" value="${escapeHtml(task.name || "")}" ${canManage ? "" : "disabled"}></td>
+      <td><button class="task-name-link" type="button" data-open-task-detail="${escapeHtml(task.id)}">${escapeHtml(task.name || "Untitled task")}</button></td>
       <td><input data-task-field="code" type="text" value="${escapeHtml(task.code || "")}" ${canManage ? "" : "disabled"}></td>
       <td>
         <select data-task-field="project_id" ${canManage ? "" : "disabled"}>
@@ -1056,7 +1222,9 @@ function taskRegisterRows(task, currentWeekHours) {
           ? `<select data-task-field="task_status">${taskStatusOptionsHtml(task.task_status || "not_started")}</select>`
           : `<span class="status-pill ${escapeHtml(status.tone)}">${escapeHtml(status.label)}</span>`}
       </td>
-      <td>${canManage ? taskAssignmentControl(task, assignments) : `<div class="assigned-resource-list">${assignedResourceLabels(assignments)}</div>`}</td>
+      <td>
+        <div class="assigned-resource-list">${assignedResourceLabels(assignments)}</div>
+      </td>
       <td>${escapeHtml(formatHours(currentWeekHours))}h</td>
     </tr>
   `;
@@ -1065,50 +1233,6 @@ function taskRegisterRows(task, currentWeekHours) {
 function taskProjectOptions(currentProjectId) {
   const projects = canManageTaskProject(currentProjectId) ? manageableTaskProjects() : app.projects.filter((project) => project.id === currentProjectId);
   return projects.map((project) => `<option value="${escapeHtml(project.id)}" ${project.id === currentProjectId ? "selected" : ""}>${escapeHtml(projectLabel(project))}</option>`).join("");
-}
-
-function taskAssignmentControl(task, assignments) {
-  return `
-    <div class="task-assignment-control">
-      <div class="assigned-resource-list">${assignedResourceLabels(assignments)}</div>
-      <button class="task-assignment-add" type="button" data-open-task-assignment="${escapeHtml(task.id)}" aria-label="Assign resources to ${escapeHtml(taskLabel(task))}">+</button>
-    </div>
-  `;
-}
-
-function taskAssignmentDrawer() {
-  const task = getTask(app.activeTaskAssignmentTaskId);
-  if (!task || !canManageTaskProject(task.project_id)) return "";
-  const assignments = assignmentsForTask(task.id);
-  const assignedIds = new Set(assignments.map((assignment) => assignment.user_id));
-  const resources = app.taskResources.filter((profile) => profile.project_id === task.project_id && !assignedIds.has(profile.id));
-  const project = getProject(task.project_id);
-  return `
-    <div class="task-assignment-backdrop" data-close-task-assignment></div>
-    <aside class="task-assignment-drawer" aria-label="Assigned resources">
-      <div class="task-assignment-drawer-head">
-        <div>
-          <span>Assigned Resources</span>
-          <strong>${escapeHtml(taskLabel(task))}</strong>
-          <p>${escapeHtml(projectLabel(project))}</p>
-        </div>
-        <button class="icon-button" type="button" data-close-task-assignment aria-label="Close assigned resources">x</button>
-      </div>
-      <div class="task-assignment-drawer-section">
-        <h3>Current Assignments</h3>
-        <div class="assigned-resource-list">${assignedResourceLabels(assignments, true)}</div>
-      </div>
-      <div class="task-assignment-drawer-section">
-        <label class="field">
-          <span>Search Resources</span>
-          <input data-task-resource-search type="search" placeholder="Search name, email, branch, division, or role" autofocus>
-        </label>
-        <div class="task-resource-results" data-task-resource-results>
-          ${taskResourceSearchResults(task, resources)}
-        </div>
-      </div>
-    </aside>
-  `;
 }
 
 function taskResourceSearchResults(task, resources, search = "") {
@@ -1147,53 +1271,163 @@ function bindTaskRegisterActions() {
     }
   }
 
-  for (const button of els.taskViewContent.querySelectorAll("[data-open-task-assignment]")) {
-    button.addEventListener("click", () => openTaskAssignmentDrawer(button.dataset.openTaskAssignment));
-  }
-
-  for (const button of els.taskViewContent.querySelectorAll("[data-close-task-assignment]")) {
-    button.addEventListener("click", closeTaskAssignmentDrawer);
-  }
-
-  const search = els.taskViewContent.querySelector("[data-task-resource-search]");
-  if (search) {
-    search.addEventListener("input", () => renderTaskResourceSearchResults(search.value));
-    search.focus();
-  }
-
-  for (const button of els.taskViewContent.querySelectorAll("[data-add-task-resource]")) {
-    button.addEventListener("click", () => {
-      assignResourceToTask(button.dataset.addTaskResource, button.dataset.resourceId || "");
-    });
-  }
-
-  for (const button of els.taskViewContent.querySelectorAll("[data-remove-task-resource]")) {
-    button.addEventListener("click", () => removeResourceFromTask(button.dataset.removeTaskResource));
+  for (const button of els.taskViewContent.querySelectorAll("[data-open-task-detail]")) {
+    button.addEventListener("click", () => openTaskDetail(button.dataset.openTaskDetail));
   }
 }
 
-function openTaskAssignmentDrawer(taskId) {
+function openTaskDetail(taskId) {
   const task = getTask(taskId);
-  if (!task || !canManageTaskProject(task.project_id)) return;
-  app.activeTaskAssignmentTaskId = taskId;
-  renderTasksView();
+  if (!task) return;
+  app.activeTaskDetailId = taskId;
+  setActiveAppView("taskDetail");
 }
 
-function closeTaskAssignmentDrawer() {
-  app.activeTaskAssignmentTaskId = "";
-  renderTasksView();
+async function loadTaskDetailData(taskId) {
+  const task = getTask(taskId);
+  if (!task) return;
+  const [{ data: assignments, error: assignmentError }, { data: resources, error: resourceError }] = await Promise.all([
+    app.supabase.from("timesheet_task_assignments").select("id, task_id, user_id, assigned_at, active").eq("task_id", taskId),
+    app.supabase
+      .from("timesheet_profiles")
+      .select("id, email, full_name, project_id, manager_id, role, active")
+      .eq("active", true)
+      .eq("project_id", task.project_id)
+      .order("full_name"),
+  ]);
+
+  if (!isMissingTaskAssignmentTableError(assignmentError)) {
+    app.taskAssignments = [...app.taskAssignments.filter((assignment) => assignment.task_id !== taskId), ...(assignments || [])];
+  }
+  if (!resourceError) app.taskResources = resources || [];
 }
 
-function renderTaskResourceSearchResults(search) {
-  const task = getTask(app.activeTaskAssignmentTaskId);
-  const results = els.taskViewContent.querySelector("[data-task-resource-results]");
+function renderTaskDetailView() {
+  if (!els.taskDetailContent) return;
+  const task = getTask(app.activeTaskDetailId);
+  if (!task) {
+    els.taskDetailBreadcrumb.innerHTML = "";
+    els.taskDetailContent.innerHTML = `<div class="empty-state"><p>This task could not be found. It may have been removed.</p></div>`;
+    return;
+  }
+
+  const project = getProject(task.project_id);
+  const canManage = canManageTaskProject(task.project_id);
+  const status = taskPlanningStatus(task);
+  const assignments = assignmentsForTask(task.id);
+  const assignedIds = new Set(assignments.map((assignment) => assignment.user_id));
+  const resources = app.taskResources.filter((profile) => profile.project_id === task.project_id && !assignedIds.has(profile.id));
+
+  els.taskDetailBreadcrumb.innerHTML = renderBreadcrumb([
+    canReviewPortfolio() ? { label: "Projects", view: "projects" } : null,
+    { label: projectLabel(project), view: "tasks", projectId: task.project_id },
+    { label: task.name || "Task", current: true },
+  ]);
+  bindBreadcrumbActions(els.taskDetailBreadcrumb);
+
+  els.taskDetailContent.innerHTML = `
+    <div class="ops-summary-head">
+      <div>
+        <h3>${escapeHtml(taskLabel(task))}</h3>
+        <p>${escapeHtml(projectLabel(project))}</p>
+      </div>
+      <span class="status-pill ${escapeHtml(status.tone)}">${escapeHtml(status.label)}</span>
+    </div>
+    <form id="taskDetailForm" class="profile-grid">
+      <label class="field"><span>Task name</span><input data-detail-field="name" type="text" value="${escapeHtml(task.name || "")}" ${canManage ? "required" : "disabled"}></label>
+      <label class="field"><span>Code</span><input data-detail-field="code" type="text" value="${escapeHtml(task.code || "")}" ${canManage ? "" : "disabled"}></label>
+      <label class="field"><span>Project</span><select data-detail-field="project_id" ${canManage ? "" : "disabled"}>${taskProjectOptions(task.project_id)}</select></label>
+      <label class="field"><span>Start</span><input data-detail-field="planned_start_date" type="date" value="${escapeHtml(task.planned_start_date || "")}" ${canManage ? "" : "disabled"}></label>
+      <label class="field"><span>Finish</span><input data-detail-field="planned_finish_date" type="date" value="${escapeHtml(task.planned_finish_date || "")}" ${canManage ? "" : "disabled"}></label>
+      <label class="field"><span>Order</span><input data-detail-field="display_order" type="number" min="0" step="1" value="${escapeHtml(task.display_order ?? "")}" ${canManage ? "" : "disabled"}></label>
+      <label class="field"><span>Status</span><select data-detail-field="task_status" ${canManage ? "" : "disabled"}>${taskStatusOptionsHtml(task.task_status || "not_started")}</select></label>
+    </form>
+    <div id="taskDetailMessage" class="message" role="status"></div>
+    <div class="admin-card task-detail-resources">
+      <h3>Assigned Resources</h3>
+      <div class="assigned-resource-list">${assignedResourceLabels(assignments, canManage)}</div>
+      ${canManage ? `
+        <label class="field">
+          <span>Search resources to add</span>
+          <input data-task-resource-search type="search" placeholder="Search name, email, branch, division, or role">
+        </label>
+        <div class="task-resource-results" data-task-resource-results>
+          ${taskResourceSearchResults(task, resources)}
+        </div>
+      ` : ""}
+    </div>
+  `;
+  bindTaskDetailActions(task);
+}
+
+function bindTaskDetailActions(task) {
+  const form = els.taskDetailContent.querySelector("#taskDetailForm");
+  if (form && canManageTaskProject(task.project_id)) {
+    for (const field of form.querySelectorAll("[data-detail-field]")) {
+      field.addEventListener("change", () => updateTaskFromDetail(task.id, form));
+    }
+  }
+
+  for (const button of els.taskDetailContent.querySelectorAll("[data-remove-task-resource]")) {
+    button.addEventListener("click", () => removeResourceFromTaskDetail(button.dataset.removeTaskResource));
+  }
+
+  for (const button of els.taskDetailContent.querySelectorAll("[data-add-task-resource]")) {
+    button.addEventListener("click", () => assignResourceToTaskDetail(button.dataset.addTaskResource, button.dataset.resourceId || ""));
+  }
+
+  const search = els.taskDetailContent.querySelector("[data-task-resource-search]");
+  if (search) {
+    search.addEventListener("input", () => renderTaskDetailResourceSearchResults(task.id, search.value));
+  }
+}
+
+function renderTaskDetailResourceSearchResults(taskId, search) {
+  const task = getTask(taskId);
+  const results = els.taskDetailContent.querySelector("[data-task-resource-results]");
   if (!task || !results) return;
   const assignedIds = new Set(assignmentsForTask(task.id).map((assignment) => assignment.user_id));
   const resources = app.taskResources.filter((profile) => profile.project_id === task.project_id && !assignedIds.has(profile.id));
   results.innerHTML = taskResourceSearchResults(task, resources, search);
   for (const button of results.querySelectorAll("[data-add-task-resource]")) {
-    button.addEventListener("click", () => assignResourceToTask(button.dataset.addTaskResource, button.dataset.resourceId || ""));
+    button.addEventListener("click", () => assignResourceToTaskDetail(button.dataset.addTaskResource, button.dataset.resourceId || ""));
   }
+}
+
+async function updateTaskFromDetail(taskId, form) {
+  const field = (name) => form.querySelector(`[data-detail-field="${name}"]`);
+  const task = getTask(taskId);
+  const messageNode = els.taskDetailContent.querySelector("#taskDetailMessage");
+  const payload = {
+    name: field("name").value.trim(),
+    code: field("code").value.trim().toUpperCase() || null,
+    project_id: field("project_id").value,
+    planned_start_date: field("planned_start_date").value || null,
+    planned_finish_date: field("planned_finish_date").value || null,
+    display_order: field("display_order").value === "" ? null : Number(field("display_order").value),
+    task_status: field("task_status")?.value || "not_started",
+  };
+
+  if (!task || !canManageTaskProject(task.project_id) || !canManageTaskProject(payload.project_id) || !payload.name) return;
+  if (payload.planned_start_date && payload.planned_finish_date && parseLocalDate(payload.planned_finish_date) < parseLocalDate(payload.planned_start_date)) {
+    if (messageNode) setMessage(messageNode, "Finish date must be on or after the start date.", true);
+    return;
+  }
+
+  const { error, statusColumnSkipped } = await updateTaskRecord(taskId, payload);
+  if (error) {
+    if (messageNode) setMessage(messageNode, error.message, true);
+    return;
+  }
+
+  const projectChanged = payload.project_id !== task.project_id;
+  Object.assign(task, payload);
+  if (statusColumnSkipped) delete task.task_status;
+  await logAdminChange("updated", "task", taskId, taskLabel(task), { ...payload, source: "task_detail" });
+  if (projectChanged) await loadTaskDetailData(taskId);
+  renderTaskDetailView();
+  const refreshedMessage = els.taskDetailContent.querySelector("#taskDetailMessage");
+  if (refreshedMessage) setMessage(refreshedMessage, "Saved.");
 }
 
 function taskPlanningStatus(task) {
@@ -1352,7 +1586,7 @@ async function updateTaskFromRegister(taskId, row) {
   const field = (name) => row.querySelector(`[data-task-field="${name}"]`);
   const task = getTask(taskId);
   const payload = {
-    name: field("name").value.trim(),
+    name: task?.name || "",
     code: field("code").value.trim().toUpperCase() || null,
     project_id: field("project_id").value,
     planned_start_date: field("planned_start_date").value || null,
@@ -1402,7 +1636,7 @@ function isMissingTaskStatusColumnError(error) {
   return error && /task_status|column/i.test(error.message || "");
 }
 
-async function assignResourceToTask(taskId, userId) {
+async function assignResourceToTaskDetail(taskId, userId) {
   const task = getTask(taskId);
   const resolvedUserId = resolveTaskResourceId(task, userId);
   if (!task || !resolvedUserId || !canManageTaskProject(task.project_id)) return;
@@ -1414,13 +1648,12 @@ async function assignResourceToTask(taskId, userId) {
   }, { onConflict: "task_id,user_id" });
 
   if (error) {
-    els.taskViewContent.insertAdjacentHTML("afterbegin", `<div class="notice"><p>${escapeHtml(error.message)}</p></div>`);
+    els.taskDetailContent.insertAdjacentHTML("afterbegin", `<div class="notice"><p>${escapeHtml(error.message)}</p></div>`);
     return;
   }
-  await logAdminChange("updated", "task", taskId, taskLabel(task), { assigned_user_id: resolvedUserId, source: "task_register" });
-  await loadTaskViewData();
-  app.activeTaskAssignmentTaskId = taskId;
-  renderTasksView();
+  await logAdminChange("updated", "task", taskId, taskLabel(task), { assigned_user_id: resolvedUserId, source: "task_detail" });
+  await loadTaskDetailData(taskId);
+  renderTaskDetailView();
 }
 
 function resolveTaskResourceId(task, value) {
@@ -1435,17 +1668,18 @@ function resolveTaskResourceId(task, value) {
   return match?.id || "";
 }
 
-async function removeResourceFromTask(assignmentId) {
+async function removeResourceFromTaskDetail(assignmentId) {
   const assignment = app.taskAssignments.find((item) => item.id === assignmentId);
   const task = getTask(assignment?.task_id);
   if (!assignment || !task || !canManageTaskProject(task.project_id)) return;
   const { error } = await app.supabase.from("timesheet_task_assignments").update({ active: false }).eq("id", assignmentId);
   if (error) {
-    els.taskViewContent.insertAdjacentHTML("afterbegin", `<div class="notice"><p>${escapeHtml(error.message)}</p></div>`);
+    els.taskDetailContent.insertAdjacentHTML("afterbegin", `<div class="notice"><p>${escapeHtml(error.message)}</p></div>`);
     return;
   }
-  await logAdminChange("updated", "task", task.id, taskLabel(task), { removed_assignment_id: assignmentId, source: "task_register" });
-  await loadTaskViewData();
+  await logAdminChange("updated", "task", task.id, taskLabel(task), { removed_assignment_id: assignmentId, source: "task_detail" });
+  await loadTaskDetailData(task.id);
+  renderTaskDetailView();
 }
 
 async function loadNotificationsView() {

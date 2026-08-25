@@ -72,12 +72,13 @@
 
         <div id="appNav" class="app-nav hidden" aria-label="Resource reporting sections">
           <button class="app-nav-button" type="button" data-app-view="dashboard"><span>01</span> Dashboard</button>
-          <button class="app-nav-button" type="button" data-app-view="timesheet"><span>02</span> Timesheet</button>
-          <button class="app-nav-button" type="button" data-app-view="tasks"><span>03</span> Tasks</button>
-          <button class="app-nav-button" type="button" data-app-view="notifications"><span>04</span> Notifications</button>
-          <button class="app-nav-button" type="button" data-app-view="reviews"><span>05</span> Review Queue</button>
-          <button class="app-nav-button" type="button" data-app-view="reports"><span>06</span> Reports</button>
-          <button class="app-nav-button" type="button" data-app-view="admin"><span>07</span> Admin Console</button>
+          <button class="app-nav-button" type="button" data-app-view="projects"><span>02</span> Projects</button>
+          <button class="app-nav-button" type="button" data-app-view="timesheet"><span>03</span> Timesheet</button>
+          <button class="app-nav-button" type="button" data-app-view="tasks"><span>04</span> Tasks</button>
+          <button class="app-nav-button" type="button" data-app-view="notifications"><span>05</span> Notifications</button>
+          <button class="app-nav-button" type="button" data-app-view="reviews"><span>06</span> Review Queue</button>
+          <button class="app-nav-button" type="button" data-app-view="reports"><span>07</span> Reports</button>
+          <button class="app-nav-button" type="button" data-app-view="admin"><span>08</span> Admin Console</button>
         </div>
 
         <section id="authView" class="auth-panel">
@@ -239,9 +240,37 @@
           </section>
         </section>
 
+        <section id="projectsView" class="panel hidden">
+          <div class="panel-head">
+            <div>
+              <h2>Projects</h2>
+              <p class="helper">Browse the portfolio. Click a project to open its tasks.</p>
+            </div>
+            <div class="toolbar">
+              <label class="field inline-filter">
+                <span>Status</span>
+                <select id="projectStatusFilter" aria-label="Filter projects by status">
+                  <option value="active">Active</option>
+                  <option value="planning">Planning</option>
+                  <option value="paused">Paused</option>
+                  <option value="closed">Closed</option>
+                  <option value="all">All</option>
+                </select>
+              </label>
+              <label class="field inline-filter">
+                <span>Search</span>
+                <input id="projectSearch" type="search" placeholder="name, code, client, sponsor">
+              </label>
+            </div>
+          </div>
+          <div id="projectCount" class="admin-result-count">Showing active projects</div>
+          <div id="projectViewContent" class="portfolio-dashboard"></div>
+        </section>
+
         <section id="tasksView" class="panel hidden">
           <div class="panel-head">
             <div>
+              <div id="tasksBreadcrumb" class="breadcrumb"></div>
               <h2>Tasks <button id="taskQuickAddToggle" class="icon-button inline-add-toggle" type="button" aria-label="Add task" aria-expanded="false">+</button></h2>
               <p class="helper">Maintain task dates, assignments, and current-week work by project.</p>
             </div>
@@ -269,6 +298,17 @@
             </div>
           </form>
           <div id="taskViewContent" class="portfolio-dashboard"></div>
+        </section>
+
+        <section id="taskDetailView" class="panel hidden">
+          <div class="panel-head">
+            <div>
+              <div id="taskDetailBreadcrumb" class="breadcrumb"></div>
+              <h2>Task Details</h2>
+              <p class="helper">Edit every property of this task and manage who is assigned to it.</p>
+            </div>
+          </div>
+          <div id="taskDetailContent"></div>
         </section>
 
         <section id="notificationsView" class="panel hidden">
