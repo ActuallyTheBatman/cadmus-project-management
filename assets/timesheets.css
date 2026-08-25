@@ -13,7 +13,7 @@
   --steel: #8ea1ad;
   --sky: #8bc7ff;
   --violet: #c6a3ff;
-  --radius: 8px;
+  --radius: 10px;
 
   /* Spacing scale */
   --space-1: 1px;
@@ -56,20 +56,20 @@
 }
 
 body.light-mode {
-  --ink: #f5f3ee;
-  --ink-soft: #ece7dd;
-  --carbon: #fffdf8;
-  --graphite: #e3ddd2;
-  --paper: #15181d;
-  --muted: #5f6470;
-  --line: rgba(21, 24, 29, 0.16);
-  --brass: #b08424;
-  --brass-soft: #765816;
-  --signal: #ba3b2f;
-  --mint: #19705a;
-  --steel: #647481;
-  --sky: #176fa8;
-  --violet: #7254a6;
+  --ink: #f6f7fb;
+  --ink-soft: #eef0f6;
+  --carbon: #ffffff;
+  --graphite: #e7e9f2;
+  --paper: #23283b;
+  --muted: #6b7280;
+  --line: rgba(35, 40, 59, 0.1);
+  --brass: #c9962e;
+  --brass-soft: #a97c1f;
+  --signal: #e2445c;
+  --mint: #00a765;
+  --steel: #676879;
+  --sky: #0086c0;
+  --violet: #a25ddc;
 }
 
 * { box-sizing: border-box; }
@@ -533,7 +533,6 @@ textarea:focus-visible,
   color: rgba(245, 241, 232, 0.78);
   font-size: var(--text-12);
   font-weight: 800;
-  text-transform: uppercase;
 }
 
 .nav-links a:hover,
@@ -551,14 +550,13 @@ textarea:focus-visible,
   background: rgba(255, 255, 255, 0.035);
   padding: 0 var(--space-15);
   font-size: var(--text-12);
-  font-weight: 900;
-  text-transform: uppercase;
+  font-weight: 700;
 }
 
 .button.primary {
-  border-color: var(--brass-soft);
+  border-color: var(--brass);
   color: #15120b;
-  background: linear-gradient(135deg, var(--brass-soft), var(--brass));
+  background: var(--brass);
 }
 
 .button.danger {
@@ -605,8 +603,7 @@ h1 {
   margin-top: var(--space-10);
   font-size: clamp(28px, 3.1vw, 42px);
   line-height: 1.02;
-  font-weight: 900;
-  text-transform: uppercase;
+  font-weight: 700;
 }
 
 .lead {
@@ -618,6 +615,31 @@ h1 {
 }
 
 .app-shell { padding: 22px 0 74px; }
+
+/* App shell: once signed in, the site's marketing chrome (public nav links,
+   hero banner, footer) gets out of the way so the workspace reads as a
+   product, not a page on the marketing site. */
+body.app-active .hero,
+body.app-active footer,
+body.app-active .nav-links {
+  display: none;
+}
+
+body.app-active .nav {
+  border-bottom: 1px solid var(--line);
+}
+
+body.app-active .nav-inner {
+  min-height: 52px;
+}
+
+body.app-active .app-shell {
+  padding-top: var(--space-16);
+}
+
+body.app-active .app-nav-button span {
+  display: none;
+}
 .hidden { display: none !important; }
 
 .loading-view {
@@ -644,7 +666,6 @@ h1 {
   display: block;
   color: var(--paper);
   font-size: var(--text-13);
-  text-transform: uppercase;
 }
 
 .loading-view p {
@@ -698,7 +719,6 @@ h1 {
   background: transparent;
   font-size: var(--text-11);
   font-weight: 800;
-  text-transform: uppercase;
 }
 
 .app-nav-button span {
@@ -733,8 +753,7 @@ h1 {
   color: rgba(245, 241, 232, 0.68);
   background: rgba(255, 255, 255, 0.024);
   font-size: var(--text-11);
-  font-weight: 900;
-  text-transform: uppercase;
+  font-weight: 700;
 }
 
 .section-tab:hover,
@@ -790,7 +809,6 @@ h1 {
 .auth-panel h2 {
   margin-bottom: var(--space-10);
   font-size: var(--text-28);
-  text-transform: uppercase;
 }
 
 .auth-panel p,
@@ -810,7 +828,6 @@ h1 {
 
 .panel-head h2 {
   font-size: var(--text-18);
-  text-transform: uppercase;
 }
 
 .panel-body { padding: 18px; }
@@ -835,8 +852,7 @@ h1 {
 .field span {
   color: rgba(245, 241, 232, 0.66);
   font-size: var(--text-11);
-  font-weight: 900;
-  text-transform: uppercase;
+  font-weight: 700;
 }
 
 .checkbox-field > div {
@@ -851,7 +867,6 @@ h1 {
   background: rgba(255, 255, 255, 0.035);
   font-size: var(--text-12);
   font-weight: 800;
-  text-transform: uppercase;
 }
 
 body.light-mode .checkbox-field > div {
@@ -962,33 +977,31 @@ select option { color: #111418; }
 }
 
 .profile-summary div {
-  display: grid;
-  align-content: start;
-  gap: var(--space-5);
-  min-height: 74px;
-  border: 1px solid rgba(245, 241, 232, 0.11);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.025);
-  padding: var(--space-12);
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-6);
+  border: none;
+  border-bottom: 1px solid rgba(245, 241, 232, 0.11);
+  border-radius: 0;
+  background: none;
+  padding: var(--space-8) 0;
 }
 
 .profile-summary span {
   color: rgba(245, 241, 232, 0.54);
   font-size: var(--text-10);
-  font-weight: 900;
-  text-transform: uppercase;
+  font-weight: 700;
 }
 
 .profile-summary strong {
   color: rgba(245, 241, 232, 0.86);
-  font-size: clamp(14px, 1.05vw, 17px);
+  font-size: var(--text-13);
   line-height: 1.22;
   overflow-wrap: anywhere;
 }
 
 body.light-mode .profile-summary div {
-  border-color: rgba(21, 24, 29, 0.12);
-  background: rgba(21, 24, 29, 0.035);
+  border-bottom-color: rgba(21, 24, 29, 0.12);
 }
 
 body.light-mode .profile-summary span {
@@ -1009,27 +1022,27 @@ body.light-mode .user-chip {
 }
 
 .metric {
-  display: grid;
-  align-content: start;
-  gap: var(--space-5);
-  border: 1px solid rgba(245, 241, 232, 0.11);
-  border-radius: 8px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-8);
+  border: none;
+  border-radius: var(--radius);
   background: rgba(255, 255, 255, 0.018);
-  padding: var(--space-12);
+  padding: var(--space-9) var(--space-12);
 }
 
 .metric span {
   color: rgba(245, 241, 232, 0.62);
   font-size: var(--text-12);
-  font-weight: 900;
-  text-transform: uppercase;
+  font-weight: 700;
 }
 
 .metric strong {
   max-width: 100%;
   overflow-wrap: anywhere;
-  text-align: left;
-  font-size: clamp(20px, 1.7vw, 30px);
+  text-align: right;
+  font-size: var(--text-18);
   line-height: 1.05;
 }
 
@@ -1059,13 +1072,12 @@ body.light-mode .user-chip {
 
 .day-card h3 {
   font-size: var(--text-14);
-  text-transform: uppercase;
 }
 
 .day-card time {
   color: var(--brass-soft);
   font-size: var(--text-12);
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .day-body {
@@ -1100,8 +1112,7 @@ body.light-mode .user-chip {
 .task-line-head strong {
   color: rgba(245, 241, 232, 0.72);
   font-size: var(--text-11);
-  font-weight: 900;
-  text-transform: uppercase;
+  font-weight: 700;
 }
 
 .add-task-line {
@@ -1137,8 +1148,7 @@ body.light-mode .user-chip {
 .weekly-grid-head {
   color: rgba(245, 241, 232, 0.58);
   font-size: var(--text-10);
-  font-weight: 900;
-  text-transform: uppercase;
+  font-weight: 700;
 }
 
 .weekly-grid-day {
@@ -1158,14 +1168,13 @@ body.light-mode .user-chip {
 .weekly-grid-day strong,
 .work-log-date strong {
   font-size: var(--text-11);
-  text-transform: uppercase;
 }
 
 .weekly-grid-day span,
 .work-log-date span {
   color: var(--brass-soft);
   font-size: var(--text-11);
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .weekly-grid-table input {
@@ -1230,14 +1239,15 @@ body.light-mode .user-chip {
 .status-pill {
   display: inline-flex;
   align-items: center;
-  min-height: 26px;
+  min-height: 24px;
   border: 1px solid rgba(245, 241, 232, 0.18);
   border-radius: 999px;
   padding: 0 var(--space-10);
   color: rgba(245, 241, 232, 0.74);
   font-size: var(--text-11);
-  font-weight: 900;
+  font-weight: 700;
   text-transform: uppercase;
+  letter-spacing: 0.02em;
 }
 
 .status-pill.submitted,
@@ -1286,7 +1296,6 @@ body.light-mode .user-chip {
 
 .ops-summary-head h3 {
   font-size: var(--text-15);
-  text-transform: uppercase;
 }
 
 .ops-summary-head p {
@@ -1313,46 +1322,30 @@ body.light-mode .user-chip {
 .ops-metric {
   display: grid;
   align-content: start;
-  gap: var(--space-5);
-  min-height: 118px;
+  gap: var(--space-3);
   border: 1px solid rgba(245, 241, 232, 0.12);
+  border-left: 3px solid rgba(245, 241, 232, 0.2);
   border-radius: var(--radius);
-  padding: var(--space-12);
+  padding: var(--space-9) var(--space-12);
   background: rgba(255, 255, 255, 0.024);
 }
 
-.ops-metric.tone-success {
-  border-color: rgba(143, 227, 193, 0.26);
-  background: linear-gradient(180deg, rgba(143, 227, 193, 0.09), rgba(255, 255, 255, 0.024));
-}
-
-.ops-metric.tone-warning {
-  border-color: rgba(242, 217, 138, 0.28);
-  background: linear-gradient(180deg, rgba(242, 217, 138, 0.09), rgba(255, 255, 255, 0.024));
-}
-
-.ops-metric.tone-danger {
-  border-color: rgba(255, 113, 95, 0.3);
-  background: linear-gradient(180deg, rgba(255, 113, 95, 0.08), rgba(255, 255, 255, 0.024));
-}
-
-.ops-metric.tone-info {
-  border-color: rgba(139, 199, 255, 0.24);
-  background: linear-gradient(180deg, rgba(139, 199, 255, 0.08), rgba(255, 255, 255, 0.024));
-}
+.ops-metric.tone-success { border-left-color: var(--mint); }
+.ops-metric.tone-warning { border-left-color: var(--brass); }
+.ops-metric.tone-danger { border-left-color: var(--signal); }
+.ops-metric.tone-info { border-left-color: var(--sky); }
 
 .ops-metric span,
 .ops-breakdown h4 {
   color: rgba(245, 241, 232, 0.58);
   font-size: var(--text-10);
-  font-weight: 900;
-  text-transform: uppercase;
+  font-weight: 700;
 }
 
 .ops-metric strong {
   color: var(--paper);
-  font-size: clamp(22px, 2vw, 34px);
-  line-height: 1;
+  font-size: var(--text-22);
+  line-height: 1.15;
   overflow-wrap: anywhere;
 }
 
@@ -1459,8 +1452,7 @@ body.light-mode .user-chip {
   transform: translateX(-1px);
   color: rgba(245, 241, 232, 0.62);
   font-size: var(--text-11);
-  font-weight: 900;
-  text-transform: uppercase;
+  font-weight: 700;
   white-space: nowrap;
 }
 
@@ -1491,7 +1483,7 @@ body.light-mode .user-chip {
 .timeline-task-label strong {
   color: var(--paper);
   font-size: var(--text-12);
-  font-weight: 900;
+  font-weight: 700;
   line-height: 1.25;
   overflow-wrap: anywhere;
 }
@@ -1532,10 +1524,9 @@ body.light-mode .user-chip {
   overflow: hidden;
   color: #08100e;
   font-size: var(--text-10);
-  font-weight: 900;
+  font-weight: 700;
   line-height: 1;
   text-overflow: ellipsis;
-  text-transform: uppercase;
   white-space: nowrap;
 }
 
@@ -1580,7 +1571,6 @@ body.light-mode .user-chip {
 
 .queue-head h3 {
   font-size: var(--text-15);
-  text-transform: uppercase;
 }
 
 .queue-head p {
@@ -1598,18 +1588,17 @@ body.light-mode .user-chip {
 
 .queue-metric {
   display: grid;
-  gap: var(--space-5);
+  gap: var(--space-3);
   border: 1px solid rgba(245, 241, 232, 0.12);
   border-radius: var(--radius);
-  padding: var(--space-12);
+  padding: var(--space-9) var(--space-12);
   background: rgba(255, 255, 255, 0.024);
 }
 
 .queue-metric span {
   color: rgba(245, 241, 232, 0.58);
   font-size: var(--text-10);
-  font-weight: 900;
-  text-transform: uppercase;
+  font-weight: 700;
 }
 
 .queue-metric strong {
@@ -1660,7 +1649,6 @@ body.light-mode .user-chip {
 
 .quality-head h3 {
   font-size: var(--text-14);
-  text-transform: uppercase;
 }
 
 .quality-head p {
@@ -1707,8 +1695,9 @@ body.light-mode .user-chip {
   justify-content: space-between;
   gap: var(--space-16);
   border: 1px solid rgba(214, 168, 71, 0.28);
+  border-left: 3px solid var(--brass);
   border-radius: var(--radius);
-  padding: var(--space-16);
+  padding: var(--space-12) var(--space-16);
   background: rgba(214, 168, 71, 0.055);
 }
 
@@ -1716,18 +1705,16 @@ body.light-mode .user-chip {
   display: block;
   color: rgba(214, 168, 71, 0.9);
   font-size: var(--text-11);
-  font-weight: 900;
-  text-transform: uppercase;
+  font-weight: 700;
 }
 
 .command-panel strong {
   display: block;
-  margin-top: var(--space-5);
+  margin-top: var(--space-3);
   color: var(--paper);
-  font-size: clamp(20px, 2.5vw, 30px);
-  font-weight: 900;
-  line-height: 1;
-  text-transform: uppercase;
+  font-size: var(--text-18);
+  font-weight: 700;
+  line-height: 1.2;
 }
 
 .command-panel p {
@@ -1801,8 +1788,7 @@ body.light-mode .user-chip {
 .task-register th {
   color: rgba(245, 241, 232, 0.58);
   font-size: var(--text-10);
-  font-weight: 900;
-  text-transform: uppercase;
+  font-weight: 700;
 }
 
 .task-register td {
@@ -2108,8 +2094,7 @@ body.light-mode .user-chip {
   display: block;
   color: rgba(245, 241, 232, 0.56);
   font-size: var(--text-10);
-  font-weight: 900;
-  text-transform: uppercase;
+  font-weight: 700;
 }
 
 .task-card-head strong {
@@ -2117,7 +2102,7 @@ body.light-mode .user-chip {
   margin-top: var(--space-5);
   color: var(--paper);
   font-size: var(--text-16);
-  font-weight: 900;
+  font-weight: 700;
   line-height: 1.2;
   overflow-wrap: anywhere;
 }
@@ -2191,8 +2176,7 @@ body.light-mode .user-chip {
   display: block;
   color: rgba(245, 241, 232, 0.56);
   font-size: var(--text-10);
-  font-weight: 900;
-  text-transform: uppercase;
+  font-weight: 700;
 }
 
 .notification-card-head strong {
@@ -2200,7 +2184,7 @@ body.light-mode .user-chip {
   margin-top: var(--space-5);
   color: var(--paper);
   font-size: var(--text-16);
-  font-weight: 900;
+  font-weight: 700;
   line-height: 1.25;
   overflow-wrap: anywhere;
 }
@@ -2223,7 +2207,6 @@ body.light-mode .user-chip {
   color: rgba(242, 217, 138, 0.95);
   font-size: var(--text-11);
   font-weight: 800;
-  text-transform: uppercase;
 }
 
 .calendar-badge.pto {
@@ -2281,7 +2264,6 @@ body.light-mode .calendar-badge.non_working {
 
 .admin-card h3 {
   font-size: var(--text-16);
-  text-transform: uppercase;
 }
 
 .inline-add-fields {
@@ -2343,7 +2325,6 @@ body.light-mode .calendar-badge.non_working {
 .exception-head h4 {
   color: var(--paper);
   font-size: var(--text-13);
-  text-transform: uppercase;
 }
 
 .exception-head p {
@@ -2397,8 +2378,7 @@ body.light-mode .calendar-badge.non_working {
   padding: 0 var(--space-11);
   color: rgba(245, 241, 232, 0.76);
   font-size: var(--text-12);
-  font-weight: 900;
-  text-transform: uppercase;
+  font-weight: 700;
 }
 
 .format-options input {
@@ -2440,8 +2420,7 @@ body.light-mode .calendar-badge.non_working {
 .admin-row-status {
   color: rgba(143, 227, 193, 0.78);
   font-size: var(--text-11);
-  font-weight: 900;
-  text-transform: uppercase;
+  font-weight: 700;
 }
 
 .admin-row-status.error {
@@ -2530,8 +2509,7 @@ body.light-mode .calendar-badge.non_working {
   padding-top: var(--space-12);
   color: rgba(245, 241, 232, 0.62);
   font-size: var(--text-12);
-  font-weight: 900;
-  text-transform: uppercase;
+  font-weight: 700;
 }
 
 .admin-item-main {
@@ -2615,7 +2593,6 @@ body.light-mode .calendar-badge.non_working {
 
 .review-head h3 {
   font-size: var(--text-17);
-  text-transform: uppercase;
 }
 
 .review-meta,
@@ -2636,8 +2613,7 @@ body.light-mode .calendar-badge.non_working {
   display: block;
   color: rgba(245, 241, 232, 0.54);
   font-size: var(--text-11);
-  font-weight: 900;
-  text-transform: uppercase;
+  font-weight: 700;
 }
 
 .review-meta strong,
@@ -2676,7 +2652,6 @@ body.light-mode .calendar-badge.non_working {
 
 .adjustment-request-panel h3 {
   font-size: var(--text-14);
-  text-transform: uppercase;
 }
 
 .report-lifecycle {
@@ -2698,7 +2673,6 @@ body.light-mode .calendar-badge.non_working {
 
 .lifecycle-head h3 {
   font-size: var(--text-14);
-  text-transform: uppercase;
 }
 
 .lifecycle-head p {
@@ -2734,14 +2708,13 @@ body.light-mode .calendar-badge.non_working {
   background: rgba(245, 241, 232, 0.08);
   color: rgba(245, 241, 232, 0.62);
   font-size: var(--text-11);
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .lifecycle-step strong {
   color: rgba(245, 241, 232, 0.66);
   font-size: var(--text-11);
-  font-weight: 900;
-  text-transform: uppercase;
+  font-weight: 700;
   overflow-wrap: anywhere;
 }
 
@@ -2765,8 +2738,7 @@ body.light-mode .calendar-badge.non_working {
 .review-note span {
   color: rgba(245, 241, 232, 0.54);
   font-size: var(--text-11);
-  font-weight: 900;
-  text-transform: uppercase;
+  font-weight: 700;
 }
 
 .review-note p {
@@ -2809,10 +2781,9 @@ body.light-mode .calendar-badge.non_working {
   border-radius: 999px;
   color: rgba(245, 241, 232, 0.78);
   font-size: var(--text-11);
-  font-weight: 900;
+  font-weight: 700;
   line-height: 1;
   padding: var(--space-6) var(--space-8);
-  text-transform: uppercase;
 }
 
 body.light-mode .audit-event {
@@ -2840,7 +2811,6 @@ footer {
   color: rgba(245, 241, 232, 0.58);
   font-size: var(--text-12);
   font-weight: 800;
-  text-transform: uppercase;
 }
 
 .footer-inner {

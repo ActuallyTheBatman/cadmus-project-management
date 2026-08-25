@@ -336,7 +336,7 @@ function setTheme(theme) {
 
 function readSavedTheme() {
   try {
-    return localStorage.getItem(themeStorageKey) || "dark";
+    return localStorage.getItem(themeStorageKey) || "light";
   } catch {
     return "dark";
   }
@@ -673,6 +673,7 @@ async function renderForAuthState({ showLoading = false } = {}) {
 
   try {
     if (!app.user) {
+      document.body.classList.remove("app-active");
       els.authView.classList.remove("hidden");
       els.userEmail.textContent = "Not signed in";
       if (new URL(window.location.href).searchParams.get("invite")) {
@@ -688,24 +689,28 @@ async function renderForAuthState({ showLoading = false } = {}) {
     if (renderId !== app.renderNonce) return;
 
     if (app.profile?.active === false) {
+      document.body.classList.remove("app-active");
       els.authView.classList.remove("hidden");
       setMessage(els.authMessage, "This timesheet account is inactive. Contact your Portfolio Manager for access.", true);
       return;
     }
 
     if (!app.profile) {
+      document.body.classList.remove("app-active");
       renderProfileForm();
       els.profileView.classList.remove("hidden");
       return;
     }
 
     if (app.passwordRecovery) {
+      document.body.classList.remove("app-active");
       renderProfileForm();
       els.profileView.classList.remove("hidden");
       setMessage(els.profileMessage, "Create a new password before continuing.");
       return;
     }
 
+    document.body.classList.add("app-active");
     els.rolePill.textContent = roleLabel(app.profile.role);
     els.rolePill.classList.remove("hidden");
     els.appNav.classList.remove("hidden");
