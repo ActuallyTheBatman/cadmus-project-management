@@ -81,6 +81,9 @@ create table if not exists public.timesheet_tasks (
   project_id uuid references public.timesheet_projects(id) on delete cascade,
   name text not null,
   code text,
+  planned_start_date date,
+  planned_finish_date date,
+  display_order integer,
   active boolean not null default true,
   created_at timestamptz not null default now(),
   unique (project_id, name)
@@ -272,6 +275,11 @@ create table if not exists public.timesheet_notification_queue (
 alter table public.timesheet_daily_reports
   add column if not exists task_id uuid references public.timesheet_tasks(id);
 
+alter table public.timesheet_tasks
+  add column if not exists planned_start_date date,
+  add column if not exists planned_finish_date date,
+  add column if not exists display_order integer;
+
 alter table public.timesheet_daily_reports
   add column if not exists line_index int not null default 0 check (line_index >= 0);
 
@@ -424,6 +432,10 @@ create index if not exists timesheet_allowed_domains_created_by_idx
 
 create index if not exists timesheet_daily_reports_task_id_idx
   on public.timesheet_daily_reports (task_id);
+
+create index if not exists timesheet_tasks_project_schedule_idx
+  on public.timesheet_tasks (project_id, planned_start_date, planned_finish_date)
+  where active = true;
 
 create index if not exists timesheet_approval_chains_scope_idx
   on public.timesheet_approval_chains (project_id, branch, division, active);

@@ -183,6 +183,9 @@ const els = {
   adminTaskProject: document.querySelector("#adminTaskProject"),
   adminTaskName: document.querySelector("#adminTaskName"),
   adminTaskCode: document.querySelector("#adminTaskCode"),
+  adminTaskStart: document.querySelector("#adminTaskStart"),
+  adminTaskFinish: document.querySelector("#adminTaskFinish"),
+  adminTaskOrder: document.querySelector("#adminTaskOrder"),
   adminExportBranch: document.querySelector("#adminExportBranch"),
   adminExportDivision: document.querySelector("#adminExportDivision"),
   adminExportStart: document.querySelector("#adminExportStart"),
@@ -819,7 +822,7 @@ async function loadReferenceData() {
     app.supabase.from("timesheet_project_managers").select("id, project_id, manager_name, manager_email").eq("active", true).order("manager_name"),
     app.supabase.from("timesheet_branches").select("id, name").eq("active", true).order("name"),
     app.supabase.from("timesheet_divisions").select("id, branch_id, name").eq("active", true).order("name"),
-    app.supabase.from("timesheet_tasks").select("id, project_id, name, code").eq("active", true).order("name"),
+    app.supabase.from("timesheet_tasks").select("id, project_id, name, code, planned_start_date, planned_finish_date, display_order").eq("active", true).order("display_order", { ascending: true, nullsFirst: false }).order("name"),
     app.supabase.from("timesheet_approval_chains").select("id, name, project_id, branch, division, primary_manager_id, backup_manager_id, final_approver_id, require_final_approval, active").eq("active", true).order("name"),
     app.supabase.from("timesheet_allowed_domains").select("domain, active").eq("active", true).order("domain"),
     app.supabase.from("timesheet_calendar_days").select("id, work_date, label, day_type, project_id, branch, division, active").eq("active", true).order("work_date"),
@@ -1948,6 +1951,14 @@ async function loadPortfolio() {
   if (!app.profile || !canReviewPortfolio()) return;
 
   els.portfolioList.innerHTML = `<div class="empty-state"><p>Loading portfolio reports...</p></div>`;
+  if (app.activeAppView === "reports" && app.activeReportSection === "timeline") {
+    els.portfolioDashboard.classList.add("hidden");
+    els.reviewQueueSummary.innerHTML = "";
+    app.reviewQueue = { reports: [], daysByReport: new Map() };
+    renderProjectTimeline();
+    return;
+  }
+
   await loadPortfolioDashboard();
   if (els.portfolioStatus.value === "missing") {
     app.reviewQueue = { reports: [], daysByReport: new Map() };
@@ -2032,7 +2043,7 @@ function configurePortfolioMode(mode) {
 }
 
 function setActiveReportSection(section) {
-  const allowed = new Set(["operations", "missing", "late", "approved", "audit"]);
+  const allowed = new Set(["operations", "missing", "late", "timeline", "approved", "audit"]);
   setReportSectionStatus(allowed.has(section) ? section : "operations");
   updateReportsSubNav();
   loadPortfolio();
@@ -2044,6 +2055,7 @@ function setReportSectionStatus(section) {
     operations: "all",
     missing: "missing",
     late: "all",
+    timeline: "all",
     approved: "approved",
     audit: "all",
   };
@@ -2059,6 +2071,148 @@ function updateReportsSubNav() {
   }
   els.exportAudit.classList.toggle("hidden", app.activeReportSection !== "audit");
   els.exportApprovedReports.classList.toggle("hidden", app.activeReportSection !== "approved" || !isPortfolioManager());
+}
+
+function renderProjectTimeline() {
+  const selectedProjectId = els.portfolioProject.value || "all";
+  const scopedTasks = app.tasks
+    .filter((task) => selectedProjectId === "all" || task.project_id === selectedProjectId)
+    .sort(compareTimelineTasks);
+  const datedTasks = scopedTasks.filter((task) => task.planned_start_date && task.planned_finish_date);
+  const missingDateTasks = scopedTasks.filter((task) => !task.planned_start_date || !task.planned_finish_date);
+
+  if (!scopedTasks.length) {
+    els.portfolioList.innerHTML = `<div class="empty-state"><p>No tasks are configured for this project scope.</p></div>`;
+    return;
+  }
+
+  if (!datedTasks.length) {
+    els.portfolioList.innerHTML = `
+      <div class="timeline-shell">
+        <div class="ops-summary-head">
+          <div>
+            <h3>Project Timeline</h3>
+            <p>Add planned start and finish dates in Admin Console to visualize task overlap.</p>
+          </div>
+          <span class="status-pill rejected">${missingDateTasks.length} missing dates</span>
+        </div>
+        ${timelineMissingDates(missingDateTasks)}
+      </div>
+    `;
+    return;
+  }
+
+  const rangeStart = new Date(Math.min(...datedTasks.map((task) => parseLocalDate(task.planned_start_date).getTime())));
+  const rangeEnd = new Date(Math.max(...datedTasks.flatMap((task) => [
+    parseLocalDate(task.planned_start_date).getTime(),
+    parseLocalDate(task.planned_finish_date).getTime(),
+  ])));
+  const totalDays = Math.max(1, dayDiff(rangeStart, rangeEnd) + 1);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const inProgress = datedTasks.filter((task) => {
+    const start = parseLocalDate(task.planned_start_date);
+    const finish = parseLocalDate(task.planned_finish_date);
+    return start <= today && finish >= today;
+  }).length;
+  const complete = datedTasks.filter((task) => parseLocalDate(task.planned_finish_date) < today).length;
+  const scheduled = datedTasks.length - inProgress - complete;
+  const trackWidth = Math.max(760, Math.min(1800, totalDays * 14));
+  const ticks = buildTimelineTicks(rangeStart, rangeEnd, totalDays);
+  const scopeLabel = selectedProjectId === "all" ? "All projects" : projectLabel(getProject(selectedProjectId));
+
+  els.portfolioList.innerHTML = `
+    <div class="timeline-shell">
+      <div class="ops-summary-head">
+        <div>
+          <h3>Project Timeline</h3>
+          <p>${escapeHtml(scopeLabel)} - ${escapeHtml(formatShortDate(rangeStart))} through ${escapeHtml(formatShortDate(rangeEnd))}</p>
+        </div>
+        <div class="ops-actions">
+          <span class="status-pill submitted">${datedTasks.length} dated tasks</span>
+          ${missingDateTasks.length ? `<span class="status-pill rejected">${missingDateTasks.length} missing dates</span>` : `<span class="status-pill approved">fully dated</span>`}
+        </div>
+      </div>
+      <div class="ops-metric-grid timeline-metrics">
+        ${opsMetric("In Progress", inProgress, "Active against today's date", inProgress ? "info" : "")}
+        ${opsMetric("Scheduled", scheduled, "Starts after today", scheduled ? "warning" : "")}
+        ${opsMetric("Complete", complete, "Finish date has passed", complete ? "success" : "")}
+        ${opsMetric("Span", `${totalDays}d`, "Planned schedule range")}
+      </div>
+      <div class="timeline-scroll" style="--timeline-width: ${trackWidth}px;">
+        <div class="timeline-header" style="width: ${trackWidth}px;">
+          ${ticks.map((tick) => `<span style="left: ${timelinePercent(rangeStart, totalDays, tick.date)}%">${escapeHtml(tick.label)}</span>`).join("")}
+        </div>
+        <div class="timeline-rows">
+          ${datedTasks.map((task, index) => timelineTaskRow(task, index, rangeStart, totalDays, trackWidth)).join("")}
+        </div>
+      </div>
+      ${missingDateTasks.length ? timelineMissingDates(missingDateTasks) : ""}
+    </div>
+  `;
+}
+
+function timelineTaskRow(task, index, rangeStart, totalDays, trackWidth) {
+  const start = parseLocalDate(task.planned_start_date);
+  const finish = parseLocalDate(task.planned_finish_date);
+  const startsAfterFinish = finish < start;
+  const safeFinish = startsAfterFinish ? start : finish;
+  const left = timelinePercent(rangeStart, totalDays, start);
+  const width = Math.max(2, ((dayDiff(start, safeFinish) + 1) / totalDays) * 100);
+  const project = getProject(task.project_id);
+  const tone = startsAfterFinish ? "rejected" : `tone-${(index % 5) + 1}`;
+  return `
+    <div class="timeline-row">
+      <div class="timeline-task-label">
+        <strong>${escapeHtml(taskLabel(task))}</strong>
+        <span>${escapeHtml(projectLabel(project))} - ${escapeHtml(formatShortDate(start))} to ${escapeHtml(formatShortDate(safeFinish))}</span>
+      </div>
+      <div class="timeline-track" style="width: ${trackWidth}px;">
+        <div class="timeline-bar ${escapeHtml(tone)}" style="left: ${left}%; width: ${width}%;">
+          <span>${escapeHtml(startsAfterFinish ? "Check dates" : task.code || task.name)}</span>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function timelineMissingDates(tasks) {
+  return `
+    <div class="ops-breakdown">
+      <h4>Tasks Missing Planned Dates</h4>
+      <div class="timeline-missing-list">
+        ${tasks.slice(0, 12).map((task) => `<span>${escapeHtml(taskLabel(task))} - ${escapeHtml(projectLabel(getProject(task.project_id)))}</span>`).join("")}
+        ${tasks.length > 12 ? `<span>${tasks.length - 12} more tasks need dates</span>` : ""}
+      </div>
+    </div>
+  `;
+}
+
+function buildTimelineTicks(rangeStart, rangeEnd, totalDays) {
+  const ticks = [];
+  const interval = totalDays > 180 ? 30 : totalDays > 84 ? 14 : 7;
+  let cursor = startOfWeek(rangeStart);
+  while (cursor <= rangeEnd) {
+    ticks.push({ date: new Date(cursor), label: formatShortDate(cursor) });
+    cursor = addDays(cursor, interval);
+  }
+  if (!ticks.some((tick) => toDateInput(tick.date) === toDateInput(rangeEnd))) {
+    ticks.push({ date: rangeEnd, label: formatShortDate(rangeEnd) });
+  }
+  return ticks;
+}
+
+function timelinePercent(rangeStart, totalDays, date) {
+  return Math.min(100, Math.max(0, (dayDiff(rangeStart, date) / totalDays) * 100));
+}
+
+function compareTimelineTasks(a, b) {
+  const orderA = Number.isFinite(Number(a.display_order)) ? Number(a.display_order) : Number.MAX_SAFE_INTEGER;
+  const orderB = Number.isFinite(Number(b.display_order)) ? Number(b.display_order) : Number.MAX_SAFE_INTEGER;
+  if (orderA !== orderB) return orderA - orderB;
+  return String(a.planned_start_date || "9999-12-31").localeCompare(String(b.planned_start_date || "9999-12-31"))
+    || projectLabel(getProject(a.project_id)).localeCompare(projectLabel(getProject(b.project_id)))
+    || taskLabel(a).localeCompare(taskLabel(b));
 }
 
 function syncReportSectionFromStatus() {
@@ -3517,7 +3671,7 @@ function renderAdminLists() {
     els.taskList,
     tasks,
     (task) => taskLabel(task),
-    (task) => projectLabel(getProject(task.project_id)),
+    (task) => taskScheduleLabel(task),
     (task) => deactivateAdminItem("timesheet_tasks", task.id, "Task removed."),
   );
   renderUserAdminList();
@@ -4465,11 +4619,19 @@ async function addTask(event) {
     project_id: els.adminTaskProject.value,
     name: els.adminTaskName.value.trim(),
     code: els.adminTaskCode.value.trim().toUpperCase() || null,
+    planned_start_date: els.adminTaskStart.value || null,
+    planned_finish_date: els.adminTaskFinish.value || null,
+    display_order: els.adminTaskOrder.value === "" ? null : Number(els.adminTaskOrder.value),
     active: true,
   };
 
   if (!payload.project_id || !payload.name) {
     setMessage(els.adminMessage, "Project and task name are required.", true);
+    return;
+  }
+
+  if (payload.planned_start_date && payload.planned_finish_date && parseLocalDate(payload.planned_finish_date) < parseLocalDate(payload.planned_start_date)) {
+    setMessage(els.adminMessage, "Task finish date must be on or after the start date.", true);
     return;
   }
 
@@ -5306,6 +5468,16 @@ function taskLabel(task) {
   return [task.code, task.name].filter(Boolean).join(" - ");
 }
 
+function taskScheduleLabel(task) {
+  const project = projectLabel(getProject(task.project_id));
+  if (task.planned_start_date && task.planned_finish_date) {
+    return `${project} - ${formatShortDate(task.planned_start_date)} to ${formatShortDate(task.planned_finish_date)}`;
+  }
+  if (task.planned_start_date) return `${project} - starts ${formatShortDate(task.planned_start_date)}`;
+  if (task.planned_finish_date) return `${project} - finishes ${formatShortDate(task.planned_finish_date)}`;
+  return `${project} - No planned dates`;
+}
+
 function titleCase(value) {
   return String(value || "")
     .split(/\s+/)
@@ -5450,6 +5622,12 @@ function addDays(date, days) {
   const copy = new Date(date);
   copy.setDate(copy.getDate() + days);
   return copy;
+}
+
+function dayDiff(start, end) {
+  const startDate = typeof start === "string" ? parseLocalDate(start) : start;
+  const endDate = typeof end === "string" ? parseLocalDate(end) : end;
+  return Math.round((endDate.getTime() - startDate.getTime()) / 86400000);
 }
 
 function deadlineDateForWeek(weekStart) {

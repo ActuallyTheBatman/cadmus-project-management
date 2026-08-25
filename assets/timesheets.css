@@ -103,6 +103,11 @@ body.light-mode :is(.auth-panel, .panel, .admin-card, .review-card, .daily-card,
   background: rgba(255, 253, 248, 0.78);
 }
 
+body.light-mode :is(.timeline-task-label, .timeline-track) {
+  border-color: rgba(21, 24, 29, 0.12);
+  background: rgba(21, 24, 29, 0.028);
+}
+
 body.light-mode .ops-metric.tone-success {
   border-color: rgba(25, 112, 90, 0.28);
   background: rgba(25, 112, 90, 0.06);
@@ -154,6 +159,16 @@ body.light-mode .command-panel strong {
 }
 
 body.light-mode .command-panel p {
+  color: rgba(21, 24, 29, 0.68);
+}
+
+body.light-mode .timeline-task-label strong {
+  color: var(--paper);
+}
+
+body.light-mode .timeline-task-label span,
+body.light-mode .timeline-header span,
+body.light-mode .timeline-missing-list span {
   color: rgba(21, 24, 29, 0.68);
 }
 
@@ -1164,6 +1179,140 @@ body.light-mode .user-chip {
 .ops-chart-bar.tone-4 { background: linear-gradient(90deg, var(--violet), #9071d9); }
 .ops-chart-bar.tone-5 { background: linear-gradient(90deg, var(--steel), #b8c3c9); }
 
+.timeline-shell {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+
+.timeline-metrics {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.timeline-scroll {
+  overflow-x: auto;
+  border: 1px solid rgba(245, 241, 232, 0.12);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.timeline-header {
+  position: relative;
+  height: 42px;
+  border-bottom: 1px solid var(--line);
+  background:
+    repeating-linear-gradient(90deg, rgba(245, 241, 232, 0.055) 0 1px, transparent 1px 84px),
+    rgba(255, 255, 255, 0.02);
+}
+
+.timeline-header span {
+  position: absolute;
+  top: 14px;
+  transform: translateX(-1px);
+  color: rgba(245, 241, 232, 0.62);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.timeline-rows {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.timeline-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  gap: 10px;
+  align-items: stretch;
+}
+
+.timeline-task-label {
+  display: grid;
+  align-content: center;
+  gap: 5px;
+  min-height: 54px;
+  border: 1px solid rgba(245, 241, 232, 0.12);
+  border-radius: var(--radius);
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.024);
+}
+
+.timeline-task-label strong {
+  color: var(--paper);
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.timeline-task-label span {
+  color: rgba(245, 241, 232, 0.58);
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.timeline-track {
+  position: relative;
+  min-height: 54px;
+  overflow: hidden;
+  border: 1px solid rgba(245, 241, 232, 0.1);
+  border-radius: var(--radius);
+  background:
+    repeating-linear-gradient(90deg, rgba(245, 241, 232, 0.052) 0 1px, transparent 1px 84px),
+    rgba(255, 255, 255, 0.018);
+}
+
+.timeline-bar {
+  position: absolute;
+  top: 11px;
+  min-width: 34px;
+  max-width: 100%;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  border-radius: 999px;
+  padding: 0 10px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+}
+
+.timeline-bar span {
+  min-width: 0;
+  overflow: hidden;
+  color: #08100e;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.timeline-bar.tone-1 { background: linear-gradient(90deg, var(--mint), #4fc19c); }
+.timeline-bar.tone-2 { background: linear-gradient(90deg, var(--brass-soft), var(--brass)); }
+.timeline-bar.tone-3 { background: linear-gradient(90deg, var(--sky), #4d95d9); }
+.timeline-bar.tone-4 { background: linear-gradient(90deg, var(--violet), #9071d9); }
+.timeline-bar.tone-5 { background: linear-gradient(90deg, var(--steel), #b8c3c9); }
+.timeline-bar.rejected { background: linear-gradient(90deg, var(--signal), #ffb0a4); }
+
+.timeline-missing-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.timeline-missing-list span {
+  border: 1px solid rgba(245, 241, 232, 0.12);
+  border-radius: 999px;
+  padding: 7px 9px;
+  color: rgba(245, 241, 232, 0.68);
+  font-size: 11px;
+  font-weight: 800;
+}
+
 .review-queue-summary {
   display: grid;
   gap: 12px;
@@ -2026,6 +2175,14 @@ footer {
 
   .work-log-row {
     grid-template-columns: 100px minmax(160px, 1fr) 90px minmax(190px, 1.4fr) minmax(150px, 1fr) minmax(150px, 1fr) auto;
+  }
+
+  .timeline-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .timeline-row {
+    grid-template-columns: minmax(190px, 240px) minmax(0, 1fr);
   }
 }
 

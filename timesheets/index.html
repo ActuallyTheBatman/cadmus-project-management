@@ -13,9 +13,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Libre+Baskerville:wght@700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/timesheets.css?v=20260824-load-ux">
-  <script src="/assets/timesheets-config.js?v=20260824-load-ux"></script>
-  <script type="module" src="/assets/timesheets.js?v=20260824-load-ux"></script>
+  <link rel="stylesheet" href="/assets/timesheets.css?v=20260825-task-timeline">
+  <script src="/assets/timesheets-config.js?v=20260825-task-timeline"></script>
+  <script type="module" src="/assets/timesheets.js?v=20260825-task-timeline"></script>
 </head>
 <body>
   <nav class="nav" aria-label="Primary navigation">
@@ -270,6 +270,7 @@
             <button class="section-tab" type="button" data-report-section-target="operations">Operations</button>
             <button class="section-tab" type="button" data-report-section-target="missing">Missing</button>
             <button class="section-tab" type="button" data-report-section-target="late">Late</button>
+            <button class="section-tab" type="button" data-report-section-target="timeline">Project Timeline</button>
             <button class="section-tab" type="button" data-report-section-target="approved">Approved Time</button>
             <button class="section-tab" type="button" data-report-section-target="audit">Audit</button>
           </div>
@@ -410,6 +411,11 @@
               <label class="field"><span>Project</span><select id="adminTaskProject" required></select></label>
               <label class="field"><span>Task name</span><input id="adminTaskName" type="text" required></label>
               <label class="field"><span>Code</span><input id="adminTaskCode" type="text"></label>
+              <div class="profile-grid tight-grid">
+                <label class="field"><span>Start date</span><input id="adminTaskStart" type="date"></label>
+                <label class="field"><span>Finish date</span><input id="adminTaskFinish" type="date"></label>
+                <label class="field"><span>Display order</span><input id="adminTaskOrder" type="number" min="0" step="1"></label>
+              </div>
               <button class="button primary" type="submit">Add Task</button>
               <ul id="taskList" class="admin-list"></ul>
             </form>
