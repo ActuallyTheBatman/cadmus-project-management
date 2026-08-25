@@ -5,13 +5,35 @@ create table if not exists public.timesheet_projects (
   name text not null,
   code text unique,
   client text,
+  project_status text not null default 'active' check (project_status in ('active', 'planning', 'paused', 'closed')),
+  sponsor text,
+  planned_start_date date,
+  planned_finish_date date,
+  budget_hours numeric check (budget_hours is null or budget_hours >= 0),
+  notes text,
   reporting_formats text[] not null default array['weekly_grid'],
   active boolean not null default true,
   created_at timestamptz not null default now()
 );
 
 alter table public.timesheet_projects
-  add column if not exists reporting_formats text[] not null default array['weekly_grid'];
+  add column if not exists reporting_formats text[] not null default array['weekly_grid'],
+  add column if not exists project_status text not null default 'active',
+  add column if not exists sponsor text,
+  add column if not exists planned_start_date date,
+  add column if not exists planned_finish_date date,
+  add column if not exists budget_hours numeric,
+  add column if not exists notes text;
+
+alter table public.timesheet_projects
+  drop constraint if exists timesheet_projects_project_status_check,
+  add constraint timesheet_projects_project_status_check
+    check (project_status in ('active', 'planning', 'paused', 'closed'));
+
+alter table public.timesheet_projects
+  drop constraint if exists timesheet_projects_budget_hours_check,
+  add constraint timesheet_projects_budget_hours_check
+    check (budget_hours is null or budget_hours >= 0);
 
 drop index if exists public.timesheet_projects_code_idx;
 
@@ -357,6 +379,10 @@ create index if not exists timesheet_weekly_reports_manager_idx
 
 create index if not exists timesheet_weekly_reports_project_id_idx
   on public.timesheet_weekly_reports (project_id);
+
+create index if not exists timesheet_projects_status_schedule_idx
+  on public.timesheet_projects (project_status, planned_start_date, planned_finish_date)
+  where active = true;
 
 create index if not exists timesheet_weekly_reports_reviewed_by_idx
   on public.timesheet_weekly_reports (reviewed_by);

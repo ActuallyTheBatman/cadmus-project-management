@@ -13,9 +13,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Libre+Baskerville:wght@700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/timesheets.css?v=20260825-task-timeline">
-  <script src="/assets/timesheets-config.js?v=20260825-task-timeline"></script>
-  <script type="module" src="/assets/timesheets.js?v=20260825-task-timeline"></script>
+  <link rel="stylesheet" href="/assets/timesheets.css?v=20260825-project-properties">
+  <script src="/assets/timesheets-config.js?v=20260825-project-properties"></script>
+  <script type="module" src="/assets/timesheets.js?v=20260825-project-properties"></script>
 </head>
 <body>
   <nav class="nav" aria-label="Primary navigation">
@@ -332,6 +332,19 @@
               <label class="field"><span>Project name</span><input id="adminProjectName" type="text" required></label>
               <label class="field"><span>Code</span><input id="adminProjectCode" type="text" required></label>
               <label class="field"><span>Client</span><input id="adminProjectClient" type="text" value="Cadmus"></label>
+              <div class="profile-grid tight-grid">
+                <label class="field"><span>Status</span><select id="adminProjectStatus">
+                  <option value="active">Active</option>
+                  <option value="planning">Planning</option>
+                  <option value="paused">Paused</option>
+                  <option value="closed">Closed</option>
+                </select></label>
+                <label class="field"><span>Sponsor</span><input id="adminProjectSponsor" type="text"></label>
+                <label class="field"><span>Start date</span><input id="adminProjectStart" type="date"></label>
+                <label class="field"><span>Finish date</span><input id="adminProjectFinish" type="date"></label>
+                <label class="field"><span>Budget hours</span><input id="adminProjectBudget" type="number" min="0" step="0.25"></label>
+              </div>
+              <label class="field"><span>Notes</span><textarea id="adminProjectNotes" placeholder="Scope notes, operating context, or reporting expectations"></textarea></label>
               <div class="format-options" aria-label="Enabled reporting formats">
                 <label><input id="adminFormatDaily" type="checkbox" value="daily_cards"> Daily Cards</label>
                 <label><input id="adminFormatGrid" type="checkbox" value="weekly_grid" checked> Weekly Grid</label>
