@@ -18,6 +18,13 @@ const ppmRoles = {
   manager: "Project Manager",
   admin: "Portfolio Manager",
 };
+const taskStatusOptions = [
+  { value: "not_started", label: "Not Started", tone: "draft" },
+  { value: "in_progress", label: "In Progress", tone: "submitted" },
+  { value: "blocked", label: "Blocked", tone: "rejected" },
+  { value: "on_hold", label: "On Hold", tone: "submitted" },
+  { value: "done", label: "Done", tone: "approved" },
+];
 const minimumPasswordLength = 12;
 const blockedPasswordTokens = new Set([
   "cadmus",
@@ -68,6 +75,8 @@ const app = {
   notifications: [],
   taskAssignments: [],
   taskResources: [],
+  userTaskAssignments: [],
+  activeTaskAssignmentTaskId: "",
   reportFormat: "weekly_grid",
   weekStart: startOfWeek(new Date()),
 };
@@ -900,7 +909,7 @@ async function loadTaskViewData() {
     assignmentQuery,
   ]);
 
-  const assignmentTableMissing = assignmentError && /timesheet_task_assignments|does not exist|schema cache/i.test(assignmentError.message || "");
+  const assignmentTableMissing = isMissingTaskAssignmentTableError(assignmentError);
   if (profileError || (assignmentError && !assignmentTableMissing)) {
     app.taskResources = [];
     app.taskAssignments = [];
@@ -962,6 +971,7 @@ function renderTasksView() {
       ${opsMetric("This Week", `${formatHours([...currentWeekHours.values()].reduce((sum, hours) => sum + hours, 0))}h`, "Your saved current-week task hours", "warning")}
     </div>
     ${scopedTasks.length ? taskRegisterTable(scopedTasks, currentWeekHours) : `<div class="empty-state"><p>No tasks match that search.</p></div>`}
+    ${taskAssignmentDrawer()}
   `;
   bindCommandPanelActions(els.taskViewContent);
   bindTaskRegisterActions();
@@ -999,7 +1009,7 @@ function taskRegisterTable(tasks, currentWeekHours) {
             <th>Finish</th>
             <th>Order</th>
             <th>Status</th>
-            <th>Assigned Resources</th>
+            <th>Resources</th>
             <th>This Week</th>
           </tr>
         </thead>
@@ -1016,9 +1026,8 @@ function taskRegisterRows(task, currentWeekHours) {
   const project = getProject(task.project_id);
   const assignments = assignmentsForTask(task.id);
   const canManage = canManageTaskProject(task.project_id);
-  const assignmentEditor = canManage ? taskAssignmentEditor(task, assignments) : "";
   return `
-    <tr class="task-register-row ${escapeHtml(status.key)}" data-task-id="${escapeHtml(task.id)}" title="${canManage ? "Double-click to assign resources" : ""}">
+    <tr class="task-register-row ${escapeHtml(status.key)}" data-task-id="${escapeHtml(task.id)}">
       <td><input data-task-field="name" type="text" value="${escapeHtml(task.name || "")}" ${canManage ? "" : "disabled"}></td>
       <td><input data-task-field="code" type="text" value="${escapeHtml(task.code || "")}" ${canManage ? "" : "disabled"}></td>
       <td>
@@ -1029,11 +1038,14 @@ function taskRegisterRows(task, currentWeekHours) {
       <td><input data-task-field="planned_start_date" type="date" value="${escapeHtml(task.planned_start_date || "")}" ${canManage ? "" : "disabled"}></td>
       <td><input data-task-field="planned_finish_date" type="date" value="${escapeHtml(task.planned_finish_date || "")}" ${canManage ? "" : "disabled"}></td>
       <td><input data-task-field="display_order" type="number" min="0" step="1" value="${escapeHtml(task.display_order ?? "")}" ${canManage ? "" : "disabled"}></td>
-      <td><span class="status-pill ${escapeHtml(status.tone)}">${escapeHtml(status.label)}</span></td>
-      <td><div class="assigned-resource-list">${assignedResourceLabels(assignments)}</div></td>
+      <td>
+        ${canManage
+          ? `<select data-task-field="task_status">${taskStatusOptionsHtml(task.task_status || "not_started")}</select>`
+          : `<span class="status-pill ${escapeHtml(status.tone)}">${escapeHtml(status.label)}</span>`}
+      </td>
+      <td>${canManage ? taskAssignmentLink(task, assignments) : `<div class="assigned-resource-list">${assignedResourceLabels(assignments)}</div>`}</td>
       <td>${escapeHtml(formatHours(currentWeekHours))}h</td>
     </tr>
-    ${assignmentEditor}
   `;
 }
 
@@ -1042,42 +1054,104 @@ function taskProjectOptions(currentProjectId) {
   return projects.map((project) => `<option value="${escapeHtml(project.id)}" ${project.id === currentProjectId ? "selected" : ""}>${escapeHtml(projectLabel(project))}</option>`).join("");
 }
 
-function taskAssignmentEditor(task, assignments) {
+function taskAssignmentLink(task, assignments) {
+  const countLabel = assignments.length ? `${assignments.length} assigned` : "Unassigned";
+  return `
+    <button class="task-assignment-link" type="button" data-open-task-assignment="${escapeHtml(task.id)}">
+      <span>Assigned Resources</span>
+      <strong>${escapeHtml(countLabel)}</strong>
+    </button>
+  `;
+}
+
+function taskAssignmentDrawer() {
+  const task = getTask(app.activeTaskAssignmentTaskId);
+  if (!task || !canManageTaskProject(task.project_id)) return "";
+  const assignments = assignmentsForTask(task.id);
   const assignedIds = new Set(assignments.map((assignment) => assignment.user_id));
   const resources = app.taskResources.filter((profile) => profile.project_id === task.project_id && !assignedIds.has(profile.id));
+  const project = getProject(task.project_id);
   return `
-    <tr class="task-assignment-row hidden" data-assignment-for="${escapeHtml(task.id)}">
-      <td colspan="9">
-        <div class="task-assignment-editor">
-          <strong>Assigned resources</strong>
-          <div class="assigned-resource-list">${assignedResourceLabels(assignments, true)}</div>
-          <div class="toolbar">
-            <select data-task-resource-picker>
-              <option value="">${resources.length ? "Select resource" : "No unassigned resources"}</option>
-              ${resources.map((profile) => `<option value="${escapeHtml(profile.id)}">${escapeHtml(resourceLabel(profile))}</option>`).join("")}
-            </select>
-            <button class="button small-button" type="button" data-add-task-resource="${escapeHtml(task.id)}" ${resources.length ? "" : "disabled"}>Assign Resource</button>
-          </div>
+    <div class="task-assignment-backdrop" data-close-task-assignment></div>
+    <aside class="task-assignment-drawer" aria-label="Assigned resources">
+      <div class="task-assignment-drawer-head">
+        <div>
+          <span>Assigned Resources</span>
+          <strong>${escapeHtml(taskLabel(task))}</strong>
+          <p>${escapeHtml(projectLabel(project))}</p>
         </div>
-      </td>
-    </tr>
+        <button class="icon-button" type="button" data-close-task-assignment aria-label="Close assigned resources">x</button>
+      </div>
+      <div class="task-assignment-drawer-section">
+        <h3>Current Assignments</h3>
+        <div class="assigned-resource-list">${assignedResourceLabels(assignments, true)}</div>
+      </div>
+      <div class="task-assignment-drawer-section">
+        <label class="field">
+          <span>Search Resources</span>
+          <input data-task-resource-search type="search" placeholder="Search name, email, branch, division, or role" autofocus>
+        </label>
+        <div class="task-resource-results" data-task-resource-results>
+          ${taskResourceSearchResults(task, resources)}
+        </div>
+      </div>
+    </aside>
   `;
+}
+
+function taskResourceSearchResults(task, resources, search = "") {
+  if (!resources.length) return `<div class="empty-state compact-empty"><p>All eligible project resources are already assigned.</p></div>`;
+  const normalizedSearch = normalizeLookup(search);
+  const matches = resources
+    .filter((profile) => !normalizedSearch || normalizeLookup(resourceSearchText(profile)).includes(normalizedSearch))
+    .slice(0, 30);
+  if (!matches.length) return `<div class="empty-state compact-empty"><p>No resources match that search.</p></div>`;
+  return matches.map((profile) => `
+    <button class="task-resource-result" type="button" data-add-task-resource="${escapeHtml(task.id)}" data-resource-id="${escapeHtml(profile.id)}">
+      <strong>${escapeHtml(profile.full_name || profile.email || "Unnamed resource")}</strong>
+      <span>${escapeHtml([profile.email, profile.branch, profile.division, roleLabel(profile.role)].filter(Boolean).join(" - "))}</span>
+    </button>
+  `).join("");
+}
+
+function resourceSearchText(profile) {
+  return [
+    profile.full_name,
+    profile.email,
+    profile.branch,
+    profile.division,
+    profile.role,
+    roleLabel(profile.role),
+    resourceLabel(profile),
+  ].filter(Boolean).join(" ");
 }
 
 function bindTaskRegisterActions() {
   for (const row of els.taskViewContent.querySelectorAll(".task-register-row")) {
     const task = getTask(row.dataset.taskId);
     if (!task || !canManageTaskProject(task.project_id)) continue;
-    row.addEventListener("dblclick", () => toggleTaskAssignmentEditor(task.id));
     for (const field of row.querySelectorAll("[data-task-field]")) {
       field.addEventListener("change", () => updateTaskFromRegister(task.id, row));
     }
   }
 
+  for (const button of els.taskViewContent.querySelectorAll("[data-open-task-assignment]")) {
+    button.addEventListener("click", () => openTaskAssignmentDrawer(button.dataset.openTaskAssignment));
+  }
+
+  for (const button of els.taskViewContent.querySelectorAll("[data-close-task-assignment]")) {
+    button.addEventListener("click", closeTaskAssignmentDrawer);
+  }
+
+  const search = els.taskViewContent.querySelector("[data-task-resource-search]");
+  if (search) {
+    search.addEventListener("input", () => renderTaskResourceSearchResults(search.value));
+    search.focus();
+  }
+
   for (const button of els.taskViewContent.querySelectorAll("[data-add-task-resource]")) {
     button.addEventListener("click", () => {
-      const picker = button.closest(".task-assignment-editor")?.querySelector("[data-task-resource-picker]");
-      assignResourceToTask(button.dataset.addTaskResource, picker?.value || "");
+      assignResourceToTask(button.dataset.addTaskResource, button.dataset.resourceId || "");
     });
   }
 
@@ -1086,12 +1160,32 @@ function bindTaskRegisterActions() {
   }
 }
 
-function toggleTaskAssignmentEditor(taskId) {
-  const editor = els.taskViewContent.querySelector(`[data-assignment-for="${CSS.escape(taskId)}"]`);
-  editor?.classList.toggle("hidden");
+function openTaskAssignmentDrawer(taskId) {
+  const task = getTask(taskId);
+  if (!task || !canManageTaskProject(task.project_id)) return;
+  app.activeTaskAssignmentTaskId = taskId;
+  renderTasksView();
+}
+
+function closeTaskAssignmentDrawer() {
+  app.activeTaskAssignmentTaskId = "";
+  renderTasksView();
+}
+
+function renderTaskResourceSearchResults(search) {
+  const task = getTask(app.activeTaskAssignmentTaskId);
+  const results = els.taskViewContent.querySelector("[data-task-resource-results]");
+  if (!task || !results) return;
+  const assignedIds = new Set(assignmentsForTask(task.id).map((assignment) => assignment.user_id));
+  const resources = app.taskResources.filter((profile) => profile.project_id === task.project_id && !assignedIds.has(profile.id));
+  results.innerHTML = taskResourceSearchResults(task, resources, search);
+  for (const button of results.querySelectorAll("[data-add-task-resource]")) {
+    button.addEventListener("click", () => assignResourceToTask(button.dataset.addTaskResource, button.dataset.resourceId || ""));
+  }
 }
 
 function taskPlanningStatus(task) {
+  if (task.task_status) return taskStatusMeta(task.task_status);
   if (!task.planned_start_date || !task.planned_finish_date) return { key: "missing_dates", label: "Missing Dates", tone: "rejected" };
   const start = parseLocalDate(task.planned_start_date);
   const finish = parseLocalDate(task.planned_finish_date);
@@ -1101,6 +1195,17 @@ function taskPlanningStatus(task) {
   if (finish < today) return { key: "complete", label: "Complete", tone: "approved" };
   if (start > today) return { key: "scheduled", label: "Scheduled", tone: "submitted" };
   return { key: "in_progress", label: "In Progress", tone: "submitted" };
+}
+
+function taskStatusMeta(status) {
+  const option = taskStatusOptions.find((item) => item.value === status) || taskStatusOptions[0];
+  return { key: option.value, label: option.label, tone: option.tone };
+}
+
+function taskStatusOptionsHtml(currentStatus) {
+  return taskStatusOptions
+    .map((option) => `<option value="${escapeHtml(option.value)}" ${option.value === currentStatus ? "selected" : ""}>${escapeHtml(option.label)}</option>`)
+    .join("");
 }
 
 function taskDateLabel(task) {
@@ -1134,6 +1239,7 @@ function taskMatchesSearch(task, search) {
     task.name,
     task.code,
     taskDateLabel(task),
+    taskStatusMeta(task.task_status).label,
     projectLabel(project),
     projectSummary(project),
     assignmentsForTask(task.id).map((assignment) => resourceLabel(app.taskResources.find((resource) => resource.id === assignment.user_id))).join(" "),
@@ -1202,6 +1308,7 @@ async function addTaskFromTaskView(event) {
     planned_start_date: els.taskQuickStart.value || null,
     planned_finish_date: els.taskQuickFinish.value || null,
     display_order: els.taskQuickOrder.value === "" ? null : Number(els.taskQuickOrder.value),
+    task_status: "not_started",
     active: true,
   };
 
@@ -1211,7 +1318,7 @@ async function addTaskFromTaskView(event) {
     return;
   }
 
-  const { error } = await app.supabase.from("timesheet_tasks").upsert(payload, { onConflict: "project_id,name" });
+  const { error } = await saveTaskRecord(payload, { onConflict: "project_id,name" });
   if (error) {
     els.taskViewContent.insertAdjacentHTML("afterbegin", `<div class="notice"><p>${escapeHtml(error.message)}</p></div>`);
     return;
@@ -1235,6 +1342,7 @@ async function updateTaskFromRegister(taskId, row) {
     planned_start_date: field("planned_start_date").value || null,
     planned_finish_date: field("planned_finish_date").value || null,
     display_order: field("display_order").value === "" ? null : Number(field("display_order").value),
+    task_status: field("task_status")?.value || "not_started",
   };
 
   if (!task || !canManageTaskProject(task.project_id) || !canManageTaskProject(payload.project_id) || !payload.name) return;
@@ -1243,7 +1351,7 @@ async function updateTaskFromRegister(taskId, row) {
     return;
   }
 
-  const { error } = await app.supabase.from("timesheet_tasks").update(payload).eq("id", taskId);
+  const { error, statusColumnSkipped } = await updateTaskRecord(taskId, payload);
   if (error) {
     row.classList.add("has-error");
     return;
@@ -1251,16 +1359,40 @@ async function updateTaskFromRegister(taskId, row) {
 
   Object.assign(task, payload);
   row.classList.remove("has-error");
+  if (statusColumnSkipped) delete task.task_status;
   await logAdminChange("updated", "task", taskId, taskLabel(task), { ...payload, source: "task_register" });
   await loadTaskViewData();
 }
 
+async function saveTaskRecord(payload, options) {
+  const result = await app.supabase.from("timesheet_tasks").upsert(payload, options);
+  if (!isMissingTaskStatusColumnError(result.error)) return { ...result, statusColumnSkipped: false };
+  const fallbackPayload = { ...payload };
+  delete fallbackPayload.task_status;
+  const fallback = await app.supabase.from("timesheet_tasks").upsert(fallbackPayload, options);
+  return { ...fallback, statusColumnSkipped: !fallback.error };
+}
+
+async function updateTaskRecord(taskId, payload) {
+  const result = await app.supabase.from("timesheet_tasks").update(payload).eq("id", taskId);
+  if (!isMissingTaskStatusColumnError(result.error)) return { ...result, statusColumnSkipped: false };
+  const fallbackPayload = { ...payload };
+  delete fallbackPayload.task_status;
+  const fallback = await app.supabase.from("timesheet_tasks").update(fallbackPayload).eq("id", taskId);
+  return { ...fallback, statusColumnSkipped: !fallback.error };
+}
+
+function isMissingTaskStatusColumnError(error) {
+  return error && /task_status|column/i.test(error.message || "");
+}
+
 async function assignResourceToTask(taskId, userId) {
   const task = getTask(taskId);
-  if (!task || !userId || !canManageTaskProject(task.project_id)) return;
+  const resolvedUserId = resolveTaskResourceId(task, userId);
+  if (!task || !resolvedUserId || !canManageTaskProject(task.project_id)) return;
   const { error } = await app.supabase.from("timesheet_task_assignments").upsert({
     task_id: taskId,
-    user_id: userId,
+    user_id: resolvedUserId,
     assigned_by: app.user.id,
     active: true,
   }, { onConflict: "task_id,user_id" });
@@ -1269,8 +1401,22 @@ async function assignResourceToTask(taskId, userId) {
     els.taskViewContent.insertAdjacentHTML("afterbegin", `<div class="notice"><p>${escapeHtml(error.message)}</p></div>`);
     return;
   }
-  await logAdminChange("updated", "task", taskId, taskLabel(task), { assigned_user_id: userId, source: "task_register" });
+  await logAdminChange("updated", "task", taskId, taskLabel(task), { assigned_user_id: resolvedUserId, source: "task_register" });
   await loadTaskViewData();
+  app.activeTaskAssignmentTaskId = taskId;
+  renderTasksView();
+}
+
+function resolveTaskResourceId(task, value) {
+  if (!task || !value) return "";
+  const normalized = normalizeLookup(value);
+  const assignedIds = new Set(assignmentsForTask(task.id).map((assignment) => assignment.user_id));
+  const resources = app.taskResources.filter((profile) => profile.project_id === task.project_id && !assignedIds.has(profile.id));
+  const match = resources.find((profile) => {
+    const values = [profile.id, profile.email, profile.full_name, resourceLabel(profile)];
+    return values.some((candidate) => normalizeLookup(candidate) === normalized);
+  });
+  return match?.id || "";
 }
 
 async function removeResourceFromTask(assignmentId) {
@@ -1470,6 +1616,7 @@ async function loadReferenceData() {
     { data: branches, error: branchError },
     { data: divisions, error: divisionError },
     { data: tasks, error: taskError },
+    { data: userTaskAssignments, error: userTaskAssignmentError },
     { data: approvalChains, error: approvalChainError },
     { data: allowedDomains, error: allowedDomainError },
     { data: calendarDays, error: calendarDayError },
@@ -1478,7 +1625,8 @@ async function loadReferenceData() {
     app.supabase.from("timesheet_project_managers").select("id, project_id, manager_name, manager_email").eq("active", true).order("manager_name"),
     app.supabase.from("timesheet_branches").select("id, name").eq("active", true).order("name"),
     app.supabase.from("timesheet_divisions").select("id, branch_id, name").eq("active", true).order("name"),
-    app.supabase.from("timesheet_tasks").select("id, project_id, name, code, planned_start_date, planned_finish_date, display_order").eq("active", true).order("display_order", { ascending: true, nullsFirst: false }).order("name"),
+    loadTasksReference(),
+    loadUserTaskAssignmentsReference(),
     app.supabase.from("timesheet_approval_chains").select("id, name, project_id, branch, division, primary_manager_id, backup_manager_id, final_approver_id, require_final_approval, active").eq("active", true).order("name"),
     app.supabase.from("timesheet_allowed_domains").select("domain, active").eq("active", true).order("domain"),
     app.supabase.from("timesheet_calendar_days").select("id, work_date, label, day_type, project_id, branch, division, active").eq("active", true).order("work_date"),
@@ -1489,6 +1637,7 @@ async function loadReferenceData() {
   if (branchError) setMessage(els.profileMessage, `Branch load failed: ${branchError.message}`, true);
   if (divisionError) setMessage(els.profileMessage, `Division load failed: ${divisionError.message}`, true);
   if (taskError) setMessage(els.profileMessage, `Task load failed: ${taskError.message}`, true);
+  if (userTaskAssignmentError && !isMissingTaskAssignmentTableError(userTaskAssignmentError)) setMessage(els.profileMessage, `Task assignment load failed: ${userTaskAssignmentError.message}`, true);
   if (approvalChainError) setMessage(els.profileMessage, `Approval chain load failed: ${approvalChainError.message}`, true);
   if (allowedDomainError) setMessage(els.profileMessage, `Domain allowlist load failed: ${allowedDomainError.message}`, true);
   if (calendarDayError) setMessage(els.profileMessage, `Calendar load failed: ${calendarDayError.message}`, true);
@@ -1498,9 +1647,35 @@ async function loadReferenceData() {
   app.branches = branches || [];
   app.divisions = divisions || [];
   app.tasks = tasks || [];
+  app.userTaskAssignments = userTaskAssignmentError ? [] : userTaskAssignments || [];
   app.approvalChains = approvalChains || [];
   app.allowedDomains = allowedDomains || [];
   app.calendarDays = calendarDays || [];
+}
+
+async function loadTasksReference() {
+  const query = (fields) => app.supabase
+    .from("timesheet_tasks")
+    .select(fields)
+    .eq("active", true)
+    .order("display_order", { ascending: true, nullsFirst: false })
+    .order("name");
+  const withStatus = await query("id, project_id, name, code, planned_start_date, planned_finish_date, display_order, task_status");
+  if (!withStatus.error || !/task_status|column/i.test(withStatus.error.message || "")) return withStatus;
+  return query("id, project_id, name, code, planned_start_date, planned_finish_date, display_order");
+}
+
+async function loadUserTaskAssignmentsReference() {
+  if (!app.user?.id) return { data: [], error: null };
+  return app.supabase
+    .from("timesheet_task_assignments")
+    .select("id, task_id, user_id, assigned_at, active")
+    .eq("user_id", app.user.id)
+    .eq("active", true);
+}
+
+function isMissingTaskAssignmentTableError(error) {
+  return error && /timesheet_task_assignments|does not exist|schema cache/i.test(error.message || "");
 }
 
 async function loadProfile() {
@@ -1809,7 +1984,7 @@ function renderDailyReports() {
   app.reportFormat = "weekly_grid";
   renderFormatSelector(enabledFormats);
 
-  const projectTasks = getTasksForProject(app.profile?.project_id);
+  const projectTasks = getTimesheetTasksForProject(app.profile?.project_id);
   const taskOptions = projectTasks
     .map((task) => `<option value="${escapeHtml(taskLabel(task))}"></option>`)
     .join("");
@@ -6121,6 +6296,17 @@ function getTasksForProject(projectId) {
   return app.tasks.filter((task) => !task.project_id || task.project_id === projectId);
 }
 
+function getTimesheetTasksForProject(projectId) {
+  const projectTasks = getTasksForProject(projectId);
+  const assignedTaskIds = new Set(app.userTaskAssignments.map((assignment) => assignment.task_id));
+  const assignedTasks = projectTasks.filter((task) => assignedTaskIds.has(task.id));
+  const visibleTasks = assignedTasks.length ? assignedTasks : projectTasks;
+  return [...visibleTasks].sort((a, b) => {
+    const assignedDelta = Number(assignedTaskIds.has(b.id)) - Number(assignedTaskIds.has(a.id));
+    return assignedDelta || compareTimelineTasks(a, b);
+  });
+}
+
 function canReviewPortfolio() {
   return ["manager", "admin"].includes(app.profile?.role);
 }
@@ -6208,7 +6394,7 @@ function formatLabel(format) {
 
 function resolveTaskId(value, projectId) {
   const normalized = normalizeLookup(value);
-  const task = getTasksForProject(projectId).find((item) => normalizeLookup(taskLabel(item)) === normalized);
+  const task = getTimesheetTasksForProject(projectId).find((item) => normalizeLookup(taskLabel(item)) === normalized);
   return task?.id || "";
 }
 

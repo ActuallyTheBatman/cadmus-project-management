@@ -106,6 +106,7 @@ create table if not exists public.timesheet_tasks (
   planned_start_date date,
   planned_finish_date date,
   display_order integer,
+  task_status text not null default 'not_started' check (task_status in ('not_started', 'in_progress', 'blocked', 'on_hold', 'done')),
   active boolean not null default true,
   created_at timestamptz not null default now(),
   unique (project_id, name)
@@ -310,7 +311,13 @@ alter table public.timesheet_daily_reports
 alter table public.timesheet_tasks
   add column if not exists planned_start_date date,
   add column if not exists planned_finish_date date,
-  add column if not exists display_order integer;
+  add column if not exists display_order integer,
+  add column if not exists task_status text not null default 'not_started';
+
+alter table public.timesheet_tasks
+  drop constraint if exists timesheet_tasks_task_status_check,
+  add constraint timesheet_tasks_task_status_check
+    check (task_status in ('not_started', 'in_progress', 'blocked', 'on_hold', 'done'));
 
 alter table public.timesheet_daily_reports
   add column if not exists line_index int not null default 0 check (line_index >= 0);
