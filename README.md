@@ -2,6 +2,12 @@
 
 Static business site for Cadmus Project Management, ready for GitHub Pages.
 
+## Cadmus Resource Reporting
+
+The timesheet and portfolio reporting app lives at `/timesheets/`. It is a static frontend backed by Supabase and uses only the Supabase project URL plus anon public key in browser-delivered configuration.
+
+Enterprise handoff notes are maintained in [docs/cadmus-resource-reporting-enterprise-readiness.md](docs/cadmus-resource-reporting-enterprise-readiness.md).
+
 ## Deployment
 
 GitHub Pages should serve this repository from the root of the default branch.

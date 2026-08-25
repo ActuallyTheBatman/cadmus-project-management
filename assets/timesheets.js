@@ -2,6 +2,11 @@ import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 
 const weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
 const config = window.CADMUS_TIMESHEETS_CONFIG || {};
+const workflowSettings = {
+  submissionDeadlineDayIndex: clampNumber(config.workflow?.submissionDeadlineDayIndex ?? 4, 0, weekdays.length - 1),
+  weeklyCapacityHours: Math.max(1, Number(config.workflow?.weeklyCapacityHours || 40)),
+};
+workflowSettings.submissionDeadlineLabel = config.workflow?.submissionDeadlineLabel || weekdays[workflowSettings.submissionDeadlineDayIndex];
 const themeStorageKey = "cadmus-timesheets-theme";
 const reportingFormats = {
   daily_cards: "Daily Cards",
@@ -42,6 +47,7 @@ const app = {
   pendingInvite: null,
   adminProjectFocus: "all",
   activeAdminSection: "overview",
+  activeReportSection: "operations",
   passwordRecovery: false,
   activeAppView: "dashboard",
   portfolioReminderTargets: {
@@ -113,7 +119,9 @@ const els = {
   portfolioProject: document.querySelector("#portfolioProject"),
   portfolioWeek: document.querySelector("#portfolioWeek"),
   refreshPortfolio: document.querySelector("#refreshPortfolio"),
+  exportApprovedReports: document.querySelector("#exportApprovedReports"),
   exportAudit: document.querySelector("#exportAudit"),
+  reportsSubNav: document.querySelector("#reportsSubNav"),
   portfolioPanelTitle: document.querySelector("#portfolioPanelTitle"),
   portfolioPanelHelper: document.querySelector("#portfolioPanelHelper"),
   portfolioDashboard: document.querySelector("#portfolioDashboard"),
@@ -374,6 +382,11 @@ function bindEvents() {
     if (!button) return;
     setActiveAdminSection(button.dataset.adminSectionTarget);
   });
+  els.reportsSubNav.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-report-section-target]");
+    if (!button) return;
+    setActiveReportSection(button.dataset.reportSectionTarget);
+  });
   els.profileProject.addEventListener("change", () => populateManagerSelect());
   els.profileBranch.addEventListener("change", () => populateDivisionSelect());
   els.signOut.addEventListener("click", () => app.supabase.auth.signOut());
@@ -394,8 +407,12 @@ function bindEvents() {
   });
   els.dailyGrid.addEventListener("input", renderQualityPanel);
   els.refreshPortfolio.addEventListener("click", loadPortfolio);
+  els.exportApprovedReports.addEventListener("click", exportApprovedReports);
   els.exportAudit.addEventListener("click", exportAuditHistory);
-  els.portfolioStatus.addEventListener("change", loadPortfolio);
+  els.portfolioStatus.addEventListener("change", () => {
+    syncReportSectionFromStatus();
+    loadPortfolio();
+  });
   els.portfolioProject.addEventListener("change", loadPortfolio);
   els.portfolioWeek.addEventListener("change", () => {
     els.portfolioWeek.value = toDateInput(startOfWeek(parseLocalDate(els.portfolioWeek.value)));
@@ -653,6 +670,7 @@ async function setActiveAppView(view) {
   if (nextView === "reports") {
     els.portfolioView.classList.remove("hidden");
     configurePortfolioMode("reports");
+    setReportSectionStatus(app.activeReportSection || "operations");
     await loadPortfolio();
     return;
   }
@@ -690,7 +708,7 @@ async function renderDashboard() {
 
   const status = app.report?.status || "draft";
   const totalHours = app.dailyReports.reduce((sum, day) => sum + Number(day.hours || 0), 0);
-  const dueDate = formatShortDate(addDays(app.weekStart, 4));
+  const dueDate = formatShortDate(deadlineDateForWeek(app.weekStart));
   els.dashboardContent.innerHTML = `
     <div class="ops-summary-head">
       <div>
@@ -702,7 +720,7 @@ async function renderDashboard() {
     <div class="ops-metric-grid resource-dashboard-grid">
       ${opsMetric("Status", formatReportStatus(status), "Current weekly report state")}
       ${opsMetric("Total Hours", `${formatHours(totalHours)}h`, "Saved task-line hours")}
-      ${opsMetric("Due", dueDate, "Standard Friday deadline")}
+      ${opsMetric("Due", dueDate, `${workflowSettings.submissionDeadlineLabel} deadline`)}
       ${opsMetric("Manager", getManager(app.profile?.manager_id)?.manager_name || "-", "Assigned reviewer")}
     </div>
     ${app.reportAudits.length ? renderAuditTimeline(app.reportAudits, 5) : `<div class="empty-state"><p>No report history yet for this week.</p></div>`}
@@ -932,7 +950,7 @@ function renderProfileSummary() {
   const approvalRoute = resolveApprovalRoute(app.profile);
   const company = app.profile.company === "Cadmus Project Management" ? "Cadmus PM" : app.profile.company;
   els.projectCode.textContent = project?.code || "-";
-  els.dueDate.textContent = formatShortDate(toDateInput(addDays(app.weekStart, 4)));
+  els.dueDate.textContent = formatShortDate(toDateInput(deadlineDateForWeek(app.weekStart)));
   els.profileSummary.innerHTML = [
     ["Company", company],
     ["Branch", app.profile.branch],
@@ -1705,15 +1723,20 @@ async function loadPortfolio() {
     return;
   }
 
-  if (!reports || reports.length === 0) {
+  const isLateReportView = app.activeAppView === "reports" && app.activeReportSection === "late";
+  const visibleReports = isLateReportView
+    ? (reports || []).filter(isLateSubmission)
+    : reports || [];
+
+  if (visibleReports.length === 0) {
     app.reviewQueue = { reports: [], daysByReport: new Map() };
     els.reviewQueueSummary.innerHTML = "";
-    els.portfolioList.innerHTML = `<div class="empty-state"><p>No reports match this view.</p></div>`;
+    els.portfolioList.innerHTML = `<div class="empty-state"><p>${escapeHtml(isLateReportView ? "No late submitted reports match this view." : "No reports match this view.")}</p></div>`;
     return;
   }
 
-  const reportIds = reports.map((report) => report.id);
-  const userIds = [...new Set(reports.map((report) => report.user_id))];
+  const reportIds = visibleReports.map((report) => report.id);
+  const userIds = [...new Set(visibleReports.map((report) => report.user_id))];
   const [{ data: profiles }, { data: days }, { data: audits }] = await Promise.all([
     app.supabase.from("timesheet_profiles").select("id, full_name, email, company, branch, division, active").in("id", userIds),
     app.supabase.from("timesheet_daily_reports").select("weekly_report_id, day_index, line_index, work_date, task_id, hours, accomplishments, blockers, next_steps").in("weekly_report_id", reportIds).order("day_index").order("line_index"),
@@ -1723,11 +1746,11 @@ async function loadPortfolio() {
   const profileMap = new Map((profiles || []).map((profile) => [profile.id, profile]));
   const daysByReport = groupBy(days || [], "weekly_report_id");
   const auditsByReport = groupBy(audits || [], "weekly_report_id");
-  app.reviewQueue = { reports, daysByReport };
-  renderReviewQueueSummary(reports, daysByReport);
+  app.reviewQueue = { reports: visibleReports, daysByReport };
+  renderReviewQueueSummary(visibleReports, daysByReport);
   els.portfolioList.innerHTML = "";
 
-  for (const report of reports) {
+  for (const report of visibleReports) {
     els.portfolioList.append(renderReviewCard(report, profileMap.get(report.user_id), daysByReport.get(report.id) || [], auditsByReport.get(report.id) || []));
   }
 }
@@ -1741,6 +1764,49 @@ function configurePortfolioMode(mode) {
   els.portfolioDashboard.classList.add("hidden");
   els.reviewQueueSummary.classList.toggle("hidden", !isReviews);
   els.exportAudit.classList.toggle("hidden", isReviews);
+  els.exportApprovedReports.classList.toggle("hidden", isReviews || !isPortfolioManager());
+  els.reportsSubNav.classList.toggle("hidden", isReviews);
+  if (!isReviews) updateReportsSubNav();
+}
+
+function setActiveReportSection(section) {
+  const allowed = new Set(["operations", "missing", "late", "approved", "audit"]);
+  setReportSectionStatus(allowed.has(section) ? section : "operations");
+  updateReportsSubNav();
+  loadPortfolio();
+}
+
+function setReportSectionStatus(section) {
+  app.activeReportSection = section;
+  const statusBySection = {
+    operations: "all",
+    missing: "missing",
+    late: "all",
+    approved: "approved",
+    audit: "all",
+  };
+  els.portfolioStatus.value = statusBySection[section] || "all";
+  updateReportsSubNav();
+}
+
+function updateReportsSubNav() {
+  for (const button of els.reportsSubNav.querySelectorAll("[data-report-section-target]")) {
+    const active = button.dataset.reportSectionTarget === app.activeReportSection;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-current", active ? "page" : "false");
+  }
+  els.exportAudit.classList.toggle("hidden", app.activeReportSection !== "audit");
+  els.exportApprovedReports.classList.toggle("hidden", app.activeReportSection !== "approved" || !isPortfolioManager());
+}
+
+function syncReportSectionFromStatus() {
+  if (app.activeAppView !== "reports") return;
+  const sectionByStatus = {
+    missing: "missing",
+    approved: "approved",
+  };
+  app.activeReportSection = sectionByStatus[els.portfolioStatus.value] || "operations";
+  updateReportsSubNav();
 }
 
 function renderReviewQueueSummary(reports, daysByReport) {
@@ -1912,6 +1978,76 @@ function buildAuditExportRow({ report, profile, project, audit = {} }) {
   ];
 }
 
+async function exportApprovedReports() {
+  if (!canReviewPortfolio()) return;
+  const selectedWeek = els.portfolioWeek.value ? toDateInput(startOfWeek(parseLocalDate(els.portfolioWeek.value))) : "";
+  let query = app.supabase
+    .from("timesheet_weekly_reports")
+    .select("id, user_id, week_start, project_id, manager_id, status, reviewed_at, reviewer_email")
+    .eq("status", "approved")
+    .order("week_start", { ascending: false })
+    .limit(500);
+
+  if (els.portfolioProject.value && els.portfolioProject.value !== "all") {
+    query = query.eq("project_id", els.portfolioProject.value);
+  }
+
+  if (selectedWeek) query = query.eq("week_start", selectedWeek);
+  if (app.profile?.role === "manager" && app.profile.manager_id) query = query.eq("manager_id", app.profile.manager_id);
+
+  const { data: reports, error } = await query;
+  if (error) {
+    showPortfolioNotice(error.message, true);
+    return;
+  }
+
+  if (!reports?.length) {
+    showPortfolioNotice("No approved reports match the current filters.");
+    return;
+  }
+
+  const reportIds = reports.map((report) => report.id);
+  const userIds = [...new Set(reports.map((report) => report.user_id))];
+  const [{ data: profiles, error: profileError }, { data: days, error: dayError }] = await Promise.all([
+    app.supabase.from("timesheet_profiles").select("id, full_name, email, branch, division").in("id", userIds),
+    app.supabase.from("timesheet_daily_reports").select("weekly_report_id, work_date, task_id, hours").in("weekly_report_id", reportIds),
+  ]);
+
+  if (profileError || dayError) {
+    showPortfolioNotice(profileError?.message || dayError?.message, true);
+    return;
+  }
+
+  const profileMap = new Map((profiles || []).map((profile) => [profile.id, profile]));
+  const daysByReport = groupBy(days || [], "weekly_report_id");
+  const rows = [["Week", "Resource", "Resource Email", "Branch", "Division", "Project", "Manager", "Reviewed", "Reviewer", "Total Hours", "Task Count"]];
+  for (const report of reports) {
+    const profile = profileMap.get(report.user_id);
+    const reportDays = daysByReport.get(report.id) || [];
+    const totalHours = reportDays.reduce((sum, day) => sum + Number(day.hours || 0), 0);
+    const taskCount = new Set(reportDays.map((day) => day.task_id).filter(Boolean)).size;
+    rows.push([
+      report.week_start,
+      profile?.full_name || "",
+      profile?.email || "",
+      profile?.branch || "",
+      profile?.division || "",
+      projectLabel(getProject(report.project_id)),
+      getManager(report.manager_id)?.manager_name || "",
+      report.reviewed_at || "",
+      report.reviewer_email || "",
+      formatHours(totalHours),
+      taskCount,
+    ]);
+  }
+
+  const scope = [
+    els.portfolioProject.value && els.portfolioProject.value !== "all" ? projectLabel(getProject(els.portfolioProject.value)) : "all-projects",
+    selectedWeek || "all-weeks",
+  ].map(slugify).join("-");
+  downloadCsv(rows.map((row) => row.map(csvCell).join(",")).join("\n"), `cadmus-approved-time-${scope}.csv`);
+}
+
 function showPortfolioNotice(message, isError = false) {
   const notice = document.createElement("div");
   notice.className = "notice";
@@ -2010,7 +2146,7 @@ function renderPortfolioDashboard({ selectedWeek, selectedProjectId, profiles, r
   const pendingApproval = (statusCounts.submitted || 0) + (statusCounts.pending_final || 0);
   const approved = statusCounts.approved || 0;
   const submitted = pendingApproval + approved;
-  const capacityHours = profiles.length * 40;
+  const capacityHours = profiles.length * workflowSettings.weeklyCapacityHours;
   const submissionRate = profiles.length ? Math.round((submitted / profiles.length) * 100) : 0;
   const utilizationRate = capacityHours ? Math.round((totalHours / capacityHours) * 100) : 0;
   const overdueCount = isPortfolioWeekPastDue(selectedWeek) ? missingProfiles.length : 0;
@@ -2076,7 +2212,7 @@ function renderPortfolioDashboard({ selectedWeek, selectedProjectId, profiles, r
       ${opsMetric("Utilization", `${utilizationRate}%`, `${formatHours(totalHours)}h of ${formatHours(capacityHours)}h capacity`, metricTone(utilizationRate, { good: 85, warn: 65 }))}
       ${opsMetric("Approval Backlog", pendingApproval, `${oldestBacklogDays}d oldest waiting report`, pendingApproval ? "warning" : "success")}
       ${opsMetric("Missing / Draft", missingProfiles.length, "Not submitted or sent back", missingProfiles.length ? "danger" : "success")}
-      ${opsMetric("Late Submissions", lateSubmissions, "Submitted after the Friday due date", lateSubmissions ? "danger" : "success")}
+      ${opsMetric("Late Submissions", lateSubmissions, `Submitted after the ${workflowSettings.submissionDeadlineLabel} due date`, lateSubmissions ? "danger" : "success")}
       ${opsMetric("Active Resources", profiles.length, "In the selected project scope", "info")}
     </div>
     <div class="ops-breakdown-grid">
@@ -2345,7 +2481,7 @@ function portfolioSelectedWeek() {
 }
 
 function isPortfolioWeekPastDue(weekStart) {
-  return new Date() > addDays(parseLocalDate(weekStart), 4);
+  return new Date() > endOfPortfolioDueDate(weekStart);
 }
 
 function isLateSubmission(report) {
@@ -2354,7 +2490,7 @@ function isLateSubmission(report) {
 }
 
 function endOfPortfolioDueDate(weekStart) {
-  const dueDate = addDays(parseLocalDate(weekStart), 4);
+  const dueDate = deadlineDateForWeek(weekStart);
   dueDate.setHours(23, 59, 59, 999);
   return dueDate;
 }
@@ -4134,7 +4270,7 @@ function adminAuditTargetForTable(table, id) {
 
 function setDefaultAdminExportWindow() {
   if (!els.adminExportStart.value) els.adminExportStart.value = toDateInput(app.weekStart);
-  if (!els.adminExportEnd.value) els.adminExportEnd.value = toDateInput(addDays(app.weekStart, 4));
+  if (!els.adminExportEnd.value) els.adminExportEnd.value = toDateInput(deadlineDateForWeek(app.weekStart));
 }
 
 async function exportAdminWork(event) {
@@ -4801,6 +4937,17 @@ function addDays(date, days) {
   const copy = new Date(date);
   copy.setDate(copy.getDate() + days);
   return copy;
+}
+
+function deadlineDateForWeek(weekStart) {
+  const start = typeof weekStart === "string" ? parseLocalDate(weekStart) : weekStart;
+  return addDays(start, workflowSettings.submissionDeadlineDayIndex);
+}
+
+function clampNumber(value, min, max) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return min;
+  return Math.min(max, Math.max(min, number));
 }
 
 function parseLocalDate(value) {

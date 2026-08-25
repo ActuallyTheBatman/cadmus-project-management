@@ -13,9 +13,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Libre+Baskerville:wght@700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/timesheets.css?v=20260824-user-search">
-  <script src="/assets/timesheets-config.js?v=20260824-manager-admin-capability"></script>
-  <script type="module" src="/assets/timesheets.js?v=20260824-user-search"></script>
+  <link rel="stylesheet" href="/assets/timesheets.css?v=20260824-enterprise-hardening">
+  <script src="/assets/timesheets-config.js?v=20260824-enterprise-hardening"></script>
+  <script type="module" src="/assets/timesheets.js?v=20260824-enterprise-hardening"></script>
 </head>
 <body>
   <nav class="nav" aria-label="Primary navigation">
@@ -240,8 +240,16 @@
                 <input id="portfolioWeek" type="date">
               </label>
               <button id="refreshPortfolio" class="button" type="button">Refresh</button>
+              <button id="exportApprovedReports" class="button" type="button">Export Approved</button>
               <button id="exportAudit" class="button" type="button">Export Audit</button>
             </div>
+          </div>
+          <div id="reportsSubNav" class="section-tabs hidden" aria-label="Reports sections">
+            <button class="section-tab" type="button" data-report-section-target="operations">Operations</button>
+            <button class="section-tab" type="button" data-report-section-target="missing">Missing</button>
+            <button class="section-tab" type="button" data-report-section-target="late">Late</button>
+            <button class="section-tab" type="button" data-report-section-target="approved">Approved Time</button>
+            <button class="section-tab" type="button" data-report-section-target="audit">Audit</button>
           </div>
           <div id="portfolioDashboard" class="portfolio-dashboard"></div>
           <div id="reviewQueueSummary" class="review-queue-summary"></div>
