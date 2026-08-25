@@ -41,6 +41,7 @@ const app = {
   adminAudit: [],
   pendingInvite: null,
   adminProjectFocus: "all",
+  activeAdminSection: "overview",
   passwordRecovery: false,
   activeAppView: "dashboard",
   portfolioReminderTargets: {
@@ -132,6 +133,7 @@ const els = {
   refreshAdminAudit: document.querySelector("#refreshAdminAudit"),
   exportAdminAudit: document.querySelector("#exportAdminAudit"),
   adminAuditList: document.querySelector("#adminAuditList"),
+  adminSubNav: document.querySelector("#adminSubNav"),
   adminProjectFocus: document.querySelector("#adminProjectFocus"),
   adminProjectName: document.querySelector("#adminProjectName"),
   adminProjectCode: document.querySelector("#adminProjectCode"),
@@ -365,6 +367,11 @@ function bindEvents() {
     const button = event.target.closest("[data-app-view]");
     if (!button) return;
     setActiveAppView(button.dataset.appView);
+  });
+  els.adminSubNav.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-admin-section-target]");
+    if (!button) return;
+    setActiveAdminSection(button.dataset.adminSectionTarget);
   });
   els.profileProject.addEventListener("change", () => populateManagerSelect());
   els.profileBranch.addEventListener("change", () => populateDivisionSelect());
@@ -650,6 +657,7 @@ async function setActiveAppView(view) {
 
   if (nextView === "admin") {
     els.adminView.classList.remove("hidden");
+    setActiveAdminSection(app.activeAdminSection || "overview");
   }
 }
 
@@ -2659,6 +2667,24 @@ async function renderAdminConsole() {
   renderAdminLists();
   await renderAdminExceptions();
   await loadAndRenderAdminAudit();
+  setActiveAdminSection(app.activeAdminSection || "overview");
+}
+
+function setActiveAdminSection(section) {
+  const panels = [...els.adminView.querySelectorAll("[data-admin-section]")];
+  const available = new Set(panels.map((panel) => panel.dataset.adminSection));
+  const nextSection = available.has(section) ? section : "overview";
+  app.activeAdminSection = nextSection;
+
+  for (const panel of panels) {
+    panel.classList.toggle("hidden", panel.dataset.adminSection !== nextSection);
+  }
+
+  for (const button of els.adminSubNav.querySelectorAll("[data-admin-section-target]")) {
+    const active = button.dataset.adminSectionTarget === nextSection;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-current", active ? "page" : "false");
+  }
 }
 
 async function loadAdminProfiles() {
@@ -3083,6 +3109,7 @@ function focusPortfolioMissing() {
 
 function focusUserExceptions(status = "active") {
   setActiveAppView("admin");
+  setActiveAdminSection("users");
   els.adminUserStatus.value = status;
   els.adminUserBranch.value = "all";
   populateAdminUserDivisions();

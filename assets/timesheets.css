@@ -131,14 +131,16 @@ body.light-mode .app-nav {
   background: rgba(255, 253, 248, 0.78);
 }
 
-body.light-mode .app-nav-button {
+body.light-mode :is(.app-nav-button, .section-tab) {
   border-color: rgba(21, 24, 29, 0.14);
   color: rgba(21, 24, 29, 0.7);
   background: rgba(21, 24, 29, 0.03);
 }
 
 body.light-mode .app-nav-button:hover,
-body.light-mode .app-nav-button.active {
+body.light-mode .app-nav-button.active,
+body.light-mode .section-tab:hover,
+body.light-mode .section-tab.active {
   border-color: rgba(176, 132, 36, 0.42);
   color: var(--paper);
   background: rgba(176, 132, 36, 0.12);
@@ -324,6 +326,33 @@ h1 {
   border-color: rgba(214, 168, 71, 0.42);
   color: var(--paper);
   background: rgba(214, 168, 71, 0.11);
+}
+
+.section-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  border-bottom: 1px solid var(--line);
+  padding: 12px 18px;
+}
+
+.section-tab {
+  min-height: 36px;
+  border: 1px solid rgba(245, 241, 232, 0.12);
+  border-radius: 8px;
+  padding: 8px 11px;
+  color: rgba(245, 241, 232, 0.68);
+  background: rgba(255, 255, 255, 0.024);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.section-tab:hover,
+.section-tab.active {
+  border-color: rgba(214, 168, 71, 0.42);
+  color: var(--paper);
+  background: rgba(214, 168, 71, 0.1);
 }
 
 .user-chip {

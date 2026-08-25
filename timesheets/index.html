@@ -13,9 +13,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Libre+Baskerville:wght@700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/timesheets.css?v=20260824-app-navigation">
+  <link rel="stylesheet" href="/assets/timesheets.css?v=20260824-admin-tabs">
   <script src="/assets/timesheets-config.js?v=20260824-manager-admin-capability"></script>
-  <script type="module" src="/assets/timesheets.js?v=20260824-app-navigation"></script>
+  <script type="module" src="/assets/timesheets.js?v=20260824-admin-tabs"></script>
 </head>
 <body>
   <nav class="nav" aria-label="Primary navigation">
@@ -259,8 +259,18 @@
               <select id="adminProjectFocus"></select>
             </label>
           </div>
+          <div id="adminSubNav" class="section-tabs" aria-label="Admin console sections">
+            <button class="section-tab" type="button" data-admin-section-target="overview">Overview</button>
+            <button class="section-tab" type="button" data-admin-section-target="users">Users</button>
+            <button class="section-tab" type="button" data-admin-section-target="invitations">Invitations</button>
+            <button class="section-tab" type="button" data-admin-section-target="organization">Organization</button>
+            <button class="section-tab" type="button" data-admin-section-target="projects">Projects</button>
+            <button class="section-tab" type="button" data-admin-section-target="approvals">Approval Chains</button>
+            <button class="section-tab" type="button" data-admin-section-target="exports">Exports</button>
+            <button class="section-tab" type="button" data-admin-section-target="audit">Audit</button>
+          </div>
           <div class="admin-grid">
-            <section class="admin-card wide-card exceptions-card">
+            <section class="admin-card wide-card exceptions-card" data-admin-section="overview">
               <div class="admin-card-head">
                 <div>
                   <h3>Portfolio Exceptions</h3>
@@ -271,7 +281,7 @@
               <div id="adminExceptions" class="exceptions-grid"></div>
             </section>
 
-            <section class="admin-card wide-card">
+            <section class="admin-card wide-card" data-admin-section="audit">
               <div class="admin-card-head">
                 <div>
                   <h3>Admin Change Log</h3>
@@ -285,7 +295,7 @@
               <ul id="adminAuditList" class="admin-list"></ul>
             </section>
 
-            <form id="projectForm" class="admin-card">
+            <form id="projectForm" class="admin-card" data-admin-section="projects">
               <h3>Projects</h3>
               <label class="field"><span>Project name</span><input id="adminProjectName" type="text" required></label>
               <label class="field"><span>Code</span><input id="adminProjectCode" type="text" required></label>
@@ -299,7 +309,7 @@
               <ul id="projectList" class="admin-list"></ul>
             </form>
 
-            <form id="managerForm" class="admin-card">
+            <form id="managerForm" class="admin-card" data-admin-section="projects">
               <h3>Resource Managers</h3>
               <label class="field"><span>Project</span><select id="adminManagerProject" required></select></label>
               <label class="field"><span>Manager name</span><input id="adminManagerName" type="text" required></label>
@@ -308,7 +318,7 @@
               <ul id="managerList" class="admin-list"></ul>
             </form>
 
-            <form id="approvalChainForm" class="admin-card wide-card">
+            <form id="approvalChainForm" class="admin-card wide-card" data-admin-section="approvals">
               <h3>Approval Chains</h3>
               <div class="profile-grid tight-grid">
                 <label class="field"><span>Chain name</span><input id="approvalChainName" type="text" placeholder="BENCON Technology Controls" required></label>
@@ -324,21 +334,21 @@
               <ul id="approvalChainList" class="admin-list"></ul>
             </form>
 
-            <form id="domainForm" class="admin-card">
+            <form id="domainForm" class="admin-card" data-admin-section="organization">
               <h3>Allowed Domains</h3>
               <label class="field"><span>Email domain</span><input id="allowedDomain" type="text" placeholder="calstrs.com" required></label>
               <button class="button primary" type="submit">Add Domain</button>
               <ul id="domainList" class="admin-list"></ul>
             </form>
 
-            <form id="branchForm" class="admin-card">
+            <form id="branchForm" class="admin-card" data-admin-section="organization">
               <h3>Branches</h3>
               <label class="field"><span>Branch name</span><input id="adminBranchName" type="text" required></label>
               <button class="button primary" type="submit">Add Branch</button>
               <ul id="branchList" class="admin-list"></ul>
             </form>
 
-            <form id="divisionForm" class="admin-card">
+            <form id="divisionForm" class="admin-card" data-admin-section="organization">
               <h3>Divisions</h3>
               <label class="field"><span>Branch</span><select id="adminDivisionBranch" required></select></label>
               <label class="field"><span>Division name</span><input id="adminDivisionName" type="text" required></label>
@@ -346,7 +356,7 @@
               <ul id="divisionList" class="admin-list"></ul>
             </form>
 
-            <form id="taskForm" class="admin-card">
+            <form id="taskForm" class="admin-card" data-admin-section="projects">
               <h3>Task Codes</h3>
               <label class="field"><span>Project</span><select id="adminTaskProject" required></select></label>
               <label class="field"><span>Task name</span><input id="adminTaskName" type="text" required></label>
@@ -355,7 +365,7 @@
               <ul id="taskList" class="admin-list"></ul>
             </form>
 
-            <form id="adminExportForm" class="admin-card">
+            <form id="adminExportForm" class="admin-card" data-admin-section="exports">
               <h3>Work Export</h3>
               <label class="field"><span>Branch</span><select id="adminExportBranch" required></select></label>
               <label class="field"><span>Division</span><select id="adminExportDivision" required></select></label>
@@ -367,7 +377,7 @@
               </div>
             </form>
 
-            <form id="userFilterForm" class="admin-card wide-card">
+            <form id="userFilterForm" class="admin-card wide-card" data-admin-section="users">
               <h3>User Management</h3>
               <div class="profile-grid tight-grid">
                 <label class="field"><span>Branch</span><select id="adminUserBranch"></select></label>
@@ -382,7 +392,7 @@
               <ul id="userList" class="admin-list user-admin-list"></ul>
             </form>
 
-            <form id="inviteForm" class="admin-card wide-card">
+            <form id="inviteForm" class="admin-card wide-card" data-admin-section="invitations">
               <h3>Bulk Invitations</h3>
               <label class="field"><span>Email list</span><textarea id="inviteEmails" placeholder="one.email@example.com&#10;two.email@example.com"></textarea></label>
               <label class="field"><span>CSV import</span><textarea id="inviteCsv" placeholder="email,full_name,role,project,manager,branch,division&#10;ada@example.com,Ada Lovelace,resource,BENCON,Alex Morgan,Northern California,Project Controls"></textarea></label>
