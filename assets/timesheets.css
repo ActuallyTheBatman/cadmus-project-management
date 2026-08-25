@@ -519,44 +519,59 @@ h1 {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 18px;
-  padding: 14px 0;
+  margin-bottom: 10px;
+  padding: 10px 0;
   border-bottom: 1px solid var(--line);
 }
 
 .app-nav {
+  position: sticky;
+  top: 75px;
+  z-index: 19;
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 18px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  gap: 4px;
+  margin: 0 0 16px;
   border: 1px solid rgba(245, 241, 232, 0.12);
   border-radius: var(--radius);
-  padding: 8px;
-  background: rgba(255, 255, 255, 0.024);
+  padding: 5px;
+  background: rgba(7, 9, 12, 0.92);
+  backdrop-filter: blur(14px);
+  scrollbar-width: thin;
 }
 
 .app-nav-button {
-  min-height: 42px;
-  border: 1px solid rgba(245, 241, 232, 0.12);
-  border-radius: 8px;
-  padding: 10px 14px;
-  color: rgba(245, 241, 232, 0.7);
-  background: rgba(255, 255, 255, 0.026);
-  font-size: 12px;
-  font-weight: 900;
+  flex: 0 0 auto;
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 6px 11px;
+  color: rgba(245, 241, 232, 0.66);
+  background: transparent;
+  font-size: 11px;
+  font-weight: 800;
   text-transform: uppercase;
 }
 
 .app-nav-button span {
-  color: rgba(214, 168, 71, 0.86);
-  font-size: 10px;
+  color: rgba(214, 168, 71, 0.78);
+  font-size: 9px;
 }
 
-.app-nav-button:hover,
+.app-nav-button:hover {
+  color: var(--paper);
+  background: rgba(255, 255, 255, 0.05);
+}
+
 .app-nav-button.active {
   border-color: rgba(214, 168, 71, 0.42);
   color: var(--paper);
-  background: rgba(214, 168, 71, 0.11);
+  background: rgba(214, 168, 71, 0.13);
 }
 
 .section-tabs {
@@ -2104,6 +2119,7 @@ body.light-mode .calendar-badge.non_working {
 
 .admin-card {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
   align-content: start;
   border: 1px solid rgba(245, 241, 232, 0.14);
@@ -2160,8 +2176,8 @@ body.light-mode .calendar-badge.non_working {
 
 .exceptions-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 12px;
 }
 
 .exception-group {
@@ -2722,6 +2738,13 @@ footer {
   .queue-metric-grid,
   .review-meta,
   .review-days { grid-template-columns: 1fr; }
+
+  .app-nav {
+    position: static;
+    top: auto;
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
 
   .lifecycle-steps { grid-template-columns: 1fr 1fr; }
 
