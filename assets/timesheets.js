@@ -5704,68 +5704,28 @@ function renderUserAdminList() {
   for (const user of users) {
     const assignmentCount = app.adminAssignmentCounts?.get(user.id) || 0;
     const weekHours = app.adminWeekHours?.get(user.id) || 0;
+    const project = getProject(user.project_id);
+    const manager = getManager(user.manager_id);
     const row = document.createElement("tr");
     row.className = `resource-register-row ${user.active === false ? "inactive" : "active"}`;
     row.innerHTML = `
       <td><button class="task-name-link" type="button" data-open-user-detail="${escapeHtml(user.id)}">${escapeHtml(user.full_name || user.email)}</button></td>
       <td>${escapeHtml(user.email)}</td>
-      <td><select data-user-field="role">
-        <option value="resource">Resource</option>
-        <option value="manager">Project Manager</option>
-        <option value="admin">Portfolio Manager</option>
-      </select></td>
-      <td><select data-user-field="project_id"></select></td>
-      <td><select data-user-field="manager_id"></select></td>
-      <td><select data-user-field="branch"></select></td>
-      <td><select data-user-field="division"></select></td>
-      <td><span data-user-status>${user.active === false ? "Inactive" : "Active"}</span></td>
+      <td>${escapeHtml(roleLabel(user.role))}</td>
+      <td>${escapeHtml(project ? projectLabel(project) : "-")}</td>
+      <td>${escapeHtml(manager ? manager.manager_name : "-")}</td>
+      <td>${escapeHtml(user.branch || "-")}</td>
+      <td>${escapeHtml(user.division || "-")}</td>
+      <td><span class="status-pill ${user.active === false ? "rejected" : "approved"}">${user.active === false ? "Inactive" : "Active"}</span></td>
       <td>${escapeHtml(String(assignmentCount))}</td>
       <td>${escapeHtml(formatHours(weekHours))}h</td>
       <td><button class="button danger small-button" type="button" data-toggle-active>${user.active === false ? "Reactivate" : "Deactivate"}</button></td>
     `;
 
-    const roleSelect = row.querySelector('[data-user-field="role"]');
-    roleSelect.value = user.role || "resource";
-
-    const projectSelect = row.querySelector('[data-user-field="project_id"]');
-    populateProjectSelectElement(projectSelect, "Select project", "");
-    projectSelect.value = user.project_id || "";
-
-    const managerSelect = row.querySelector('[data-user-field="manager_id"]');
-    populateManagerOptionsForProject(managerSelect, projectSelect.value, user.manager_id);
-
-    const branchSelect = row.querySelector('[data-user-field="branch"]');
-    branchSelect.append(new Option("Select branch", ""));
-    for (const branchItem of app.branches) branchSelect.append(new Option(branchItem.name, branchItem.name));
-    branchSelect.value = user.branch || "";
-
-    const divisionSelect = row.querySelector('[data-user-field="division"]');
-    populateDivisionOptionsForBranch(divisionSelect, branchSelect.value, user.division);
-    const statusNode = row.querySelector("[data-user-status]");
-
-    roleSelect.addEventListener("change", async () => {
-      const previousRole = user.role || "resource";
-      const nextRole = roleSelect.value;
-      if (!confirmManagedUserChange(user, { role: nextRole })) {
-        roleSelect.value = previousRole;
-        return;
-      }
-      await updateManagedUser(user.id, { role: nextRole }, statusNode);
-    });
-    projectSelect.addEventListener("change", () => {
-      populateManagerOptionsForProject(managerSelect, projectSelect.value, "");
-      updateManagedUser(user.id, { project_id: projectSelect.value || null, manager_id: managerSelect.value || null }, statusNode);
-    });
-    managerSelect.addEventListener("change", () => updateManagedUser(user.id, { manager_id: managerSelect.value || null }, statusNode));
-    branchSelect.addEventListener("change", () => {
-      populateDivisionOptionsForBranch(divisionSelect, branchSelect.value, "");
-      updateManagedUser(user.id, { branch: branchSelect.value, division: divisionSelect.value }, statusNode);
-    });
-    divisionSelect.addEventListener("change", () => updateManagedUser(user.id, { division: divisionSelect.value }, statusNode));
     row.querySelector("[data-toggle-active]").addEventListener("click", () => {
       const nextActive = user.active === false;
       if (!confirmManagedUserChange(user, { active: nextActive })) return;
-      updateManagedUser(user.id, { active: nextActive }, statusNode);
+      updateManagedUser(user.id, { active: nextActive });
     });
     row.querySelector("[data-open-user-detail]").addEventListener("click", () => openUserDetail(user.id));
 
