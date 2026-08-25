@@ -98,6 +98,15 @@ body.light-mode .status-pill.rejected {
   background: rgba(186, 59, 47, 0.07);
 }
 
+body.light-mode .danger-zone {
+  border-color: rgba(186, 59, 47, 0.28);
+  background: rgba(186, 59, 47, 0.06);
+}
+
+body.light-mode .danger-zone .helper {
+  color: rgba(21, 24, 29, 0.62);
+}
+
 body.light-mode :is(.auth-panel, .panel, .admin-card, .review-card, .daily-card, .loading-view, .command-panel, .task-card, .notification-card, .task-register-scroll, .ops-summary-head, .ops-metric, .ops-breakdown, .queue-head, .queue-metric, .exception-group, .quality-head, .report-lifecycle, .adjustment-request-panel, .notice) {
   border-color: rgba(21, 24, 29, 0.14);
   background: rgba(255, 253, 248, 0.78);
@@ -1746,6 +1755,29 @@ body.light-mode .user-chip {
 
 .task-detail-resources h3 {
   margin-top: 0;
+}
+
+.danger-zone {
+  margin-top: 16px;
+  border-color: rgba(255, 113, 95, 0.32);
+  background: rgba(255, 113, 95, 0.06);
+}
+
+.danger-zone h3 {
+  color: var(--signal);
+}
+
+.danger-zone .helper {
+  color: rgba(245, 241, 232, 0.62);
+}
+
+.danger-zone .button {
+  border-color: rgba(255, 113, 95, 0.45);
+  color: var(--signal);
+}
+
+.danger-zone .button:hover {
+  background: rgba(255, 113, 95, 0.12);
 }
 
 .resource-register-row.active td:first-child {

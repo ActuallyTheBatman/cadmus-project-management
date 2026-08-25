@@ -77,7 +77,9 @@ const app = {
   taskResources: [],
   userTaskAssignments: [],
   activeTaskDetailId: "",
+  activeProjectDetailId: "",
   taskQuickAddOpen: false,
+  projectQuickAddOpen: false,
   projectResourceCounts: new Map(),
   reportFormat: "weekly_grid",
   weekStart: startOfWeek(new Date()),
@@ -99,6 +101,16 @@ const els = {
   projectSearch: document.querySelector("#projectSearch"),
   projectStatusFilter: document.querySelector("#projectStatusFilter"),
   projectCount: document.querySelector("#projectCount"),
+  projectQuickAddToggle: document.querySelector("#projectQuickAddToggle"),
+  projectQuickAddForm: document.querySelector("#projectQuickAddForm"),
+  projectQuickAddCancel: document.querySelector("#projectQuickAddCancel"),
+  projectQuickName: document.querySelector("#projectQuickName"),
+  projectQuickCode: document.querySelector("#projectQuickCode"),
+  projectQuickClient: document.querySelector("#projectQuickClient"),
+  projectQuickStatus: document.querySelector("#projectQuickStatus"),
+  projectDetailView: document.querySelector("#projectDetailView"),
+  projectDetailBreadcrumb: document.querySelector("#projectDetailBreadcrumb"),
+  projectDetailContent: document.querySelector("#projectDetailContent"),
   tasksView: document.querySelector("#tasksView"),
   tasksBreadcrumb: document.querySelector("#tasksBreadcrumb"),
   taskDetailView: document.querySelector("#taskDetailView"),
@@ -179,14 +191,12 @@ const els = {
   portfolioDashboard: document.querySelector("#portfolioDashboard"),
   reviewQueueSummary: document.querySelector("#reviewQueueSummary"),
   portfolioList: document.querySelector("#portfolioList"),
-  projectForm: document.querySelector("#projectForm"),
   managerForm: document.querySelector("#managerForm"),
   approvalChainForm: document.querySelector("#approvalChainForm"),
   domainForm: document.querySelector("#domainForm"),
   branchForm: document.querySelector("#branchForm"),
   divisionForm: document.querySelector("#divisionForm"),
   calendarDayForm: document.querySelector("#calendarDayForm"),
-  taskForm: document.querySelector("#taskForm"),
   adminExportForm: document.querySelector("#adminExportForm"),
   inviteForm: document.querySelector("#inviteForm"),
   refreshExceptions: document.querySelector("#refreshExceptions"),
@@ -196,18 +206,6 @@ const els = {
   adminAuditList: document.querySelector("#adminAuditList"),
   adminSubNav: document.querySelector("#adminSubNav"),
   adminProjectFocus: document.querySelector("#adminProjectFocus"),
-  adminProjectName: document.querySelector("#adminProjectName"),
-  adminProjectCode: document.querySelector("#adminProjectCode"),
-  adminProjectClient: document.querySelector("#adminProjectClient"),
-  adminProjectStatus: document.querySelector("#adminProjectStatus"),
-  adminProjectSponsor: document.querySelector("#adminProjectSponsor"),
-  adminProjectStart: document.querySelector("#adminProjectStart"),
-  adminProjectFinish: document.querySelector("#adminProjectFinish"),
-  adminProjectBudget: document.querySelector("#adminProjectBudget"),
-  adminProjectNotes: document.querySelector("#adminProjectNotes"),
-  adminFormatDaily: document.querySelector("#adminFormatDaily"),
-  adminFormatGrid: document.querySelector("#adminFormatGrid"),
-  adminFormatLog: document.querySelector("#adminFormatLog"),
   adminManagerProject: document.querySelector("#adminManagerProject"),
   adminManagerName: document.querySelector("#adminManagerName"),
   adminManagerEmail: document.querySelector("#adminManagerEmail"),
@@ -229,12 +227,6 @@ const els = {
   calendarProject: document.querySelector("#calendarProject"),
   calendarBranch: document.querySelector("#calendarBranch"),
   calendarDivision: document.querySelector("#calendarDivision"),
-  adminTaskProject: document.querySelector("#adminTaskProject"),
-  adminTaskName: document.querySelector("#adminTaskName"),
-  adminTaskCode: document.querySelector("#adminTaskCode"),
-  adminTaskStart: document.querySelector("#adminTaskStart"),
-  adminTaskFinish: document.querySelector("#adminTaskFinish"),
-  adminTaskOrder: document.querySelector("#adminTaskOrder"),
   adminExportBranch: document.querySelector("#adminExportBranch"),
   adminExportDivision: document.querySelector("#adminExportDivision"),
   adminExportStart: document.querySelector("#adminExportStart"),
@@ -256,14 +248,12 @@ const els = {
   inviteManager: document.querySelector("#inviteManager"),
   inviteBranch: document.querySelector("#inviteBranch"),
   inviteDivision: document.querySelector("#inviteDivision"),
-  projectList: document.querySelector("#projectList"),
   managerList: document.querySelector("#managerList"),
   approvalChainList: document.querySelector("#approvalChainList"),
   domainList: document.querySelector("#domainList"),
   branchList: document.querySelector("#branchList"),
   divisionList: document.querySelector("#divisionList"),
   calendarDayList: document.querySelector("#calendarDayList"),
-  taskList: document.querySelector("#taskList"),
   userList: document.querySelector("#userList"),
   adminMessage: document.querySelector("#adminMessage"),
 };
@@ -462,6 +452,17 @@ function bindEvents() {
   });
   els.projectSearch.addEventListener("input", renderProjectsView);
   els.projectStatusFilter.addEventListener("change", renderProjectsView);
+  els.projectQuickAddForm.addEventListener("submit", addProjectFromProjectsView);
+  els.projectQuickAddToggle.addEventListener("click", () => {
+    app.projectQuickAddOpen = !app.projectQuickAddOpen;
+    configureProjectQuickAdd();
+    if (app.projectQuickAddOpen) els.projectQuickName.focus();
+  });
+  els.projectQuickAddCancel.addEventListener("click", () => {
+    els.projectQuickAddForm.reset();
+    app.projectQuickAddOpen = false;
+    configureProjectQuickAdd();
+  });
   els.taskProjectFilter.addEventListener("change", loadTaskViewData);
   els.taskSearch.addEventListener("input", renderTasksView);
   els.taskQuickAddForm.addEventListener("submit", addTaskFromTaskView);
@@ -513,7 +514,6 @@ function bindEvents() {
     els.portfolioWeek.value = toDateInput(startOfWeek(parseLocalDate(els.portfolioWeek.value)));
     loadPortfolio();
   });
-  els.projectForm.addEventListener("submit", addProject);
   els.managerForm.addEventListener("submit", addManager);
   els.approvalChainForm.addEventListener("submit", addApprovalChain);
   els.approvalChainProject.addEventListener("change", populateApprovalChainApprovers);
@@ -523,7 +523,6 @@ function bindEvents() {
   els.divisionForm.addEventListener("submit", addDivision);
   els.calendarDayForm.addEventListener("submit", addCalendarDay);
   els.calendarBranch.addEventListener("change", populateCalendarDivisions);
-  els.taskForm.addEventListener("submit", addTask);
   els.adminExportForm.addEventListener("submit", exportAdminWork);
   els.adminApprovedExport.addEventListener("click", exportApprovedTime);
   els.refreshExceptions.addEventListener("click", renderAdminExceptions);
@@ -728,6 +727,7 @@ function hideAllViews() {
   els.dashboardView.classList.add("hidden");
   els.appView.classList.add("hidden");
   els.projectsView.classList.add("hidden");
+  els.projectDetailView.classList.add("hidden");
   els.tasksView.classList.add("hidden");
   els.taskDetailView.classList.add("hidden");
   els.notificationsView.classList.add("hidden");
@@ -747,7 +747,7 @@ function defaultAppView() {
 
 function allowedAppViews() {
   const views = ["dashboard", "timesheet", "tasks", "taskDetail", "notifications"];
-  if (canReviewPortfolio()) views.push("projects", "reviews", "reports");
+  if (canReviewPortfolio()) views.push("projects", "projectDetail", "reviews", "reports");
   if (isPortfolioManager()) views.push("admin");
   return views;
 }
@@ -781,6 +781,13 @@ async function setActiveAppView(view) {
   if (nextView === "projects") {
     els.projectsView.classList.remove("hidden");
     await loadProjectsViewData();
+    return;
+  }
+
+  if (nextView === "projectDetail") {
+    els.projectDetailView.classList.remove("hidden");
+    await loadProjectDetailData(app.activeProjectDetailId);
+    renderProjectDetailView();
     return;
   }
 
@@ -1006,8 +1013,44 @@ function renderTasksBreadcrumb() {
 
 async function loadProjectsViewData() {
   els.projectViewContent.innerHTML = `<div class="empty-state"><p>Loading projects...</p></div>`;
+  configureProjectQuickAdd();
   await loadProjectRegisterStats();
   renderProjectsView();
+}
+
+function configureProjectQuickAdd() {
+  const canManage = isPortfolioManager();
+  els.projectQuickAddToggle.classList.toggle("hidden", !canManage);
+  if (!canManage) app.projectQuickAddOpen = false;
+  els.projectQuickAddToggle.setAttribute("aria-expanded", String(app.projectQuickAddOpen));
+  els.projectQuickAddForm.classList.toggle("hidden", !canManage || !app.projectQuickAddOpen);
+}
+
+async function addProjectFromProjectsView(event) {
+  event.preventDefault();
+  if (!isPortfolioManager()) return;
+  const payload = {
+    name: els.projectQuickName.value.trim(),
+    code: els.projectQuickCode.value.trim().toUpperCase() || null,
+    client: els.projectQuickClient.value.trim() || "Cadmus",
+    project_status: els.projectQuickStatus.value || "active",
+    reporting_formats: ["weekly_grid"],
+    active: true,
+  };
+
+  if (!payload.name) return;
+
+  const { error } = await app.supabase.from("timesheet_projects").upsert(payload, { onConflict: "code" });
+  if (error) {
+    els.projectViewContent.insertAdjacentHTML("afterbegin", `<div class="notice"><p>${escapeHtml(error.message)}</p></div>`);
+    return;
+  }
+
+  await logAdminChange("created", "project", null, `${payload.name} (${payload.code || "no code"})`, payload);
+  els.projectQuickAddForm.reset();
+  app.projectQuickAddOpen = false;
+  await loadReferenceData();
+  await loadProjectsViewData();
 }
 
 async function loadProjectRegisterStats() {
@@ -1067,6 +1110,9 @@ function renderProjectsView() {
       </table>
     </div>
   `;
+  for (const button of els.projectViewContent.querySelectorAll("[data-open-project-detail]")) {
+    button.addEventListener("click", () => openProjectDetail(button.dataset.openProjectDetail));
+  }
   for (const button of els.projectViewContent.querySelectorAll("[data-open-project-tasks]")) {
     button.addEventListener("click", () => openProjectTasks(button.dataset.openProjectTasks));
   }
@@ -1078,13 +1124,13 @@ function projectRegisterRow(project) {
   const status = projectStatusMeta(project.project_status);
   return `
     <tr class="task-register-row">
-      <td><button class="task-name-link" type="button" data-open-project-tasks="${escapeHtml(project.id)}">${escapeHtml(projectLabel(project))}</button></td>
+      <td><button class="task-name-link" type="button" data-open-project-detail="${escapeHtml(project.id)}">${escapeHtml(projectLabel(project))}</button></td>
       <td>${escapeHtml(project.client || "-")}</td>
       <td><span class="status-pill ${escapeHtml(status.tone)}">${escapeHtml(status.label)}</span></td>
       <td>${escapeHtml(project.sponsor || "-")}</td>
       <td>${escapeHtml(project.planned_start_date ? formatShortDate(project.planned_start_date) : "-")}</td>
       <td>${escapeHtml(project.planned_finish_date ? formatShortDate(project.planned_finish_date) : "-")}</td>
-      <td>${escapeHtml(String(taskCount))}</td>
+      <td><button class="task-name-link" type="button" data-open-project-tasks="${escapeHtml(project.id)}">${escapeHtml(String(taskCount))}</button></td>
       <td>${escapeHtml(String(resourceCount))}</td>
     </tr>
   `;
@@ -1102,6 +1148,164 @@ function projectStatusMeta(status) {
 function openProjectTasks(projectId) {
   if (canReviewPortfolio()) els.taskProjectFilter.value = projectId;
   setActiveAppView("tasks");
+}
+
+function openProjectDetail(projectId) {
+  const project = getProject(projectId);
+  if (!project) return;
+  app.activeProjectDetailId = projectId;
+  setActiveAppView("projectDetail");
+}
+
+async function loadProjectDetailData(projectId) {
+  const project = getProject(projectId);
+  if (!project) return;
+  await loadProjectRegisterStats();
+}
+
+function renderProjectDetailView() {
+  if (!els.projectDetailContent) return;
+  const project = getProject(app.activeProjectDetailId);
+  if (!project) {
+    els.projectDetailBreadcrumb.innerHTML = "";
+    els.projectDetailContent.innerHTML = `<div class="empty-state"><p>This project could not be found. It may have been removed.</p></div>`;
+    return;
+  }
+
+  const canManage = isPortfolioManager();
+  const status = projectStatusMeta(project.project_status);
+  const taskCount = app.tasks.filter((task) => task.project_id === project.id).length;
+  const resourceCount = app.projectResourceCounts.get(project.id) || 0;
+  const projectTasks = app.tasks
+    .filter((task) => task.project_id === project.id)
+    .sort(compareTimelineTasks)
+    .slice(0, 8);
+  const formats = getEnabledFormatsForProject(project.id);
+
+  els.projectDetailBreadcrumb.innerHTML = renderBreadcrumb([
+    { label: "Projects", view: "projects" },
+    { label: projectLabel(project), current: true },
+  ]);
+  bindBreadcrumbActions(els.projectDetailBreadcrumb);
+
+  els.projectDetailContent.innerHTML = `
+    <div class="ops-summary-head">
+      <div>
+        <h3>${escapeHtml(projectLabel(project))}</h3>
+        <p>${escapeHtml(project.client || "No client entered")}</p>
+      </div>
+      <span class="status-pill ${escapeHtml(status.tone)}">${escapeHtml(status.label)}</span>
+    </div>
+    <div class="ops-metric-grid task-metrics">
+      ${opsMetric("Tasks", taskCount, "In this project", "")}
+      ${opsMetric("Resources", resourceCount, "Active on this project", "")}
+    </div>
+    <div id="projectDetailMessage" class="message" role="status"></div>
+    <form id="projectDetailForm" class="profile-grid" data-project-id="${escapeHtml(project.id)}">
+      <label class="field"><span>Project name</span><input data-project-field="name" type="text" value="${escapeHtml(project.name || "")}" ${canManage ? "required" : "disabled"}></label>
+      <label class="field"><span>Code</span><input data-project-field="code" type="text" value="${escapeHtml(project.code || "")}" ${canManage ? "" : "disabled"}></label>
+      <label class="field"><span>Client</span><input data-project-field="client" type="text" value="${escapeHtml(project.client || "")}" ${canManage ? "" : "disabled"}></label>
+      <label class="field"><span>Status</span><select data-project-field="project_status" ${canManage ? "" : "disabled"}>
+        <option value="active">Active</option>
+        <option value="planning">Planning</option>
+        <option value="paused">Paused</option>
+        <option value="closed">Closed</option>
+      </select></label>
+      <label class="field"><span>Sponsor</span><input data-project-field="sponsor" type="text" value="${escapeHtml(project.sponsor || "")}" ${canManage ? "" : "disabled"}></label>
+      <label class="field"><span>Start date</span><input data-project-field="planned_start_date" type="date" value="${escapeHtml(project.planned_start_date || "")}" ${canManage ? "" : "disabled"}></label>
+      <label class="field"><span>Finish date</span><input data-project-field="planned_finish_date" type="date" value="${escapeHtml(project.planned_finish_date || "")}" ${canManage ? "" : "disabled"}></label>
+      <label class="field"><span>Budget hours</span><input data-project-field="budget_hours" type="number" min="0" step="0.25" value="${escapeHtml(project.budget_hours ?? "")}" ${canManage ? "" : "disabled"}></label>
+      <label class="field wide-field"><span>Notes</span><textarea data-project-field="notes" ${canManage ? "" : "disabled"}>${escapeHtml(project.notes || "")}</textarea></label>
+    </form>
+    <div class="admin-card task-detail-resources">
+      <h3>Reporting Formats</h3>
+      <div class="format-options compact-options" data-project-formats="${escapeHtml(project.id)}">
+        ${Object.entries(reportingFormats).map(([value, label]) => `
+          <label><input type="checkbox" value="${escapeHtml(value)}" ${formats.includes(value) ? "checked" : ""} ${canManage ? "" : "disabled"}> ${escapeHtml(label)}</label>
+        `).join("")}
+      </div>
+    </div>
+    <div class="admin-card task-detail-resources">
+      <div class="admin-card-head">
+        <div>
+          <h3>Tasks</h3>
+          <p class="helper">${projectTasks.length ? `Showing ${projectTasks.length} of ${taskCount}.` : "No tasks yet."}</p>
+        </div>
+        <button class="button small-button" type="button" data-open-project-tasks="${escapeHtml(project.id)}">Open Tasks Register</button>
+      </div>
+      ${projectTasks.length ? `
+        <ul class="admin-list">
+          ${projectTasks.map((task) => {
+            const taskStatus = taskPlanningStatus(task);
+            return `
+              <li class="admin-item">
+                <div>
+                  <button class="task-name-link" type="button" data-open-task-detail="${escapeHtml(task.id)}">${escapeHtml(task.name || "Untitled task")}</button>
+                  <span>${escapeHtml(taskDateLabel(task))}</span>
+                </div>
+                <span class="status-pill ${escapeHtml(taskStatus.tone)}">${escapeHtml(taskStatus.label)}</span>
+              </li>
+            `;
+          }).join("")}
+        </ul>
+      ` : ""}
+    </div>
+    ${canManage ? `
+      <div class="admin-card task-detail-resources danger-zone">
+        <h3>Deactivate Project</h3>
+        <p class="helper">Removes this project from registers and filters. Existing time entries and tasks are kept.</p>
+        <button class="button danger small-button" type="button" data-deactivate-project="${escapeHtml(project.id)}">Deactivate Project</button>
+      </div>
+    ` : ""}
+  `;
+  bindProjectDetailActions(project);
+}
+
+function bindProjectDetailActions(project) {
+  const canManage = isPortfolioManager();
+  const form = els.projectDetailContent.querySelector("#projectDetailForm");
+  if (form && canManage) {
+    for (const field of form.querySelectorAll("[data-project-field]")) {
+      field.addEventListener("change", () => updateProjectDetails(project.id, form));
+    }
+  }
+
+  const formatsBox = els.projectDetailContent.querySelector("[data-project-formats]");
+  if (formatsBox && canManage) {
+    for (const input of formatsBox.querySelectorAll('input[type="checkbox"]')) {
+      input.addEventListener("change", () => updateProjectFormats(project.id, formatsBox));
+    }
+  }
+
+  for (const button of els.projectDetailContent.querySelectorAll("[data-open-project-tasks]")) {
+    button.addEventListener("click", () => openProjectTasks(button.dataset.openProjectTasks));
+  }
+
+  for (const button of els.projectDetailContent.querySelectorAll("[data-open-task-detail]")) {
+    button.addEventListener("click", () => openTaskDetail(button.dataset.openTaskDetail));
+  }
+
+  const deactivateButton = els.projectDetailContent.querySelector("[data-deactivate-project]");
+  if (deactivateButton) {
+    deactivateButton.addEventListener("click", () => deactivateProjectFromDetail(project.id));
+  }
+}
+
+async function deactivateProjectFromDetail(projectId) {
+  const project = getProject(projectId);
+  if (!project || !isPortfolioManager()) return;
+  if (!window.confirm(`Deactivate ${projectLabel(project)}? It will no longer appear in registers or filters. Existing tasks and time entries are kept.`)) return;
+
+  const { error } = await app.supabase.from("timesheet_projects").update({ active: false }).eq("id", projectId);
+  if (error) {
+    const messageNode = els.projectDetailContent.querySelector("#projectDetailMessage");
+    if (messageNode) setMessage(messageNode, error.message, true);
+    return;
+  }
+
+  await logAdminChange("deactivated", "project", projectId, projectLabel(project), {});
+  await loadReferenceData();
+  setActiveAppView("projects");
 }
 
 function renderTasksView() {
@@ -4575,7 +4779,7 @@ function populateAdminSelects() {
   populateProjectSelectElement(els.adminProjectFocus, "All active projects", "all");
   els.adminProjectFocus.value = app.adminProjectFocus;
 
-  const projectSelects = [els.adminManagerProject, els.adminTaskProject, els.inviteProject, els.approvalChainProject, els.calendarProject];
+  const projectSelects = [els.adminManagerProject, els.inviteProject, els.approvalChainProject, els.calendarProject];
   for (const select of projectSelects) {
     populateProjectSelectElement(select, select === els.approvalChainProject || select === els.calendarProject ? "Any project" : "Select project", "");
     if (app.adminProjectFocus !== "all") select.value = app.adminProjectFocus;
@@ -4787,12 +4991,10 @@ function populateManagerSelectElement(select, managers, placeholder, placeholder
 }
 
 function renderAdminLists() {
-  renderProjectAdminList();
   renderApprovalChainAdminList();
   renderDomainAdminList();
   renderCalendarAdminList();
   const managers = filterByFocusedProject(app.managers);
-  const tasks = filterByFocusedProject(app.tasks);
   renderManagerAdminList(managers);
   renderAdminList(
     els.branchList,
@@ -4807,13 +5009,6 @@ function renderAdminLists() {
     (division) => division.name,
     (division) => app.branches.find((branch) => branch.id === division.branch_id)?.name || "All branches",
     (division) => deactivateAdminItem("timesheet_divisions", division.id, "Division removed."),
-  );
-  renderAdminList(
-    els.taskList,
-    tasks,
-    (task) => taskLabel(task),
-    (task) => taskScheduleLabel(task),
-    (task) => deactivateAdminItem("timesheet_tasks", task.id, "Task removed."),
   );
   renderUserAdminList();
 }
@@ -5145,61 +5340,6 @@ function formatEntityType(entityType) {
 function filterByFocusedProject(items) {
   if (app.adminProjectFocus === "all") return items;
   return items.filter((item) => item.project_id === app.adminProjectFocus || item.id === app.adminProjectFocus);
-}
-
-function renderProjectAdminList() {
-  els.projectList.innerHTML = "";
-  if (!app.projects.length) {
-    els.projectList.innerHTML = `<li class="admin-item"><span>No active projects configured.</span></li>`;
-    return;
-  }
-
-  for (const project of app.projects) {
-    const formats = getEnabledFormatsForProject(project.id);
-    const item = document.createElement("li");
-    item.className = "admin-item admin-item-stacked project-admin-item";
-    item.innerHTML = `
-      <div class="admin-item-main">
-        <div>
-          <strong>${escapeHtml(projectLabel(project))}</strong>
-          <span>${escapeHtml(projectSummary(project))}</span>
-          <span class="admin-row-status" data-project-status>Ready</span>
-        </div>
-        <button class="button danger small-button" type="button">Remove</button>
-      </div>
-      <div class="profile-grid tight-grid">
-        <label class="field"><span>Name</span><input data-project-field="name" type="text" value="${escapeHtml(project.name || "")}"></label>
-        <label class="field"><span>Code</span><input data-project-field="code" type="text" value="${escapeHtml(project.code || "")}"></label>
-        <label class="field"><span>Client</span><input data-project-field="client" type="text" value="${escapeHtml(project.client || "")}"></label>
-        <label class="field"><span>Status</span><select data-project-field="project_status">
-          <option value="active">Active</option>
-          <option value="planning">Planning</option>
-          <option value="paused">Paused</option>
-          <option value="closed">Closed</option>
-        </select></label>
-        <label class="field"><span>Sponsor</span><input data-project-field="sponsor" type="text" value="${escapeHtml(project.sponsor || "")}"></label>
-        <label class="field"><span>Start date</span><input data-project-field="planned_start_date" type="date" value="${escapeHtml(project.planned_start_date || "")}"></label>
-        <label class="field"><span>Finish date</span><input data-project-field="planned_finish_date" type="date" value="${escapeHtml(project.planned_finish_date || "")}"></label>
-        <label class="field"><span>Budget hours</span><input data-project-field="budget_hours" type="number" min="0" step="0.25" value="${escapeHtml(project.budget_hours ?? "")}"></label>
-      </div>
-      <label class="field"><span>Notes</span><textarea data-project-field="notes">${escapeHtml(project.notes || "")}</textarea></label>
-      <div class="format-options compact-options">
-        ${Object.entries(reportingFormats).map(([value, label]) => `
-          <label><input type="checkbox" value="${escapeHtml(value)}" ${formats.includes(value) ? "checked" : ""}> ${escapeHtml(label)}</label>
-        `).join("")}
-      </div>
-    `;
-
-    item.querySelector('[data-project-field="project_status"]').value = project.project_status || "active";
-    item.querySelector("button").addEventListener("click", () => deactivateAdminItem("timesheet_projects", project.id, "Project removed."));
-    for (const input of item.querySelectorAll("[data-project-field]")) {
-      input.addEventListener("change", () => updateProjectDetails(project.id, item));
-    }
-    for (const input of item.querySelectorAll('.format-options input[type="checkbox"]')) {
-      input.addEventListener("change", () => updateProjectFormats(project.id, item));
-    }
-    els.projectList.append(item);
-  }
 }
 
 function renderApprovalChainAdminList() {
@@ -5543,44 +5683,8 @@ function setRowStatus(node, message, isError = false) {
   node.classList.toggle("error", isError);
 }
 
-async function addProject(event) {
-  event.preventDefault();
-  setMessage(els.adminMessage, "Adding project...");
-  const payload = {
-    name: els.adminProjectName.value.trim(),
-    code: els.adminProjectCode.value.trim().toUpperCase() || null,
-    client: els.adminProjectClient.value.trim() || "Cadmus",
-    project_status: els.adminProjectStatus.value || "active",
-    sponsor: els.adminProjectSponsor.value.trim() || null,
-    planned_start_date: els.adminProjectStart.value || null,
-    planned_finish_date: els.adminProjectFinish.value || null,
-    budget_hours: els.adminProjectBudget.value === "" ? null : Number(els.adminProjectBudget.value),
-    notes: els.adminProjectNotes.value.trim() || null,
-    reporting_formats: getSelectedAdminFormats(),
-    active: true,
-  };
-
-  if (!payload.name || payload.reporting_formats.length === 0) {
-    setMessage(els.adminMessage, "Project name and at least one reporting format are required.", true);
-    return;
-  }
-
-  if (payload.planned_start_date && payload.planned_finish_date && parseLocalDate(payload.planned_finish_date) < parseLocalDate(payload.planned_start_date)) {
-    setMessage(els.adminMessage, "Project finish date must be on or after the start date.", true);
-    return;
-  }
-
-  const { error } = await app.supabase.from("timesheet_projects").upsert(payload, { onConflict: "code" });
-  await finishAdminSave(error, els.projectForm, "Project saved.", {
-    action: "created",
-    entityType: "project",
-    entityLabel: `${payload.name} (${payload.code || "no code"})`,
-    details: payload,
-  });
-}
-
 async function updateProjectDetails(projectId, row) {
-  const statusNode = row.querySelector("[data-project-status]");
+  const messageNode = els.projectDetailContent.querySelector("#projectDetailMessage");
   const field = (name) => row.querySelector(`[data-project-field="${name}"]`);
   const payload = {
     name: field("name").value.trim(),
@@ -5595,25 +5699,22 @@ async function updateProjectDetails(projectId, row) {
   };
 
   if (!payload.name) {
-    setRowStatus(statusNode, "Project name required", true);
+    if (messageNode) setMessage(messageNode, "Project name is required.", true);
     return;
   }
 
   if (payload.planned_start_date && payload.planned_finish_date && parseLocalDate(payload.planned_finish_date) < parseLocalDate(payload.planned_start_date)) {
-    setRowStatus(statusNode, "Check dates", true);
-    setMessage(els.adminMessage, "Project finish date must be on or after the start date.", true);
+    if (messageNode) setMessage(messageNode, "Finish date must be on or after the start date.", true);
     return;
   }
 
-  setRowStatus(statusNode, "Saving...");
   const { error } = await app.supabase
     .from("timesheet_projects")
     .update(payload)
     .eq("id", projectId);
 
   if (error) {
-    setRowStatus(statusNode, "Error", true);
-    setMessage(els.adminMessage, error.message, true);
+    if (messageNode) setMessage(messageNode, error.message, true);
     return;
   }
 
@@ -5622,28 +5723,28 @@ async function updateProjectDetails(projectId, row) {
   await logAdminChange("updated", "project", projectId, projectLabel(project), payload);
   renderProfileSummary();
   if (app.profile?.project_id === projectId) renderDailyReports();
-  await loadAndRenderAdminAudit();
-  setRowStatus(statusNode, "Saved");
-  setMessage(els.adminMessage, "Project updated.");
+  renderProjectDetailView();
+  const refreshedMessage = els.projectDetailContent.querySelector("#projectDetailMessage");
+  if (refreshedMessage) setMessage(refreshedMessage, "Saved.");
 }
 
 async function updateProjectFormats(projectId, row) {
-  const selected = [...row.querySelectorAll('.format-options input[type="checkbox"]:checked')].map((input) => input.value);
+  const messageNode = els.projectDetailContent.querySelector("#projectDetailMessage");
+  const selected = [...row.querySelectorAll('input[type="checkbox"]:checked')].map((input) => input.value);
   if (selected.length === 0) {
-    setMessage(els.adminMessage, "Each active project needs at least one reporting format.", true);
-    await renderAdminConsole();
+    if (messageNode) setMessage(messageNode, "Each active project needs at least one reporting format.", true);
+    renderProjectDetailView();
     return;
   }
 
-  setMessage(els.adminMessage, "Updating project views...");
   const { error } = await app.supabase
     .from("timesheet_projects")
     .update({ reporting_formats: selected })
     .eq("id", projectId);
 
   if (error) {
-    setMessage(els.adminMessage, error.message, true);
-    await renderAdminConsole();
+    if (messageNode) setMessage(messageNode, error.message, true);
+    renderProjectDetailView();
     return;
   }
 
@@ -5651,8 +5752,9 @@ async function updateProjectFormats(projectId, row) {
   if (project) project.reporting_formats = selected;
   await logAdminChange("updated", "project", projectId, projectLabel(project), { reporting_formats: selected });
   if (app.profile?.project_id === projectId) renderDailyReports();
-  await loadAndRenderAdminAudit();
-  setMessage(els.adminMessage, "Project views updated.");
+  renderProjectDetailView();
+  const refreshedMessage = els.projectDetailContent.querySelector("#projectDetailMessage");
+  if (refreshedMessage) setMessage(refreshedMessage, "Reporting formats updated.");
 }
 
 async function deactivateAdminItem(table, id, successMessage) {
@@ -5851,38 +5953,6 @@ async function addCalendarDay(event) {
       ...payload,
       project: payload.project_id ? projectLabel(getProject(payload.project_id)) : "All projects",
     },
-  });
-}
-
-async function addTask(event) {
-  event.preventDefault();
-  setMessage(els.adminMessage, "Adding task...");
-  const payload = {
-    project_id: els.adminTaskProject.value,
-    name: els.adminTaskName.value.trim(),
-    code: els.adminTaskCode.value.trim().toUpperCase() || null,
-    planned_start_date: els.adminTaskStart.value || null,
-    planned_finish_date: els.adminTaskFinish.value || null,
-    display_order: els.adminTaskOrder.value === "" ? null : Number(els.adminTaskOrder.value),
-    active: true,
-  };
-
-  if (!payload.project_id || !payload.name) {
-    setMessage(els.adminMessage, "Project and task name are required.", true);
-    return;
-  }
-
-  if (payload.planned_start_date && payload.planned_finish_date && parseLocalDate(payload.planned_finish_date) < parseLocalDate(payload.planned_start_date)) {
-    setMessage(els.adminMessage, "Task finish date must be on or after the start date.", true);
-    return;
-  }
-
-  const { error } = await app.supabase.from("timesheet_tasks").upsert(payload, { onConflict: "project_id,name" });
-  await finishAdminSave(error, els.taskForm, "Task saved.", {
-    action: "created",
-    entityType: "task",
-    entityLabel: taskLabel(payload),
-    details: { ...payload, project: projectLabel(getProject(payload.project_id)) },
   });
 }
 
@@ -6121,11 +6191,6 @@ async function finishAdminSave(error, form, successMessage, auditEvent = null) {
   }
 
   form.reset();
-  if (form === els.projectForm) {
-    els.adminFormatDaily.checked = false;
-    els.adminFormatGrid.checked = true;
-    els.adminFormatLog.checked = false;
-  }
   if (form === els.approvalChainForm) {
     if (app.adminProjectFocus !== "all") els.approvalChainProject.value = app.adminProjectFocus;
     populateApprovalChainBranches();
@@ -6689,16 +6754,6 @@ function getEnabledFormatsForProject(projectId) {
   const project = getProject(projectId);
   const formats = Array.isArray(project?.reporting_formats) ? project.reporting_formats : ["daily_cards"];
   return formats.filter((format) => reportingFormats[format]);
-}
-
-function getSelectedAdminFormats() {
-  return [
-    els.adminFormatDaily,
-    els.adminFormatGrid,
-    els.adminFormatLog,
-  ]
-    .filter((input) => input.checked)
-    .map((input) => input.value);
 }
 
 function formatLabel(format) {

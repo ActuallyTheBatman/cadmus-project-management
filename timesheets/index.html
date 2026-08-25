@@ -243,8 +243,8 @@
         <section id="projectsView" class="panel hidden">
           <div class="panel-head">
             <div>
-              <h2>Projects</h2>
-              <p class="helper">Browse the portfolio. Click a project to open its tasks.</p>
+              <h2>Projects <button id="projectQuickAddToggle" class="icon-button inline-add-toggle" type="button" aria-label="Add project" aria-expanded="false">+</button></h2>
+              <p class="helper">Browse the portfolio. Click a project to open its details.</p>
             </div>
             <div class="toolbar">
               <label class="field inline-filter">
@@ -263,6 +263,21 @@
               </label>
             </div>
           </div>
+          <form id="projectQuickAddForm" class="panel-body task-quick-add hidden">
+            <label class="field"><span>Project name</span><input id="projectQuickName" type="text" required></label>
+            <label class="field"><span>Code</span><input id="projectQuickCode" type="text" required></label>
+            <label class="field"><span>Client</span><input id="projectQuickClient" type="text" value="Cadmus"></label>
+            <label class="field"><span>Status</span><select id="projectQuickStatus">
+              <option value="active">Active</option>
+              <option value="planning">Planning</option>
+              <option value="paused">Paused</option>
+              <option value="closed">Closed</option>
+            </select></label>
+            <div class="toolbar">
+              <button class="button primary" type="submit">Add Project</button>
+              <button id="projectQuickAddCancel" class="button" type="button">Cancel</button>
+            </div>
+          </form>
           <div id="projectCount" class="admin-result-count">Showing active projects</div>
           <div id="projectViewContent" class="portfolio-dashboard"></div>
         </section>
@@ -309,6 +324,17 @@
             </div>
           </div>
           <div id="taskDetailContent"></div>
+        </section>
+
+        <section id="projectDetailView" class="panel hidden">
+          <div class="panel-head">
+            <div>
+              <div id="projectDetailBreadcrumb" class="breadcrumb"></div>
+              <h2>Project Details</h2>
+              <p class="helper">Edit project properties and see its task and resource load.</p>
+            </div>
+          </div>
+          <div id="projectDetailContent"></div>
         </section>
 
         <section id="notificationsView" class="panel hidden">
@@ -405,7 +431,7 @@
             <button class="section-tab" type="button" data-admin-section-target="invitations">Invitations</button>
             <button class="section-tab" type="button" data-admin-section-target="organization">Organization</button>
             <button class="section-tab" type="button" data-admin-section-target="calendar">Calendar</button>
-            <button class="section-tab" type="button" data-admin-section-target="projects">Projects</button>
+            <button class="section-tab" type="button" data-admin-section-target="managers">Resource Managers</button>
             <button class="section-tab" type="button" data-admin-section-target="approvals">Approval Chains</button>
             <button class="section-tab" type="button" data-admin-section-target="exports">Exports</button>
             <button class="section-tab" type="button" data-admin-section-target="audit">Audit</button>
@@ -436,34 +462,7 @@
               <ul id="adminAuditList" class="admin-list"></ul>
             </section>
 
-            <form id="projectForm" class="admin-card" data-admin-section="projects">
-              <h3>Projects</h3>
-              <label class="field"><span>Project name</span><input id="adminProjectName" type="text" required></label>
-              <label class="field"><span>Code</span><input id="adminProjectCode" type="text" required></label>
-              <label class="field"><span>Client</span><input id="adminProjectClient" type="text" value="Cadmus"></label>
-              <div class="profile-grid tight-grid">
-                <label class="field"><span>Status</span><select id="adminProjectStatus">
-                  <option value="active">Active</option>
-                  <option value="planning">Planning</option>
-                  <option value="paused">Paused</option>
-                  <option value="closed">Closed</option>
-                </select></label>
-                <label class="field"><span>Sponsor</span><input id="adminProjectSponsor" type="text"></label>
-                <label class="field"><span>Start date</span><input id="adminProjectStart" type="date"></label>
-                <label class="field"><span>Finish date</span><input id="adminProjectFinish" type="date"></label>
-                <label class="field"><span>Budget hours</span><input id="adminProjectBudget" type="number" min="0" step="0.25"></label>
-              </div>
-              <label class="field"><span>Notes</span><textarea id="adminProjectNotes" placeholder="Scope notes, operating context, or reporting expectations"></textarea></label>
-              <div class="format-options" aria-label="Enabled reporting formats">
-                <label><input id="adminFormatDaily" type="checkbox" value="daily_cards"> Daily Cards</label>
-                <label><input id="adminFormatGrid" type="checkbox" value="weekly_grid" checked> Weekly Grid</label>
-                <label><input id="adminFormatLog" type="checkbox" value="work_log"> Work Log</label>
-              </div>
-              <button class="button primary" type="submit">Add Project</button>
-              <ul id="projectList" class="admin-list"></ul>
-            </form>
-
-            <form id="managerForm" class="admin-card" data-admin-section="projects">
+            <form id="managerForm" class="admin-card" data-admin-section="managers">
               <h3>Resource Managers</h3>
               <label class="field"><span>Project</span><select id="adminManagerProject" required></select></label>
               <label class="field"><span>Manager name</span><input id="adminManagerName" type="text" required></label>
@@ -526,20 +525,6 @@
               </div>
               <button class="button primary" type="submit">Add Calendar Day</button>
               <ul id="calendarDayList" class="admin-list calendar-list"></ul>
-            </form>
-
-            <form id="taskForm" class="admin-card" data-admin-section="projects">
-              <h3>Task Codes</h3>
-              <label class="field"><span>Project</span><select id="adminTaskProject" required></select></label>
-              <label class="field"><span>Task name</span><input id="adminTaskName" type="text" required></label>
-              <label class="field"><span>Code</span><input id="adminTaskCode" type="text"></label>
-              <div class="profile-grid tight-grid">
-                <label class="field"><span>Start date</span><input id="adminTaskStart" type="date"></label>
-                <label class="field"><span>Finish date</span><input id="adminTaskFinish" type="date"></label>
-                <label class="field"><span>Display order</span><input id="adminTaskOrder" type="number" min="0" step="1"></label>
-              </div>
-              <button class="button primary" type="submit">Add Task</button>
-              <ul id="taskList" class="admin-list"></ul>
             </form>
 
             <form id="adminExportForm" class="admin-card" data-admin-section="exports">
