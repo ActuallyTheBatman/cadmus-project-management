@@ -73,6 +73,22 @@ body.light-mode .button.danger {
   background: rgba(186, 59, 47, 0.04);
 }
 
+body.light-mode .button:not(:disabled):hover {
+  background: rgba(21, 24, 29, 0.07);
+}
+
+body.light-mode :is(.admin-card, .review-card, .daily-card, .notification-card, .task-card):hover {
+  box-shadow: 0 8px 20px rgba(21, 24, 29, 0.1);
+}
+
+body.light-mode :is(.resource-register-row, .task-register-row):hover td {
+  background: rgba(21, 24, 29, 0.03);
+}
+
+body.light-mode .icon-button:hover {
+  box-shadow: 0 4px 12px rgba(21, 24, 29, 0.14);
+}
+
 body.light-mode .status-pill {
   border-color: rgba(21, 24, 29, 0.18);
   color: rgba(21, 24, 29, 0.72);
@@ -337,6 +353,94 @@ body.light-mode .section-tab.active {
 a { color: inherit; text-decoration: none; }
 button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }
+
+/* Interaction polish: consistent motion, elevation, and focus across every
+   interactive surface. Nothing here changes layout or color values already
+   set elsewhere - purely additive transitions, hover/focus states, and a
+   shared card-lift treatment. */
+a,
+button,
+input,
+select,
+textarea,
+.button,
+.icon-button,
+.app-nav-button,
+.section-tab,
+.task-name-link,
+.breadcrumb-crumb,
+.status-pill,
+.admin-card,
+.review-card,
+.daily-card,
+.notification-card,
+.task-card,
+.command-panel,
+.admin-item,
+.resource-register-row td,
+.task-register-row td {
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, box-shadow 150ms ease, transform 150ms ease, opacity 150ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+.button:focus-visible,
+.icon-button:focus-visible,
+.task-name-link:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(214, 168, 71, 0.28);
+  border-radius: 6px;
+}
+
+.button:not(:disabled):hover {
+  border-color: rgba(214, 168, 71, 0.4);
+  background: rgba(255, 255, 255, 0.06);
+  transform: translateY(-1px);
+}
+
+.button.primary:not(:disabled):hover {
+  box-shadow: 0 6px 16px rgba(214, 168, 71, 0.24);
+  transform: translateY(-1px);
+}
+
+.button.danger:not(:disabled):hover {
+  box-shadow: 0 6px 16px rgba(255, 113, 95, 0.2);
+}
+
+.button:not(:disabled):active,
+.icon-button:not(:disabled):active {
+  transform: translateY(0);
+}
+
+.icon-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.22);
+}
+
+.admin-card:hover,
+.review-card:hover,
+.daily-card:hover,
+.notification-card:hover,
+.task-card:hover {
+  border-color: rgba(214, 168, 71, 0.22);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.16);
+}
+
+.resource-register-row:hover td,
+.task-register-row:hover td {
+  background: rgba(255, 255, 255, 0.032);
+}
+
+.task-name-link:hover {
+  transform: translateX(1px);
+}
 
 .wrap {
   width: min(1180px, calc(100% - 48px));
