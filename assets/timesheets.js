@@ -2070,12 +2070,12 @@ function renderPortfolioDashboard({ selectedWeek, selectedProjectId, profiles, r
       </div>
     </div>
     <div class="ops-metric-grid">
-      ${opsMetric("Submission Rate", `${submissionRate}%`, `${submitted} of ${profiles.length} submitted or approved`)}
-      ${opsMetric("Utilization", `${utilizationRate}%`, `${formatHours(totalHours)}h of ${formatHours(capacityHours)}h capacity`)}
-      ${opsMetric("Approval Backlog", pendingApproval, `${oldestBacklogDays}d oldest waiting report`)}
-      ${opsMetric("Missing / Draft", missingProfiles.length, "Not submitted or sent back")}
-      ${opsMetric("Late Submissions", lateSubmissions, "Submitted after the Friday due date")}
-      ${opsMetric("Active Resources", profiles.length, "In the selected project scope")}
+      ${opsMetric("Submission Rate", `${submissionRate}%`, `${submitted} of ${profiles.length} submitted or approved`, metricTone(submissionRate, { good: 90, warn: 70 }))}
+      ${opsMetric("Utilization", `${utilizationRate}%`, `${formatHours(totalHours)}h of ${formatHours(capacityHours)}h capacity`, metricTone(utilizationRate, { good: 85, warn: 65 }))}
+      ${opsMetric("Approval Backlog", pendingApproval, `${oldestBacklogDays}d oldest waiting report`, pendingApproval ? "warning" : "success")}
+      ${opsMetric("Missing / Draft", missingProfiles.length, "Not submitted or sent back", missingProfiles.length ? "danger" : "success")}
+      ${opsMetric("Late Submissions", lateSubmissions, "Submitted after the Friday due date", lateSubmissions ? "danger" : "success")}
+      ${opsMetric("Active Resources", profiles.length, "In the selected project scope", "info")}
     </div>
     <div class="ops-breakdown-grid">
       ${opsBreakdown("Project Load", projectBreakdown, "No reported hours yet.")}
@@ -2224,9 +2224,9 @@ function mailtoUrl(email, subject, body) {
   return `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
-function opsMetric(label, value, helper) {
+function opsMetric(label, value, helper, tone = "neutral") {
   return `
-    <div class="ops-metric">
+    <div class="ops-metric ${escapeHtml(metricToneClass(tone))}">
       <span>${escapeHtml(label)}</span>
       <strong>${escapeHtml(value)}</strong>
       <p>${escapeHtml(helper)}</p>
@@ -2235,17 +2235,45 @@ function opsMetric(label, value, helper) {
 }
 
 function opsBreakdown(title, rows, emptyText) {
+  const visibleRows = rows.slice(0, 5);
+  const maxHours = Math.max(0, ...visibleRows.map((row) => Number(row.hours || 0)));
   return `
     <div class="ops-breakdown">
       <h4>${escapeHtml(title)}</h4>
-      ${rows.length ? rows.slice(0, 5).map((row) => `
-        <div class="ops-row">
-          <span>${escapeHtml(row.label)}</span>
-          <strong>${escapeHtml(formatHours(row.hours))}h</strong>
-        </div>
-      `).join("") : `<p>${escapeHtml(emptyText)}</p>`}
+      ${visibleRows.length ? `<div class="ops-chart">${visibleRows.map((row, index) => opsChartRow(row, maxHours, index)).join("")}</div>` : `<p>${escapeHtml(emptyText)}</p>`}
     </div>
   `;
+}
+
+function opsChartRow(row, maxHours, index) {
+  const hours = Number(row.hours || 0);
+  const width = maxHours ? Math.max(4, Math.round((hours / maxHours) * 100)) : 0;
+  return `
+    <div class="ops-chart-row">
+      <div class="ops-chart-label">
+        <span>${escapeHtml(row.label)}</span>
+        <strong>${escapeHtml(formatHours(hours))}h</strong>
+      </div>
+      <div class="ops-chart-track" aria-hidden="true">
+        <div class="ops-chart-bar tone-${(index % 5) + 1}" style="width: ${width}%"></div>
+      </div>
+    </div>
+  `;
+}
+
+function metricTone(value, thresholds) {
+  if (Number(value || 0) >= thresholds.good) return "success";
+  if (Number(value || 0) >= thresholds.warn) return "warning";
+  return "danger";
+}
+
+function metricToneClass(tone) {
+  return {
+    success: "tone-success",
+    warning: "tone-warning",
+    danger: "tone-danger",
+    info: "tone-info",
+  }[tone] || "tone-neutral";
 }
 
 function summarizeByProject(reports, reportHours) {
