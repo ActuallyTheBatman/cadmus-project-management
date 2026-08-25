@@ -196,6 +196,18 @@ body.light-mode .task-register select {
   background: rgba(21, 24, 29, 0.035);
 }
 
+body.light-mode :is(.assigned-resource-list span, .assigned-resource-chip, .muted-chip) {
+  border-color: rgba(21, 24, 29, 0.18);
+  color: rgba(21, 24, 29, 0.82);
+  background: rgba(255, 255, 255, 0.76);
+}
+
+body.light-mode .task-assignment-add {
+  border-color: rgba(23, 111, 168, 0.42);
+  color: #176fa8;
+  background: rgba(23, 111, 168, 0.08);
+}
+
 body.light-mode :is(.task-assignment-drawer, .task-resource-result) {
   border-color: rgba(21, 24, 29, 0.14);
   background: rgba(255, 253, 248, 0.98);
