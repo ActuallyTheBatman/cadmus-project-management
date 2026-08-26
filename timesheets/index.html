@@ -4,639 +4,79 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Cadmus Resource Reporting | Cadmus Project Management</title>
-  <meta name="description" content="Cadmus Project Management resource reporting portal for weekly project updates, branch and division profile setup, manager review, and portfolio visibility.">
+  <meta name="description" content="Cadmus Project Management resource reporting portal.">
+  <meta name="robots" content="noindex">
   <link rel="canonical" href="https://cadmusprojects.com/timesheets/">
-  <meta property="og:title" content="Cadmus Resource Reporting">
-  <meta property="og:description" content="Weekly project reporting, manager review, and portfolio visibility for Cadmus resources.">
-  <meta property="og:image" content="https://cadmusprojects.com/assets/cadmus-hero.png">
-  <meta property="og:type" content="website">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Libre+Baskerville:wght@700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/timesheets.css?v=20260825-monday-shell">
-  <script src="/assets/timesheets-config.js?v=20260825-task-register"></script>
-  <script type="module" src="/assets/timesheets.js?v=20260825-app-active-shell"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      min-height: 100vh;
+      background: #07090c;
+      color: #f5f1e8;
+      font-family: Inter, Arial, sans-serif;
+    }
+    .wrap {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      max-width: 480px;
+      width: 100%;
+      border: 1px solid rgba(245, 241, 232, 0.14);
+      border-radius: 12px;
+      padding: 32px;
+      background: rgba(255, 255, 255, 0.03);
+      text-align: center;
+    }
+    .brand-mark {
+      width: 44px;
+      height: 44px;
+      margin: 0 auto 16px;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(214, 168, 71, 0.6);
+      border-radius: 50%;
+      color: #f2d98a;
+      font-family: Georgia, serif;
+      font-weight: 700;
+      background: rgba(214, 168, 71, 0.08);
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 20px;
+      font-weight: 700;
+    }
+    p {
+      margin: 0;
+      color: rgba(245, 241, 232, 0.7);
+      font-size: 14px;
+      line-height: 1.55;
+    }
+    a {
+      color: #f2d98a;
+      text-decoration: none;
+    }
+  </style>
 </head>
 <body>
-  <nav class="nav" aria-label="Primary navigation">
-    <div class="wrap nav-inner">
-      <a class="brand" href="/" aria-label="Cadmus Project Management home">
-        <span class="brand-mark">C</span>
-        <span>Cadmus Project Management</span>
-      </a>
-      <div class="nav-links">
-        <a href="/services/public-sector-project-management/">Services</a>
-        <a href="/resources/epc-project-controls/">Toolkit</a>
-        <a href="/timesheets/" aria-current="page">Reporting</a>
-        <a href="/about/">About</a>
-        <a href="/contact/">Contact</a>
-      </div>
+  <div class="wrap">
+    <div class="card">
+      <div class="brand-mark">C</div>
+      <h1>Resource Reporting is temporarily offline</h1>
+      <p>
+        This tool is undergoing maintenance and is not available right now.
+        Please check back soon, or contact
+        <a href="mailto:garrett@cadmusprojects.com">garrett@cadmusprojects.com</a>
+        with any questions.
+      </p>
     </div>
-  </nav>
-
-  <main>
-    <section class="hero">
-      <div class="wrap">
-        <div class="kicker">Cadmus Operations</div>
-        <h1>Resource Reporting</h1>
-        <p class="lead">Weekly time, tasks, review, and portfolio visibility.</p>
-      </div>
-    </section>
-
-    <section class="app-shell">
-      <div class="wrap">
-        <div id="setupNotice" class="notice hidden">
-          <strong>Supabase setup needed</strong>
-          <p>Add the Supabase project URL and public anon key to <code>/assets/timesheets-config.js</code>, then run <code>/supabase-timesheets-schema.sql</code>.</p>
-        </div>
-
-        <div id="loadingView" class="loading-view hidden" role="status" aria-live="polite">
-          <div class="loading-mark" aria-hidden="true"></div>
-          <div>
-            <strong>Loading workspace</strong>
-            <p id="loadingMessage">Preparing your reporting view...</p>
-          </div>
-        </div>
-
-        <div class="status-bar">
-          <div class="user-chip">
-            <span class="dot good"></span>
-            <span id="userEmail">Not signed in</span>
-            <span id="rolePill" class="status-pill hidden">resource</span>
-          </div>
-          <div class="toolbar compact">
-            <button id="themeToggle" class="button" type="button">Light Mode</button>
-            <button id="signOut" class="button danger" type="button">Sign Out</button>
-          </div>
-        </div>
-
-        <div id="appNav" class="app-nav hidden" aria-label="Resource reporting sections">
-          <button class="app-nav-button" type="button" data-app-view="dashboard"><span>01</span> Dashboard</button>
-          <button class="app-nav-button" type="button" data-app-view="projects"><span>02</span> Projects</button>
-          <button class="app-nav-button" type="button" data-app-view="timesheet"><span>03</span> Timesheet</button>
-          <button class="app-nav-button" type="button" data-app-view="tasks"><span>04</span> Tasks</button>
-          <button class="app-nav-button" type="button" data-app-view="notifications"><span>05</span> Notifications</button>
-          <button class="app-nav-button" type="button" data-app-view="reviews"><span>06</span> Review Queue</button>
-          <button class="app-nav-button" type="button" data-app-view="reports"><span>07</span> Reports</button>
-          <button class="app-nav-button" type="button" data-app-view="admin"><span>08</span> Admin Console</button>
-        </div>
-
-        <section id="authView" class="auth-panel">
-          <h2>Sign in</h2>
-          <p>Use an email link for passwordless access. Password sign-in is available for returning users.</p>
-          <form id="authForm" class="form-grid">
-            <label class="field">
-              <span>Email</span>
-              <input id="email" type="email" autocomplete="email" required>
-            </label>
-            <label class="field">
-              <span>Password</span>
-              <input id="password" type="password" autocomplete="current-password" minlength="12">
-            </label>
-            <div class="toolbar auth-actions">
-              <button id="magicLink" class="button primary" type="submit">Email Link</button>
-              <button id="passwordSignIn" class="button" type="button">Sign In</button>
-              <button id="passwordSignUp" class="button" type="button">Create Account</button>
-              <button id="resetPassword" class="button" type="button">Reset Password</button>
-            </div>
-            <div id="authMessage" class="message" role="status"></div>
-          </form>
-        </section>
-
-        <section id="profileView" class="panel hidden">
-          <div class="panel-head">
-            <div>
-              <h2>Complete Profile</h2>
-              <p class="helper">Create a strong password and set your branch, division, project, and reporting manager before filing weekly updates.</p>
-            </div>
-          </div>
-          <form id="profileForm" class="panel-body profile-grid">
-            <label class="field">
-              <span>Create password</span>
-              <input id="profilePassword" type="password" autocomplete="new-password" minlength="12" required>
-            </label>
-            <label class="field">
-              <span>Confirm password</span>
-              <input id="profilePasswordConfirm" type="password" autocomplete="new-password" minlength="12" required>
-            </label>
-            <label class="field">
-              <span>Full name</span>
-              <input id="profileName" type="text" autocomplete="name" required>
-            </label>
-            <label class="field">
-              <span>Company</span>
-              <input id="profileCompany" type="text" value="Cadmus Project Management" required>
-            </label>
-            <label class="field">
-              <span>Branch</span>
-              <select id="profileBranch" required></select>
-            </label>
-            <label class="field">
-              <span>Division</span>
-              <select id="profileDivision" required></select>
-            </label>
-            <label class="field">
-              <span>Project</span>
-              <select id="profileProject" required></select>
-            </label>
-            <label class="field">
-              <span>Manager</span>
-              <select id="profileManager" required></select>
-            </label>
-            <div class="form-actions">
-              <button class="button primary" type="submit">Save Profile</button>
-              <div id="profileMessage" class="message" role="status"></div>
-            </div>
-          </form>
-        </section>
-
-        <section id="dashboardView" class="panel hidden">
-          <div class="panel-head">
-            <div>
-              <h2>Dashboard</h2>
-              <p class="helper">A focused command center for the current reporting week.</p>
-            </div>
-            <div id="dashboardActions" class="toolbar"></div>
-          </div>
-          <div id="dashboardContent" class="portfolio-dashboard"></div>
-        </section>
-
-        <section id="appView" class="workspace hidden">
-          <aside class="panel context-panel">
-            <div class="panel-head">
-              <div>
-                <h2>Timesheet</h2>
-                <p class="helper">Review the week, update task lines, then save or submit.</p>
-              </div>
-            </div>
-            <div class="panel-body context-body">
-              <div class="week-controls">
-                <label class="field">
-                  <span>Week starting</span>
-                  <input id="weekStart" type="date">
-                </label>
-                <div class="toolbar compact">
-                  <button id="prevWeek" class="button" type="button">Previous</button>
-                  <button id="nextWeek" class="button" type="button">Next</button>
-                </div>
-              </div>
-
-              <div id="profileSummary" class="profile-summary"></div>
-
-              <div class="summary-grid" aria-label="Weekly summary">
-                <div class="metric">
-                  <span>Total hours</span>
-                  <strong id="totalHours">0</strong>
-                </div>
-                <div class="metric">
-                  <span>Status</span>
-                  <strong id="reportStatus">Draft</strong>
-                </div>
-                <div class="metric">
-                  <span>Project</span>
-                  <strong id="projectCode">-</strong>
-                </div>
-                <div class="metric">
-                  <span>Due</span>
-                  <strong id="dueDate">-</strong>
-                </div>
-              </div>
-            </div>
-          </aside>
-
-          <section class="panel">
-            <div class="panel-head">
-              <div>
-                <h2 id="reportFormatTitle">Weekly Grid</h2>
-                <p class="helper">Use the weekly grid to add one or more task lines per day. Save drafts during the week and submit when complete.</p>
-              </div>
-              <div class="toolbar">
-                <select id="reportFormat" aria-label="Reporting format"></select>
-                <button id="saveWeek" class="button" type="button">Save Draft</button>
-                <button id="submitWeek" class="button primary" type="button">Submit Week</button>
-                <button id="withdrawWeek" class="button danger hidden" type="button">Withdraw</button>
-                <button id="exportCsv" class="button" type="button">Export CSV</button>
-              </div>
-            </div>
-            <div id="dailyGrid" class="daily-grid"></div>
-            <div id="qualityPanel" class="quality-panel"></div>
-            <form id="adjustmentRequestPanel" class="adjustment-request-panel hidden" aria-label="Request approved week adjustment">
-              <div>
-                <h3>Request Reopen</h3>
-                <p class="helper">Approved weeks are locked. Add the reason a reviewer should reopen this labor record.</p>
-              </div>
-              <label class="field">
-                <span>Adjustment reason</span>
-                <textarea id="adjustmentReason" placeholder="Describe what needs to change and why" required></textarea>
-              </label>
-              <div class="toolbar">
-                <button class="button primary" type="submit">Send Request</button>
-                <button id="cancelAdjustmentRequest" class="button" type="button">Cancel</button>
-              </div>
-            </form>
-            <div class="panel-body">
-              <div id="appMessage" class="message" role="status"></div>
-            </div>
-          </section>
-        </section>
-
-        <section id="projectsView" class="panel hidden">
-          <div class="panel-head">
-            <div>
-              <h2>Projects <button id="projectQuickAddToggle" class="icon-button inline-add-toggle" type="button" aria-label="Add project" aria-expanded="false">+</button></h2>
-              <p class="helper">Browse the portfolio. Click a project to open its details.</p>
-            </div>
-            <div class="toolbar">
-              <label class="field inline-filter">
-                <span>Status</span>
-                <select id="projectStatusFilter" aria-label="Filter projects by status">
-                  <option value="active">Active</option>
-                  <option value="planning">Planning</option>
-                  <option value="paused">Paused</option>
-                  <option value="closed">Closed</option>
-                  <option value="all">All</option>
-                </select>
-              </label>
-              <label class="field inline-filter">
-                <span>Search</span>
-                <input id="projectSearch" type="search" placeholder="name, code, client, sponsor">
-              </label>
-            </div>
-          </div>
-          <form id="projectQuickAddForm" class="panel-body task-quick-add hidden">
-            <label class="field"><span>Project name</span><input id="projectQuickName" type="text" required></label>
-            <label class="field"><span>Code</span><input id="projectQuickCode" type="text" required></label>
-            <label class="field"><span>Client</span><input id="projectQuickClient" type="text" value="Cadmus"></label>
-            <label class="field"><span>Status</span><select id="projectQuickStatus">
-              <option value="active">Active</option>
-              <option value="planning">Planning</option>
-              <option value="paused">Paused</option>
-              <option value="closed">Closed</option>
-            </select></label>
-            <div class="toolbar">
-              <button class="button primary" type="submit">Add Project</button>
-              <button id="projectQuickAddCancel" class="button" type="button">Cancel</button>
-            </div>
-          </form>
-          <div id="projectCount" class="admin-result-count">Showing active projects</div>
-          <div id="projectViewContent" class="portfolio-dashboard"></div>
-        </section>
-
-        <section id="tasksView" class="panel hidden">
-          <div class="panel-head">
-            <div>
-              <div id="tasksBreadcrumb" class="breadcrumb"></div>
-              <h2>Tasks <button id="taskQuickAddToggle" class="icon-button inline-add-toggle" type="button" aria-label="Add task" aria-expanded="false">+</button></h2>
-              <p class="helper">Maintain task dates, assignments, and current-week work by project.</p>
-            </div>
-            <div class="toolbar">
-              <label class="field inline-filter">
-                <span>Project</span>
-                <select id="taskProjectFilter" aria-label="Filter tasks by project"></select>
-              </label>
-              <label class="field inline-filter">
-                <span>Search</span>
-                <input id="taskSearch" type="search" placeholder="code, task, project, sponsor">
-              </label>
-            </div>
-          </div>
-          <form id="taskQuickAddForm" class="panel-body task-quick-add hidden">
-            <label class="field"><span>Project</span><select id="taskQuickProject" required></select></label>
-            <label class="field"><span>Task name</span><input id="taskQuickName" type="text" required></label>
-            <label class="field"><span>Code</span><input id="taskQuickCode" type="text"></label>
-            <label class="field"><span>Start</span><input id="taskQuickStart" type="date"></label>
-            <label class="field"><span>Finish</span><input id="taskQuickFinish" type="date"></label>
-            <label class="field"><span>Order</span><input id="taskQuickOrder" type="number" min="0" step="1"></label>
-            <div class="toolbar">
-              <button class="button primary" type="submit">Add Task</button>
-              <button id="taskQuickAddCancel" class="button" type="button">Cancel</button>
-            </div>
-          </form>
-          <div id="taskViewContent" class="portfolio-dashboard"></div>
-        </section>
-
-        <section id="taskDetailView" class="panel hidden">
-          <div class="panel-head">
-            <div>
-              <div id="taskDetailBreadcrumb" class="breadcrumb"></div>
-              <h2>Task Details</h2>
-              <p class="helper">Edit every property of this task and manage who is assigned to it.</p>
-            </div>
-          </div>
-          <div id="taskDetailContent"></div>
-        </section>
-
-        <section id="projectDetailView" class="panel hidden">
-          <div class="panel-head">
-            <div>
-              <div id="projectDetailBreadcrumb" class="breadcrumb"></div>
-              <h2>Project Details</h2>
-              <p class="helper">Edit project properties and see its task and resource load.</p>
-            </div>
-          </div>
-          <div id="projectDetailContent"></div>
-        </section>
-
-        <section id="userDetailView" class="panel hidden">
-          <div class="panel-head">
-            <div>
-              <div id="userDetailBreadcrumb" class="breadcrumb"></div>
-              <h2>User Details</h2>
-              <p class="helper">Edit this user's profile and see their task assignment history.</p>
-            </div>
-          </div>
-          <div id="userDetailContent"></div>
-        </section>
-
-        <section id="notificationsView" class="panel hidden">
-          <div class="panel-head">
-            <div>
-              <h2>Notifications</h2>
-              <p class="helper">Track workflow messages, reminder records, and follow-up items generated by the app.</p>
-            </div>
-            <div class="toolbar">
-              <select id="notificationStatusFilter" aria-label="Filter notifications by status">
-                <option value="all">All status</option>
-                <option value="queued">Queued</option>
-                <option value="sent">Sent</option>
-                <option value="failed">Failed</option>
-                <option value="skipped">Skipped</option>
-              </select>
-              <select id="notificationTypeFilter" aria-label="Filter notifications by type">
-                <option value="all">All types</option>
-                <option value="submitted">Submitted</option>
-                <option value="approved">Approved</option>
-                <option value="rejected">Rejected</option>
-                <option value="final_requested">Final Approval</option>
-                <option value="adjustment_requested">Adjustment Requested</option>
-                <option value="adjustment_approved">Adjustment Approved</option>
-                <option value="adjustment_rejected">Adjustment Rejected</option>
-              </select>
-              <label class="field inline-filter">
-                <span>Search</span>
-                <input id="notificationSearch" type="search" placeholder="recipient, subject, project">
-              </label>
-              <button id="refreshNotifications" class="button" type="button">Refresh</button>
-              <button id="exportNotifications" class="button" type="button">Export CSV</button>
-            </div>
-          </div>
-          <div id="notificationsContent" class="portfolio-dashboard"></div>
-        </section>
-
-        <section id="portfolioView" class="panel portfolio-panel hidden">
-          <div class="panel-head">
-            <div>
-              <h2 id="portfolioPanelTitle">Portfolio Operations</h2>
-              <p id="portfolioPanelHelper" class="helper">Track submission coverage, approval backlog, missing reports, and weekly project load.</p>
-            </div>
-              <div class="toolbar">
-              <label class="field inline-filter">
-                <span>Project</span>
-                <select id="portfolioProject" aria-label="Filter reports by project"></select>
-              </label>
-              <select id="portfolioStatus" aria-label="Filter reports by status">
-                <option value="submitted">Submitted</option>
-                <option value="pending_final">Pending Final</option>
-                <option value="missing">Missing</option>
-                <option value="draft">Draft</option>
-                <option value="approved">Approved</option>
-                <option value="rejected">Rejected</option>
-                <option value="all">All</option>
-              </select>
-              <label class="field inline-filter">
-                <span>Week</span>
-                <input id="portfolioWeek" type="date">
-              </label>
-              <button id="refreshPortfolio" class="button" type="button">Refresh</button>
-              <button id="exportApprovedReports" class="button" type="button">Export Approved</button>
-              <button id="exportAudit" class="button" type="button">Export Audit</button>
-            </div>
-          </div>
-          <div id="reportsSubNav" class="section-tabs hidden" aria-label="Reports sections">
-            <button class="section-tab" type="button" data-report-section-target="operations">Operations</button>
-            <button class="section-tab" type="button" data-report-section-target="missing">Missing</button>
-            <button class="section-tab" type="button" data-report-section-target="late">Late</button>
-            <button class="section-tab" type="button" data-report-section-target="timeline">Project Timeline</button>
-            <button class="section-tab" type="button" data-report-section-target="approved">Approved Time</button>
-            <button class="section-tab" type="button" data-report-section-target="audit">Audit</button>
-          </div>
-          <div id="portfolioDashboard" class="portfolio-dashboard"></div>
-          <div id="reviewQueueSummary" class="review-queue-summary"></div>
-          <div id="portfolioList" class="portfolio-list"></div>
-        </section>
-
-        <section id="adminView" class="panel portfolio-panel hidden">
-          <div class="panel-head">
-            <div>
-              <h2>Portfolio Manager Setup</h2>
-              <p class="helper">Manage project setup, invitations, reporting views, and controlled values across the portfolio.</p>
-            </div>
-            <label class="field inline-filter">
-              <span>Project Focus</span>
-              <select id="adminProjectFocus"></select>
-            </label>
-          </div>
-          <div id="adminSubNav" class="section-tabs" aria-label="Admin console sections">
-            <button class="section-tab" type="button" data-admin-section-target="overview">Overview</button>
-            <button class="section-tab" type="button" data-admin-section-target="users">Users</button>
-            <button class="section-tab" type="button" data-admin-section-target="invitations">Invitations</button>
-            <button class="section-tab" type="button" data-admin-section-target="organization">Organization</button>
-            <button class="section-tab" type="button" data-admin-section-target="calendar">Calendar</button>
-            <button class="section-tab" type="button" data-admin-section-target="managers">Resource Managers</button>
-            <button class="section-tab" type="button" data-admin-section-target="approvals">Approval Chains</button>
-            <button class="section-tab" type="button" data-admin-section-target="exports">Exports</button>
-            <button class="section-tab" type="button" data-admin-section-target="audit">Audit</button>
-          </div>
-          <div class="admin-grid">
-            <section class="admin-card wide-card exceptions-card" data-admin-section="overview">
-              <div class="admin-card-head">
-                <div>
-                  <h3>Portfolio Exceptions</h3>
-                  <p class="helper">Current setup and submission items that need administrator attention.</p>
-                </div>
-                <button id="refreshExceptions" class="button small-button" type="button">Refresh</button>
-              </div>
-              <div id="adminExceptions" class="exceptions-grid"></div>
-            </section>
-
-            <section class="admin-card wide-card" data-admin-section="audit">
-              <div class="admin-card-head">
-                <div>
-                  <h3>Admin Change Log</h3>
-                  <p class="helper">Recent setup and access changes made by Portfolio Managers.</p>
-                </div>
-                <div class="toolbar">
-                  <label class="field inline-filter">
-                    <span>Search</span>
-                    <input id="adminAuditSearch" type="search" placeholder="actor, action, entity">
-                  </label>
-                  <button id="refreshAdminAudit" class="button small-button" type="button">Refresh</button>
-                  <button id="exportAdminAudit" class="button small-button" type="button">Export CSV</button>
-                </div>
-              </div>
-              <ul id="adminAuditList" class="admin-list"></ul>
-            </section>
-
-            <form id="managerForm" class="admin-card" data-admin-section="managers">
-              <div class="admin-card-head">
-                <h3>Resource Managers</h3>
-                <button id="managerFormToggle" class="icon-button inline-add-toggle" type="button" aria-label="Add resource manager" aria-expanded="false">+</button>
-              </div>
-              <div class="inline-add-fields hidden">
-                <label class="field"><span>Project</span><select id="adminManagerProject" required></select></label>
-                <label class="field"><span>Manager name</span><input id="adminManagerName" type="text" required></label>
-                <label class="field"><span>Manager email</span><input id="adminManagerEmail" type="email" required></label>
-                <button class="button primary" type="submit">Add Manager</button>
-              </div>
-              <ul id="managerList" class="admin-list"></ul>
-            </form>
-
-            <form id="approvalChainForm" class="admin-card wide-card" data-admin-section="approvals">
-              <div class="admin-card-head">
-                <h3>Approval Chains</h3>
-                <button id="approvalChainFormToggle" class="icon-button inline-add-toggle" type="button" aria-label="Add approval chain" aria-expanded="false">+</button>
-              </div>
-              <div class="inline-add-fields hidden">
-                <div class="profile-grid tight-grid">
-                  <label class="field"><span>Chain name</span><input id="approvalChainName" type="text" placeholder="BENCON Technology Controls" required></label>
-                  <label class="field"><span>Project</span><select id="approvalChainProject"></select></label>
-                  <label class="field"><span>Branch</span><select id="approvalChainBranch"></select></label>
-                  <label class="field"><span>Division</span><select id="approvalChainDivision"></select></label>
-                  <label class="field"><span>Primary approver</span><select id="approvalChainPrimary" required></select></label>
-                  <label class="field"><span>Backup approver</span><select id="approvalChainBackup"></select></label>
-                  <label class="field"><span>Final approver</span><select id="approvalChainFinal"></select></label>
-                  <label class="field checkbox-field"><span>Final approval</span><div><input id="approvalChainRequireFinal" type="checkbox"> Require final approver</div></label>
-                </div>
-                <button class="button primary" type="submit">Add Chain</button>
-              </div>
-              <ul id="approvalChainList" class="admin-list"></ul>
-            </form>
-
-            <form id="domainForm" class="admin-card" data-admin-section="organization">
-              <div class="admin-card-head">
-                <h3>Allowed Domains</h3>
-                <button id="domainFormToggle" class="icon-button inline-add-toggle" type="button" aria-label="Add allowed domain" aria-expanded="false">+</button>
-              </div>
-              <div class="inline-add-fields hidden">
-                <label class="field"><span>Email domain</span><input id="allowedDomain" type="text" placeholder="calstrs.com" required></label>
-                <button class="button primary" type="submit">Add Domain</button>
-              </div>
-              <ul id="domainList" class="admin-list"></ul>
-            </form>
-
-            <form id="branchForm" class="admin-card" data-admin-section="organization">
-              <div class="admin-card-head">
-                <h3>Branches</h3>
-                <button id="branchFormToggle" class="icon-button inline-add-toggle" type="button" aria-label="Add branch" aria-expanded="false">+</button>
-              </div>
-              <div class="inline-add-fields hidden">
-                <label class="field"><span>Branch name</span><input id="adminBranchName" type="text" required></label>
-                <button class="button primary" type="submit">Add Branch</button>
-              </div>
-              <ul id="branchList" class="admin-list"></ul>
-            </form>
-
-            <form id="divisionForm" class="admin-card" data-admin-section="organization">
-              <div class="admin-card-head">
-                <h3>Divisions</h3>
-                <button id="divisionFormToggle" class="icon-button inline-add-toggle" type="button" aria-label="Add division" aria-expanded="false">+</button>
-              </div>
-              <div class="inline-add-fields hidden">
-                <label class="field"><span>Branch</span><select id="adminDivisionBranch" required></select></label>
-                <label class="field"><span>Division name</span><input id="adminDivisionName" type="text" required></label>
-                <button class="button primary" type="submit">Add Division</button>
-              </div>
-              <ul id="divisionList" class="admin-list"></ul>
-            </form>
-
-            <form id="calendarDayForm" class="admin-card wide-card" data-admin-section="calendar">
-              <div class="admin-card-head">
-                <h3>Business Calendar</h3>
-                <button id="calendarDayFormToggle" class="icon-button inline-add-toggle" type="button" aria-label="Add calendar day" aria-expanded="false">+</button>
-              </div>
-              <div class="inline-add-fields hidden">
-                <div class="profile-grid tight-grid">
-                  <label class="field"><span>Date</span><input id="calendarDate" type="date" required></label>
-                  <label class="field"><span>Type</span><select id="calendarType" required>
-                    <option value="holiday">Holiday</option>
-                    <option value="pto">PTO</option>
-                    <option value="non_working">Non-working day</option>
-                  </select></label>
-                  <label class="field"><span>Label</span><input id="calendarLabel" type="text" placeholder="Labor Day" required></label>
-                  <label class="field"><span>Project scope</span><select id="calendarProject"></select></label>
-                  <label class="field"><span>Branch scope</span><select id="calendarBranch"></select></label>
-                  <label class="field"><span>Division scope</span><select id="calendarDivision"></select></label>
-                </div>
-                <button class="button primary" type="submit">Add Calendar Day</button>
-              </div>
-              <ul id="calendarDayList" class="admin-list calendar-list"></ul>
-            </form>
-
-            <form id="adminExportForm" class="admin-card" data-admin-section="exports">
-              <h3>Work Export</h3>
-              <label class="field"><span>Branch</span><select id="adminExportBranch" required></select></label>
-              <label class="field"><span>Division</span><select id="adminExportDivision" required></select></label>
-              <label class="field"><span>Start date</span><input id="adminExportStart" type="date" required></label>
-              <label class="field"><span>End date</span><input id="adminExportEnd" type="date" required></label>
-              <div class="toolbar">
-                <button class="button" type="submit">Export Work</button>
-                <button id="adminApprovedExport" class="button primary" type="button">Approved Time</button>
-              </div>
-            </form>
-
-            <form id="userFilterForm" class="admin-card wide-card" data-admin-section="users">
-              <h3>User Management</h3>
-              <div class="profile-grid tight-grid">
-                <label class="field"><span>Search users</span><input id="adminUserSearch" type="search" placeholder="name, email, project, manager"></label>
-                <label class="field"><span>Branch</span><select id="adminUserBranch"></select></label>
-                <label class="field"><span>Division</span><select id="adminUserDivision"></select></label>
-                <label class="field"><span>Project</span><select id="adminUserProject"></select></label>
-                <label class="field"><span>Status</span><select id="adminUserStatus">
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                  <option value="all">All</option>
-                </select></label>
-              </div>
-              <div id="adminUserCount" class="admin-result-count">Showing active users</div>
-              <div id="userList" class="resource-register-wrap"></div>
-            </form>
-
-            <form id="inviteForm" class="admin-card wide-card" data-admin-section="invitations">
-              <h3>Bulk Invitations</h3>
-              <label class="field"><span>Email list</span><textarea id="inviteEmails" placeholder="one.email@example.com&#10;two.email@example.com"></textarea></label>
-              <label class="field"><span>CSV import</span><textarea id="inviteCsv" placeholder="email,full_name,role,project,manager,branch,division&#10;ada@example.com,Ada Lovelace,resource,BENCON,Alex Morgan,Northern California,Project Controls"></textarea></label>
-              <div class="profile-grid tight-grid">
-                <label class="field"><span>Tier</span><select id="inviteRole">
-                  <option value="resource">Resource</option>
-                  <option value="manager">Project Manager</option>
-                  <option value="admin">Portfolio Manager</option>
-                </select></label>
-                <label class="field"><span>Project</span><select id="inviteProject"></select></label>
-                <label class="field"><span>Project Manager</span><select id="inviteManager"></select></label>
-                <label class="field"><span>Branch</span><select id="inviteBranch"></select></label>
-                <label class="field"><span>Division</span><select id="inviteDivision"></select></label>
-              </div>
-              <div id="inviteImportPreview" class="import-preview"></div>
-              <div class="toolbar">
-                <button id="validateInviteImport" class="button" type="button">Validate CSV</button>
-                <button class="button primary" type="submit">Send Invitations</button>
-              </div>
-            </form>
-          </div>
-          <div class="panel-body">
-            <div id="adminMessage" class="message" role="status"></div>
-          </div>
-        </section>
-      </div>
-    </section>
-  </main>
-
-  <footer>
-    <div class="wrap footer-inner">
-      <span>Cadmus Project Management LLC</span>
-      <span>Resource Reporting v0.9 | support: Garrett@cadmusprojects.com</span>
-      <span>DVBE 2032694 | CMAS 4-25-10-1019 | PMP | SDVOSB</span>
-    </div>
-  </footer>
+  </div>
 </body>
 </html>
