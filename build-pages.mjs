@@ -70,18 +70,19 @@ const pages = [
     path: "dvbe-project-management-california/index.html",
     title: "California DVBE Project Management Partner | Cadmus",
     description:
-      "Cadmus is a California-certified DVBE and SDVOSB project management partner supporting agencies and prime contractors with meaningful PMO and delivery work.",
-    eyebrow: "DVBE + SDVOSB",
+      "Cadmus is a California-certified DVBE, SDVOSB, and SB Micro project management partner supporting agencies and prime contractors with meaningful PMO and delivery work.",
+    eyebrow: "DVBE + SDVOSB + SB Micro",
     h1: "A DVBE project management partner that does the work.",
     lead:
       "Cadmus is built for primes and agencies that need certified DVBE participation tied to useful project delivery, PMO support, reporting, governance, and stakeholder coordination.",
     sections: [
       ["Meaningful Participation", "Cadmus is positioned for useful, documentable project work: PMO support, schedule management, reporting, meeting cadence, decision tracking, and delivery coordination."],
       ["Prime Teaming", "Primes can bring Cadmus in for proposal strength and practical delivery support after award, with clear roles and accountable outputs."],
-      ["Credentials", "Cadmus Project Management LLC is a California certified DVBE, SDVOSB, CMAS contract holder, and PMP-led firm based in Rocklin, California."],
+      ["Credentials", "Cadmus Project Management LLC is a California certified DVBE, SDVOSB, SB Micro business, CMAS contract holder, PMP-led firm, and general liability insured partner based in Rocklin, California."],
     ],
     cards: [
       ["DVBE 2032694", "California Disabled Veteran Business Enterprise certification."],
+      ["SB Micro", "California Small Business (Micro) certification for public-sector procurement."],
       ["CMAS", "California Multiple Award Schedule contract 4-25-10-1019."],
       ["PMP Led", "Credentialed project-management discipline for public programs."],
     ],
@@ -154,17 +155,17 @@ const pages = [
     path: "about/index.html",
     title: "About Cadmus Project Management | Rocklin, CA",
     description:
-      "Cadmus Project Management LLC is a Rocklin, California public-sector project management firm led by Garrett Wilkerson, a PMP, Army veteran, DVBE, and SDVOSB.",
+      "Cadmus Project Management LLC is a Rocklin, California public-sector project management firm led by Garrett Wilkerson, a PMP and Army veteran. Cadmus is certified DVBE, SDVOSB, and SB Micro.",
     eyebrow: "About Cadmus",
     h1: "Veteran-led project discipline for public-sector delivery.",
     lead:
       "Cadmus Project Management LLC is based in Rocklin, California and supports agencies and prime contractors with PMO support, project controls, governance, and delivery leadership.",
     sections: [
       ["Founder", "Garrett Wilkerson brings Army veteran discipline, PMP standards, and more than nine years of California public-sector program experience to the work."],
-      ["Business Identity", "Cadmus is a California certified DVBE, SDVOSB, and CMAS contract holder focused on project management and PMO support."],
+      ["Business Identity", "Cadmus is a California certified DVBE, SDVOSB, SB Micro business, CMAS contract holder, and general liability insured partner focused on project management and PMO support."],
       ["Operating Belief", "The work gets better when teams have clarity, cadence, calm escalation, and someone making sure the next action actually happens."],
     ],
-    cards: [["Rocklin, CA", "Serving California agencies and prime contractors."], ["DVBE + SDVOSB", "Veteran-owned public-sector delivery partner."], ["PMP", "Credentialed project-management leadership."]],
+    cards: [["Rocklin, CA", "Serving California agencies and prime contractors."], ["DVBE + SDVOSB + SB Micro", "Certified small-business public-sector delivery partner."], ["PMP", "Credentialed project-management leadership."]],
   },
   {
     path: "contact/index.html",
@@ -386,7 +387,7 @@ function renderPage(page) {
   <footer>
     <div class="wrap footer-inner">
       <span>Cadmus Project Management LLC</span>
-      <span>DVBE 2032694 | CMAS 4-25-10-1019 | PMP | SDVOSB</span>
+      <span>DVBE 2032694 | SB Micro | CMAS 4-25-10-1019 | PMP | SDVOSB | General Liability Insured</span>
     </div>
   </footer>
 </body>
