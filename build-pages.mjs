@@ -263,7 +263,6 @@ function nav() {
           <a href="/sacramento-project-management/">Sacramento</a>
           <a href="/dvbe-project-management-california/">DVBE</a>
           <a href="/resources/epc-project-controls/">Toolkit</a>
-          <a href="/timesheets/">Timesheets</a>
           <a href="/about/">About</a>
           <a href="/contact/">Contact</a>
         </div>
@@ -405,7 +404,6 @@ const urls = [
   "",
   ...pages.map((page) => page.path.replace(/index\.html$/, "")),
   "resources/epc-project-controls/",
-  "timesheets/",
 ];
 
 writeFileSync(
@@ -456,7 +454,7 @@ index = index
   )
   .replace(
     /<div class="nav-links">[\s\S]*?<\/div>\s*<a class="nav-cta"/,
-    `<div class="nav-links">\n          <a href="#work">Work</a>\n          <a href="/services/public-sector-project-management/">Services</a>\n          <a href="/rocklin-project-management/">Rocklin</a>\n          <a href="/sacramento-project-management/">Sacramento</a>\n          <a href="/dvbe-project-management-california/">DVBE</a>\n          <a href="/resources/epc-project-controls/">Toolkit</a>\n          <a href="/timesheets/">Timesheets</a>\n          <a href="/about/">About</a>\n        </div>\n        <a class="nav-cta"`,
+    `<div class="nav-links">\n          <a href="#work">Work</a>\n          <a href="/services/public-sector-project-management/">Services</a>\n          <a href="/rocklin-project-management/">Rocklin</a>\n          <a href="/sacramento-project-management/">Sacramento</a>\n          <a href="/dvbe-project-management-california/">DVBE</a>\n          <a href="/resources/epc-project-controls/">Toolkit</a>\n          <a href="/about/">About</a>\n        </div>\n        <a class="nav-cta"`,
   )
   .replace("Letâ€™s make the next program room calmer.", "Let's make the next program room calmer.");
 
