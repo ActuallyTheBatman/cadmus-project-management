@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 const root = process.cwd();
-const today = "2026-08-10";
+const today = "2026-08-26";
 const baseUrl = "https://cadmusprojects.com";
 
 const pages = [
@@ -28,22 +28,28 @@ const pages = [
   },
   {
     path: "sacramento-project-management/index.html",
-    title: "Sacramento Public-Sector Project Management | Cadmus",
+    title: "Sacramento DVBE Project Management Partner | Cadmus",
     description:
-      "Sacramento-area project management and PMO support for California agencies, public-sector programs, and prime contractors needing DVBE delivery support.",
+      "Sacramento-area DVBE project management partner for prime contractors and California public agencies needing PMO, schedule, governance, and delivery support.",
     eyebrow: "Sacramento Region",
-    h1: "Public-sector project management for Sacramento-area delivery.",
+    h1: "Sacramento DVBE project management partner for public-sector delivery.",
     lead:
-      "Cadmus supports Sacramento agencies and primes with the operating discipline needed for complex public programs: project controls, stakeholder visibility, governance, and action accountability.",
+      "Cadmus supports Sacramento-area prime contractors and agencies with certified DVBE participation tied to real project management, PMO support, project controls, stakeholder visibility, and action accountability.",
     sections: [
-      ["Regional Focus", "Sacramento public-sector work moves through procurement, governance, reporting, and multi-stakeholder delivery realities. Cadmus is built for that environment."],
-      ["Prime Contractor Support", "For primes, Cadmus brings real DVBE participation, proposal credibility, and delivery capacity that can stand in front of agency teams."],
-      ["Agency Support", "For agencies, Cadmus helps clarify scope, establish cadence, manage risk, and keep leadership ahead of delivery issues."],
+      ["Sacramento DVBE Partner", "Cadmus is local to the Sacramento region and built for public-sector programs where procurement, governance, reporting, and multi-stakeholder delivery all have to stay coordinated."],
+      ["Prime Contractor Support", "For primes, Cadmus brings certified DVBE, SDVOSB, and SB Micro participation with practical delivery capacity, proposal credibility, and roles that can be described clearly after award."],
+      ["Project Management Scope", "Cadmus can support schedule control, PMO cadence, risk and issue tracking, action logs, decision records, stakeholder coordination, executive reporting, and recovery for slipping work."],
     ],
     cards: [
+      ["DVBE Teaming", "Sacramento-area partner support for proposals, pursuits, and post-award delivery."],
       ["PMO Support", "Portfolio visibility, dashboards, risk registers, and governance cadence."],
       ["Project Recovery", "Triage for stalled work, unclear ownership, and missed milestones."],
       ["Executive Reporting", "Clear status and decisions without status theater."],
+    ],
+    faqs: [
+      ["Does Cadmus support prime contractors looking for a Sacramento DVBE project management partner?", "Yes. Cadmus supports prime contractors that need certified DVBE participation connected to real project management, PMO, project controls, reporting, and delivery coordination work."],
+      ["Is Cadmus local to Sacramento?", "Cadmus is based in Rocklin, California and supports Sacramento-area agencies, public-sector programs, and prime contractors throughout the region."],
+      ["What project-management work can Cadmus own on a prime team?", "Cadmus can own practical workstreams such as schedule tracking, PMO cadence, risk and issue management, meeting facilitation, action tracking, stakeholder coordination, and executive reporting."],
     ],
   },
   {
@@ -68,16 +74,16 @@ const pages = [
   },
   {
     path: "dvbe-project-management-california/index.html",
-    title: "California DVBE Project Management Partner | Cadmus",
+    title: "California DVBE Project Management Partner for Primes | Cadmus",
     description:
-      "Cadmus is a California-certified DVBE, SDVOSB, and SB Micro project management partner supporting agencies and prime contractors with meaningful PMO and delivery work.",
+      "California-certified DVBE, SDVOSB, and SB Micro project management partner for prime contractors needing PMO, project controls, and delivery support.",
     eyebrow: "DVBE + SDVOSB + SB Micro",
-    h1: "A DVBE project management partner that does the work.",
+    h1: "California DVBE project management partner for prime contractors.",
     lead:
-      "Cadmus is built for primes and agencies that need certified DVBE participation tied to useful project delivery, PMO support, reporting, governance, and stakeholder coordination.",
+      "Cadmus is built for prime contractors and agencies that need certified DVBE participation tied to useful project delivery, PMO support, reporting, governance, project controls, and stakeholder coordination.",
     sections: [
-      ["Meaningful Participation", "Cadmus is positioned for useful, documentable project work: PMO support, schedule management, reporting, meeting cadence, decision tracking, and delivery coordination."],
-      ["Prime Teaming", "Primes can bring Cadmus in for proposal strength and practical delivery support after award, with clear roles and accountable outputs."],
+      ["Meaningful Participation", "Cadmus is positioned for useful, documentable project-management work: PMO support, schedule management, reporting, meeting cadence, decision tracking, stakeholder coordination, and delivery follow-through."],
+      ["Prime Teaming", "Primes can bring Cadmus in for proposal strength and practical delivery support after award, with clear roles, accountable outputs, and a procurement-ready credential set."],
       ["Credentials", "Cadmus Project Management LLC is a California certified DVBE, SDVOSB, SB Micro business, CMAS contract holder, PMP-led firm, and general liability insured partner based in Rocklin, California."],
     ],
     cards: [
@@ -85,6 +91,11 @@ const pages = [
       ["SB Micro", "California Small Business (Micro) certification for public-sector procurement."],
       ["CMAS", "California Multiple Award Schedule contract 4-25-10-1019."],
       ["PMP Led", "Credentialed project-management discipline for public programs."],
+    ],
+    faqs: [
+      ["What makes Cadmus a useful DVBE partner for prime contractors?", "Cadmus connects DVBE participation to delivery work primes can actually use: project management, PMO support, project controls, schedule tracking, reporting, governance, and stakeholder coordination."],
+      ["Can Cadmus support California public-sector pursuits outside Sacramento?", "Yes. Cadmus is based near Sacramento and supports California agencies and prime contractors statewide when the scope fits its public-sector project management and PMO capabilities."],
+      ["Is Cadmus insured for project work?", "Cadmus maintains general liability insurance for client and project work."],
     ],
   },
   {
@@ -121,19 +132,23 @@ const pages = [
   },
   {
     path: "services/dvbe-partner-support/index.html",
-    title: "DVBE Partner Support for Prime Contractors | Cadmus",
+    title: "DVBE Project Management Partner Support for Prime Contractors | Cadmus",
     description:
-      "Cadmus provides California DVBE partner support for prime contractors through real project management, PMO, reporting, governance, and delivery work.",
+      "California DVBE project management partner support for prime contractors: PMO, project controls, reporting, governance, schedule, and delivery work.",
     eyebrow: "Service",
-    h1: "DVBE partner support with real delivery value.",
+    h1: "DVBE project management partner support with real delivery value.",
     lead:
-      "Cadmus helps prime contractors strengthen proposals and delivery teams with certified DVBE participation tied to practical project-management outcomes.",
+      "Cadmus helps prime contractors strengthen proposals and delivery teams with certified DVBE, SDVOSB, and SB Micro participation tied to practical project-management outcomes.",
     sections: [
-      ["Prime Value", "A stronger partner when the scope needs project management, PMO support, stakeholder coordination, reporting, and schedule discipline."],
+      ["Prime Value", "A stronger partner when the scope needs project management, PMO support, stakeholder coordination, reporting, project controls, and schedule discipline."],
       ["Delivery Role", "Cadmus can own useful workstreams such as status cadence, governance support, schedule tracking, action management, and executive materials."],
-      ["Compliance Mindset", "The focus is meaningful work, clear ownership, and participation that can be described plainly in proposal and delivery contexts."],
+      ["Compliance Mindset", "The focus is meaningful work, clear ownership, commercially useful participation, and roles that can be described plainly in proposal and delivery contexts."],
     ],
     cards: [["Proposal Support", "Credible DVBE project-management capability."], ["Execution Support", "Hands-on PMO and delivery coordination."], ["Clean Ownership", "Roles and outputs that are easy to document."]],
+    faqs: [
+      ["Can Cadmus be listed as a DVBE project management partner in prime contractor proposals?", "Yes, when the proposed role matches Cadmus capabilities such as project management, PMO support, project controls, reporting, governance, schedule tracking, or stakeholder coordination."],
+      ["What kind of DVBE work is best suited for Cadmus?", "Cadmus is best suited for meaningful project delivery work, including PMO operations, project controls, risk and issue tracking, executive reporting, action management, and delivery recovery."],
+    ],
   },
   {
     path: "services/project-controls-schedule-risk/index.html",
@@ -237,6 +252,10 @@ const css = `
     .detail article { border-top: 1px solid currentColor; padding-top: 18px; }
     .detail h2 { margin-bottom: 12px; font-size: 24px; text-transform: uppercase; }
     .detail p { margin: 0; font-size: 17px; line-height: 1.75; color: rgba(22,19,13,.74); }
+    .faq { margin-top: 40px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+    .faq article { border-top: 1px solid rgba(22,19,13,.22); padding-top: 18px; }
+    .faq h2 { margin-bottom: 10px; font-size: 22px; line-height: 1.18; text-transform: uppercase; }
+    .faq p { margin: 0; color: rgba(22,19,13,.74); font-size: 16px; line-height: 1.65; }
     .cta { padding: 70px 0; background: var(--ink); }
     .cta-inner { display: flex; justify-content: space-between; gap: 28px; align-items: center; border-top: 1px solid var(--line); padding-top: 34px; }
     .contact-list { display: grid; gap: 10px; color: rgba(245,241,232,.82); font-weight: 800; }
@@ -246,7 +265,7 @@ const css = `
       .nav-inner, .cta-inner { align-items: flex-start; flex-direction: column; }
       .nav-links { justify-content: flex-start; }
       .hero { padding-top: 74px; }
-      .grid, .detail { grid-template-columns: 1fr; }
+      .grid, .detail, .faq { grid-template-columns: 1fr; }
     }
 `;
 
@@ -273,39 +292,72 @@ function nav() {
 
 function schema(page) {
   const url = `${baseUrl}/${page.path.replace(/index\.html$/, "")}`;
+  const graph = [
+    {
+      "@type": "LocalBusiness",
+      "@id": `${baseUrl}/#business`,
+      name: "Cadmus Project Management LLC",
+      url: baseUrl,
+      image: `${baseUrl}/assets/cadmus-hero.png`,
+      telephone: "+1-719-425-6025",
+      email: "Garrett@cadmusprojects.com",
+      address: {
+        "@type": "PostalAddress",
+        addressLocality: "Rocklin",
+        addressRegion: "CA",
+        addressCountry: "US",
+      },
+      areaServed: ["Rocklin CA", "Sacramento CA", "Placer County CA", "California"],
+      description:
+        "California DVBE project management partner for prime contractors, public agencies, PMO support, project controls, and delivery leadership.",
+    },
+    {
+      "@type": "Service",
+      "@id": `${url}#service`,
+      name: page.h1,
+      serviceType: page.eyebrow,
+      provider: { "@id": `${baseUrl}/#business` },
+      areaServed: ["Rocklin CA", "Sacramento CA", "California"],
+      url,
+      description: page.description,
+    },
+  ];
+
+  if (page.faqs?.length) {
+    graph.push({
+      "@type": "FAQPage",
+      "@id": `${url}#faq`,
+      mainEntity: page.faqs.map(([question, answer]) => ({
+        "@type": "Question",
+        name: question,
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: answer,
+        },
+      })),
+    });
+  }
+
   return JSON.stringify({
     "@context": "https://schema.org",
-    "@graph": [
-      {
-        "@type": "LocalBusiness",
-        "@id": `${baseUrl}/#business`,
-        name: "Cadmus Project Management LLC",
-        url: baseUrl,
-        image: `${baseUrl}/assets/cadmus-hero.png`,
-        telephone: "+1-719-425-6025",
-        email: "Garrett@cadmusprojects.com",
-        address: {
-          "@type": "PostalAddress",
-          addressLocality: "Rocklin",
-          addressRegion: "CA",
-          addressCountry: "US",
-        },
-        areaServed: ["Rocklin CA", "Sacramento CA", "Placer County CA", "California"],
-        description:
-          "California public-sector project management, PMO support, project controls, and DVBE partner support.",
-      },
-      {
-        "@type": "Service",
-        "@id": `${url}#service`,
-        name: page.h1,
-        serviceType: page.eyebrow,
-        provider: { "@id": `${baseUrl}/#business` },
-        areaServed: ["Rocklin CA", "Sacramento CA", "California"],
-        url,
-        description: page.description,
-      },
-    ],
+    "@graph": graph,
   });
+}
+
+function renderFaq(page) {
+  if (!page.faqs?.length) return "";
+  return `
+        <div class="faq" aria-label="Frequently asked questions">
+          ${page.faqs.map(([question, answer]) => `<article><h2>${question}</h2><p>${answer}</p></article>`).join("\n          ")}
+        </div>`;
+}
+
+function renderToolkitCta(page) {
+  if (page.path !== "services/project-controls-schedule-risk/index.html") return "";
+  return `
+        <div class="hero-actions">
+          <a class="button primary" href="/resources/epc-project-controls/">View Project Controls Toolkit</a>
+        </div>`;
 }
 
 function renderPage(page) {
@@ -349,14 +401,7 @@ function renderPage(page) {
         </div>
         <div class="detail">
           ${page.sections.map(([heading, text]) => `<article><h2>${heading}</h2><p>${text}</p></article>`).join("\n          ")}
-        </div>
-        ${
-          page.path === "services/project-controls-schedule-risk/index.html"
-            ? `<div class="hero-actions">
-          <a class="button primary" href="/resources/epc-project-controls/">View Project Controls Toolkit</a>
-        </div>`
-            : ""
-        }
+        </div>${renderFaq(page)}${renderToolkitCta(page)}
       </div>
     </section>
     <section class="section metal">
