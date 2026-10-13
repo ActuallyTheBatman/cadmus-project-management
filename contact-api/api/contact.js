@@ -28,7 +28,18 @@ module.exports = async function handler(req, res) {
   }
   body = body || {};
 
-  const { name, email, organization, message, _gotcha } = body;
+  const {
+    name,
+    email,
+    organization,
+    phone,
+    inquiryType,
+    rfpNumber,
+    deadline,
+    message,
+    preferCall,
+    _gotcha,
+  } = body;
 
   // Honeypot: bots fill every field, including this hidden one. Pretend success, drop silently.
   if (_gotcha) {
@@ -61,15 +72,23 @@ module.exports = async function handler(req, res) {
       },
     });
 
+    const subjectBits = [inquiryType || "New inquiry", rfpNumber ? `- ${rfpNumber}` : ""].filter(Boolean).join(" ");
+    const callFlag = preferCall ? "YES - prefers a call" : "No";
+
     await transporter.sendMail({
       from: `"Cadmus Site" <${process.env.GMAIL_USER}>`,
       to: "Garrett@cadmusprojects.com",
       replyTo: email,
-      subject: "New inquiry from cadmusprojects.com",
+      subject: `${subjectBits} | cadmusprojects.com`,
       text: [
         `Name: ${name}`,
         `Email: ${email}`,
+        `Phone: ${phone || "-"}`,
         `Organization: ${organization || "-"}`,
+        `Inquiry type: ${inquiryType || "-"}`,
+        `RFP # / Solicitation: ${rfpNumber || "-"}`,
+        `Proposal deadline: ${deadline || "-"}`,
+        `Prefers a call: ${callFlag}`,
         "",
         "Message:",
         message,
