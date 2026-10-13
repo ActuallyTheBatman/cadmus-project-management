@@ -347,6 +347,17 @@ const css = `
       .hero { padding-top: 74px; }
       .grid, .detail, .faq { grid-template-columns: 1fr; }
     }
+    .lead-form-wrap { margin-top: 44px; padding-top: 36px; border-top: 1px solid rgba(22,19,13,.18); max-width: 560px; }
+    .lead-form-wrap h2 { font-size: 24px; text-transform: uppercase; margin-bottom: 10px; }
+    .lead-form { display: grid; gap: 14px; margin-top: 20px; }
+    .lead-form label { font-size: 12px; font-weight: 800; text-transform: uppercase; color: #16130d; }
+    .lead-form input[type="text"], .lead-form input[type="email"], .lead-form textarea {
+      font-family: Inter, Arial, sans-serif; font-size: 15px; padding: 12px 14px; border-radius: var(--radius);
+      border: 1px solid rgba(22,19,13,.22); background: #fff; color: #16130d; resize: vertical;
+    }
+    .lead-form input:focus, .lead-form textarea:focus { outline: 2px solid var(--brass); outline-offset: 1px; }
+    .lead-form button { margin-top: 6px; width: fit-content; }
+    .lead-form-success { margin-top: 20px; padding: 16px 20px; border-radius: var(--radius); background: rgba(143,227,193,.18); border: 1px solid rgba(60,140,100,.4); color: #0d2e20; font-weight: 700; }
 `;
 
 function nav() {
@@ -441,6 +452,45 @@ function renderToolkitCta(page) {
         </div>`;
 }
 
+// Formspree endpoint: sign up free at https://formspree.io with Garrett@cadmusprojects.com,
+// create a form, and replace YOUR_FORM_ID below with the real endpoint ID (e.g. "xaybzwkd").
+// Until replaced, the form will not actually deliver submissions.
+const FORMSPREE_FORM_ID = "YOUR_FORM_ID";
+
+function renderLeadForm(page) {
+  if (page.path !== "contact/index.html") return "";
+  return `
+        <div id="lead-form" class="lead-form-wrap">
+          <h2>Send Cadmus a message.</h2>
+          <p class="body-copy">For capability statements, DVBE teaming inquiries, or project support requests. Cadmus typically responds within one business day.</p>
+          <form class="lead-form" action="https://formspree.io/f/${FORMSPREE_FORM_ID}" method="POST">
+            <input type="hidden" name="_next" value="${baseUrl}/contact/?sent=true#lead-form">
+            <input type="hidden" name="_subject" value="New inquiry from cadmusprojects.com">
+            <label for="lf-name">Name</label>
+            <input id="lf-name" type="text" name="name" required>
+            <label for="lf-email">Email</label>
+            <input id="lf-email" type="email" name="email" required>
+            <label for="lf-org">Organization</label>
+            <input id="lf-org" type="text" name="organization">
+            <label for="lf-message">How can Cadmus help?</label>
+            <textarea id="lf-message" name="message" rows="5" required></textarea>
+            <input type="text" name="_gotcha" style="display:none" tabindex="-1" autocomplete="off">
+            <button type="submit" class="button primary">Send Message</button>
+          </form>
+          <p id="lead-form-success" class="lead-form-success" hidden>Thanks — your message has been sent. Garrett will follow up shortly.</p>
+        </div>
+        <script>
+          (function () {
+            if (new URLSearchParams(location.search).get("sent") === "true") {
+              var form = document.querySelector(".lead-form");
+              var success = document.getElementById("lead-form-success");
+              if (form) form.hidden = true;
+              if (success) success.hidden = false;
+            }
+          })();
+        </script>`;
+}
+
 function renderPage(page) {
   return `<!doctype html>
 <html lang="en">
@@ -469,7 +519,7 @@ function renderPage(page) {
         <h1>${page.h1}</h1>
         <p class="lead">${page.lead}</p>
         <div class="hero-actions">
-          <a class="button primary" href="mailto:Garrett@cadmusprojects.com?subject=Cadmus%20Project%20Support">Start a Conversation</a>
+          <a class="button primary" href="/contact/#lead-form">Start a Conversation</a>
           <a class="button" href="/contact/">Contact Cadmus</a>
         </div>
       </div>
@@ -482,7 +532,7 @@ function renderPage(page) {
         </div>
         <div class="detail">
           ${page.sections.map(([heading, text]) => `<article><h2>${heading}</h2><p>${text}</p></article>`).join("\n          ")}
-        </div>${renderFaq(page)}${renderToolkitCta(page)}
+        </div>${renderFaq(page)}${renderToolkitCta(page)}${renderLeadForm(page)}
       </div>
     </section>
     <section class="section metal">

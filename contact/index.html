@@ -81,6 +81,17 @@
       .hero { padding-top: 74px; }
       .grid, .detail, .faq { grid-template-columns: 1fr; }
     }
+    .lead-form-wrap { margin-top: 44px; padding-top: 36px; border-top: 1px solid rgba(22,19,13,.18); max-width: 560px; }
+    .lead-form-wrap h2 { font-size: 24px; text-transform: uppercase; margin-bottom: 10px; }
+    .lead-form { display: grid; gap: 14px; margin-top: 20px; }
+    .lead-form label { font-size: 12px; font-weight: 800; text-transform: uppercase; color: #16130d; }
+    .lead-form input[type="text"], .lead-form input[type="email"], .lead-form textarea {
+      font-family: Inter, Arial, sans-serif; font-size: 15px; padding: 12px 14px; border-radius: var(--radius);
+      border: 1px solid rgba(22,19,13,.22); background: #fff; color: #16130d; resize: vertical;
+    }
+    .lead-form input:focus, .lead-form textarea:focus { outline: 2px solid var(--brass); outline-offset: 1px; }
+    .lead-form button { margin-top: 6px; width: fit-content; }
+    .lead-form-success { margin-top: 20px; padding: 16px 20px; border-radius: var(--radius); background: rgba(143,227,193,.18); border: 1px solid rgba(60,140,100,.4); color: #0d2e20; font-weight: 700; }
 </style>
 </head>
 <body>
@@ -110,7 +121,7 @@
         <h1>Start the project-management conversation.</h1>
         <p class="lead">Reach Cadmus for public-sector project support, PMO capacity, DVBE teaming, capability statements, or schedule and delivery recovery conversations.</p>
         <div class="hero-actions">
-          <a class="button primary" href="mailto:Garrett@cadmusprojects.com?subject=Cadmus%20Project%20Support">Start a Conversation</a>
+          <a class="button primary" href="/contact/#lead-form">Start a Conversation</a>
           <a class="button" href="/contact/">Contact Cadmus</a>
         </div>
       </div>
@@ -126,6 +137,35 @@
           <article><h2>Phone</h2><p>719-425-6025</p></article>
           <article><h2>Location</h2><p>Rocklin, California. Supporting agencies and prime contractors across the Sacramento region and California.</p></article>
         </div>
+        <div id="lead-form" class="lead-form-wrap">
+          <h2>Send Cadmus a message.</h2>
+          <p class="body-copy">For capability statements, DVBE teaming inquiries, or project support requests. Cadmus typically responds within one business day.</p>
+          <form class="lead-form" action="https://formspree.io/f/YOUR_FORM_ID" method="POST">
+            <input type="hidden" name="_next" value="https://cadmusprojects.com/contact/?sent=true#lead-form">
+            <input type="hidden" name="_subject" value="New inquiry from cadmusprojects.com">
+            <label for="lf-name">Name</label>
+            <input id="lf-name" type="text" name="name" required>
+            <label for="lf-email">Email</label>
+            <input id="lf-email" type="email" name="email" required>
+            <label for="lf-org">Organization</label>
+            <input id="lf-org" type="text" name="organization">
+            <label for="lf-message">How can Cadmus help?</label>
+            <textarea id="lf-message" name="message" rows="5" required></textarea>
+            <input type="text" name="_gotcha" style="display:none" tabindex="-1" autocomplete="off">
+            <button type="submit" class="button primary">Send Message</button>
+          </form>
+          <p id="lead-form-success" class="lead-form-success" hidden>Thanks — your message has been sent. Garrett will follow up shortly.</p>
+        </div>
+        <script>
+          (function () {
+            if (new URLSearchParams(location.search).get("sent") === "true") {
+              var form = document.querySelector(".lead-form");
+              var success = document.getElementById("lead-form-success");
+              if (form) form.hidden = true;
+              if (success) success.hidden = false;
+            }
+          })();
+        </script>
       </div>
     </section>
     <section class="section metal">
