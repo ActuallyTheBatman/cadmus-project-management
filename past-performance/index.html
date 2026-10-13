@@ -28,7 +28,7 @@
     .nav { position: sticky; top: 0; z-index: 20; border-bottom: 1px solid rgba(245,241,232,.11); background: rgba(7,9,12,.84); backdrop-filter: blur(18px); }
     .nav-inner { min-height: 74px; display: flex; align-items: center; justify-content: space-between; gap: 22px; }
     .brand { display: inline-flex; align-items: center; gap: 12px; font-size: 14px; font-weight: 900; text-transform: uppercase; }
-    .brand-mark { width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid rgba(214,168,71,.6); border-radius: 50%; color: var(--brass-soft); font-family: "Libre Baskerville", Georgia, serif; background: rgba(214,168,71,.08); }
+    .brand-mark { width: 36px; height: 36px; object-fit: contain; }
     .nav-links { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 18px; color: rgba(245,241,232,.78); font-size: 12px; font-weight: 800; text-transform: uppercase; }
     .nav-links a:hover { color: var(--brass-soft); }
     .button { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid rgba(245,241,232,.26); border-radius: var(--radius); padding: 0 17px; font-size: 12px; font-weight: 900; text-transform: uppercase; }
@@ -52,6 +52,7 @@
     .cred h3 { font-size: 20px; text-transform: uppercase; color: var(--brass-soft); margin-bottom: 10px; }
     .cred .id-tag { display: block; font-size: 12px; font-weight: 800; letter-spacing: .04em; color: var(--mint); text-transform: uppercase; margin-bottom: 10px; }
     .cred p { margin: 0; color: rgba(245,241,232,.76); font-size: 15.5px; line-height: 1.7; }
+    .cred-badge { width: 64px; height: auto; margin-bottom: 14px; border-radius: 6px; background: #fff; padding: 6px; }
     .award { border: 1px solid rgba(143,227,193,.4); border-radius: var(--radius); padding: 30px; background: rgba(143,227,193,.05); margin-top: 36px; }
     .award h3 { font-size: 22px; text-transform: uppercase; color: var(--mint); margin-bottom: 12px; }
     .award p { margin: 0 0 10px; color: rgba(245,241,232,.82); font-size: 16px; line-height: 1.7; }
@@ -73,7 +74,7 @@
 <body>
   <header class="nav">
     <div class="wrap nav-inner">
-      <a class="brand" href="/"><span class="brand-mark">C</span>Cadmus Project Management</a>
+      <a class="brand" href="/"><img class="brand-mark" src="/assets/cadmus-logo-white.png" alt="" width="36" height="36">Cadmus Project Management</a>
       <nav class="nav-links">
         <a href="/#services">Services</a>
         <a href="/current-pursuits/">Pursuits</a>
@@ -103,6 +104,7 @@
       </div>
       <div class="cred-grid">
         <div class="cred featured">
+          <img class="cred-badge" src="/assets/dvbe-cert-badge.png" alt="California DVBE Certified badge, certification #2032694" loading="lazy">
           <span class="id-tag">Certification #2032694</span>
           <h3>DVBE</h3>
           <p>California certified Disabled Veteran Business Enterprise, qualifying Cadmus for DVBE participation and incentive credit on California state and public-agency procurements.</p>
@@ -113,10 +115,12 @@
           <p>California certified Small Business — Microbusiness designation. Microbusiness status carries additional procurement advantages on top of standard small-business certification, including eligibility for certain set-asides and simplified bidding thresholds under California's small-business program.</p>
         </div>
         <div class="cred">
+          <img class="cred-badge" src="/assets/sdvosb-cert-badge.png" alt="SDVOSB Certified badge" loading="lazy">
           <h3>SDVOSB</h3>
           <p>Service-Disabled Veteran-Owned Small Business, qualifying Cadmus for federal and state SDVOSB set-aside opportunities.</p>
         </div>
         <div class="cred">
+          <img class="cred-badge" src="/assets/cmas-badge.png" alt="California Multiple Award Schedules (CMAS) logo" loading="lazy">
           <span class="id-tag">Contract 4-25-10-1019</span>
           <h3>CMAS</h3>
           <p>California Multiple Award Schedule contract holder, allowing public agencies to procure Cadmus's project management and PMO services without a separate competitive bid.</p>
@@ -157,6 +161,7 @@
         <span>719-425-6025</span>
         <span>Rocklin, CA</span>
         <a class="button primary" href="/contact/#lead-form">Request Capability Statement</a>
+        <a class="button" href="/assets/Cadmus_Capabilities_Statement.pdf" target="_blank" rel="noopener">Download Now</a>
       </div>
     </div>
   </section>

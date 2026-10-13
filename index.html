@@ -98,14 +98,7 @@
     .brand-mark {
       width: 36px;
       height: 36px;
-      display: grid;
-      place-items: center;
-      border: 1px solid rgba(214, 168, 71, 0.6);
-      border-radius: 50%;
-      color: var(--brass-soft);
-      font-family: "Libre Baskerville", Georgia, serif;
-      font-size: 16px;
-      background: rgba(214, 168, 71, 0.08);
+      object-fit: contain;
     }
 
     .nav-links {
@@ -711,7 +704,7 @@
     <nav class="nav" aria-label="Primary navigation">
       <div class="wrap nav-inner">
         <a class="brand" href="#top" aria-label="Cadmus Project Management home">
-          <span class="brand-mark">C</span>
+          <img class="brand-mark" src="/assets/cadmus-logo-white.png" alt="" width="36" height="36">
           <span>Cadmus Project Management</span>
         </a>
         <div class="nav-links">
@@ -962,6 +955,7 @@
           </div>
           <div class="hero-actions">
             <a class="button primary" href="/contact/#lead-form">Request PDF</a>
+            <a class="button" href="/assets/Cadmus_Capabilities_Statement.pdf" target="_blank" rel="noopener">Download Now</a>
           </div>
         </div>
         <div class="capability-visual">
