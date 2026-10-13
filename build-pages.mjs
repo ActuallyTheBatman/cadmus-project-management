@@ -151,6 +151,86 @@ const pages = [
     ],
   },
   {
+    path: "roseville-project-management/index.html",
+    title: "Roseville Project Management Consultant | Cadmus Project Management",
+    description:
+      "Cadmus Project Management supports Roseville and Placer County agencies, primes, and public-sector teams with disciplined project management, PMO support, and DVBE partnership.",
+    eyebrow: "Roseville, California",
+    h1: "Project management support for Roseville public-sector work.",
+    lead:
+      "Cadmus gives Roseville-area agencies and prime contractors a local delivery partner for schedules, risks, decisions, reporting, and the daily follow-through that keeps programs moving.",
+    sections: [
+      ["Local Support", "Roseville teams often need senior project-management capacity without building a full internal PMO. Cadmus steps in with practical operating rhythms, executive-ready reporting, and clear ownership for open work."],
+      ["Who We Help", "City, county, education, transportation, technology, facilities, and prime-contractor teams that need disciplined coordination across vendors, departments, and stakeholders."],
+      ["Search Fit", "Built for searches like Roseville project management consultant, Placer County PMO support, California DVBE project manager, and public-sector project management near Roseville."],
+    ],
+    cards: [
+      ["Schedule Control", "Milestones, dependencies, critical dates, and recovery planning."],
+      ["Stakeholder Cadence", "Meetings, decisions, actions, and escalation paths that stay useful."],
+      ["DVBE Partner", "Certified California DVBE support with meaningful project work."],
+    ],
+  },
+  {
+    path: "folsom-project-management/index.html",
+    title: "Folsom Project Management Consultant | Cadmus Project Management",
+    description:
+      "Cadmus Project Management supports Folsom and Sacramento County agencies, primes, and public-sector teams with disciplined project management, PMO support, and DVBE partnership.",
+    eyebrow: "Folsom, California",
+    h1: "Project management support for Folsom public-sector work.",
+    lead:
+      "Cadmus gives Folsom-area agencies and prime contractors a local delivery partner for schedules, risks, decisions, reporting, and the daily follow-through that keeps programs moving.",
+    sections: [
+      ["Local Support", "Folsom teams often need senior project-management capacity without building a full internal PMO. Cadmus steps in with practical operating rhythms, executive-ready reporting, and clear ownership for open work."],
+      ["Who We Help", "City, county, education, transportation, technology, facilities, and prime-contractor teams that need disciplined coordination across vendors, departments, and stakeholders."],
+      ["Search Fit", "Built for searches like Folsom project management consultant, Sacramento County PMO support, California DVBE project manager, and public-sector project management near Folsom."],
+    ],
+    cards: [
+      ["Schedule Control", "Milestones, dependencies, critical dates, and recovery planning."],
+      ["Stakeholder Cadence", "Meetings, decisions, actions, and escalation paths that stay useful."],
+      ["DVBE Partner", "Certified California DVBE support with meaningful project work."],
+    ],
+  },
+  {
+    path: "elk-grove-project-management/index.html",
+    title: "Elk Grove Project Management Consultant | Cadmus Project Management",
+    description:
+      "Cadmus Project Management supports Elk Grove and Sacramento County agencies, primes, and public-sector teams with disciplined project management, PMO support, and DVBE partnership.",
+    eyebrow: "Elk Grove, California",
+    h1: "Project management support for Elk Grove public-sector work.",
+    lead:
+      "Cadmus gives Elk Grove-area agencies and prime contractors a local delivery partner for schedules, risks, decisions, reporting, and the daily follow-through that keeps programs moving.",
+    sections: [
+      ["Local Support", "Elk Grove teams often need senior project-management capacity without building a full internal PMO. Cadmus steps in with practical operating rhythms, executive-ready reporting, and clear ownership for open work."],
+      ["Who We Help", "City, county, education, transportation, technology, facilities, and prime-contractor teams that need disciplined coordination across vendors, departments, and stakeholders."],
+      ["Search Fit", "Built for searches like Elk Grove project management consultant, Sacramento County PMO support, California DVBE project manager, and public-sector project management near Elk Grove."],
+    ],
+    cards: [
+      ["Schedule Control", "Milestones, dependencies, critical dates, and recovery planning."],
+      ["Stakeholder Cadence", "Meetings, decisions, actions, and escalation paths that stay useful."],
+      ["DVBE Partner", "Certified California DVBE support with meaningful project work."],
+    ],
+  },
+  {
+    path: "placer-county-project-management/index.html",
+    title: "Placer County Project Management Consultant | Cadmus Project Management",
+    description:
+      "Cadmus Project Management supports Placer County agencies, primes, and public-sector teams with disciplined project management, PMO support, and DVBE partnership.",
+    eyebrow: "Placer County, California",
+    h1: "Project management support for Placer County public-sector work.",
+    lead:
+      "Cadmus gives Placer County agencies and prime contractors a local delivery partner for schedules, risks, decisions, reporting, and the daily follow-through that keeps programs moving.",
+    sections: [
+      ["Local Support", "Placer County teams often need senior project-management capacity without building a full internal PMO. Cadmus steps in with practical operating rhythms, executive-ready reporting, and clear ownership for open work."],
+      ["Who We Help", "City, county, education, transportation, technology, facilities, and prime-contractor teams that need disciplined coordination across vendors, departments, and stakeholders."],
+      ["Search Fit", "Built for searches like Placer County project management consultant, Placer County PMO support, California DVBE project manager, and public-sector project management near Placer County."],
+    ],
+    cards: [
+      ["Schedule Control", "Milestones, dependencies, critical dates, and recovery planning."],
+      ["Stakeholder Cadence", "Meetings, decisions, actions, and escalation paths that stay useful."],
+      ["DVBE Partner", "Certified California DVBE support with meaningful project work."],
+    ],
+  },
+  {
     path: "services/project-controls-schedule-risk/index.html",
     title: "Project Controls, Schedule, and Risk Support | Cadmus",
     description:
@@ -176,8 +256,8 @@ const pages = [
     lead:
       "Cadmus Project Management LLC is based in Rocklin, California and supports agencies and prime contractors with PMO support, project controls, governance, and delivery leadership.",
     sections: [
-      ["Founder", "Garrett Wilkerson brings Army veteran discipline, PMP standards, and more than nine years of California public-sector program experience to the work."],
-      ["Business Identity", "Cadmus is a California certified DVBE, SDVOSB, SB Micro business, CMAS contract holder, and general liability insured partner focused on project management and PMO support."],
+      ["Founder", "Garrett Wilkerson brings Army veteran discipline, PMP standards, and more than nine years of California public-sector program experience to the work. See the full <a href=\"/founder-experience/\" style=\"color:#7b5512;text-decoration:underline;\">Founder Experience</a> page for the career background behind Cadmus."],
+      ["Business Identity", "Cadmus is a California certified DVBE, SDVOSB, SB Micro business, CMAS contract holder, and general liability insured partner focused on project management and PMO support. Full detail on the <a href=\"/past-performance/\" style=\"color:#7b5512;text-decoration:underline;\">Credentials &amp; Past Performance</a> page."],
       ["Operating Belief", "The work gets better when teams have clarity, cadence, calm escalation, and someone making sure the next action actually happens."],
     ],
     cards: [["Rocklin, CA", "Serving California agencies and prime contractors."], ["DVBE + SDVOSB + SB Micro", "Certified small-business public-sector delivery partner."], ["PMP", "Credentialed project-management leadership."]],
@@ -279,6 +359,7 @@ function nav() {
         </a>
         <div class="nav-links">
           <a href="/services/public-sector-project-management/">Services</a>
+          <a href="/current-pursuits/">Pursuits</a>
           <a href="/rocklin-project-management/">Rocklin</a>
           <a href="/sacramento-project-management/">Sacramento</a>
           <a href="/dvbe-project-management-california/">DVBE</a>
@@ -450,6 +531,14 @@ const urls = [
   "",
   ...pages.map((page) => page.path.replace(/index\.html$/, "")),
   "resources/epc-project-controls/",
+  "current-pursuits/",
+  "founder-experience/",
+  "past-performance/",
+  "federal-sdvosb-supply/",
+  "resources/dvbe-cuf-explained/",
+  "resources/dvbe-sdvosb-sb-micro-explained/",
+  "resources/cmas-vs-direct-award-explained/",
+  "resources/cpuc-dvbe-participation-explained/",
 ];
 
 writeFileSync(
@@ -500,7 +589,7 @@ index = index
   )
   .replace(
     /<div class="nav-links">[\s\S]*?<\/div>\s*<a class="nav-cta"/,
-    `<div class="nav-links">\n          <a href="#work">Work</a>\n          <a href="/services/public-sector-project-management/">Services</a>\n          <a href="/rocklin-project-management/">Rocklin</a>\n          <a href="/sacramento-project-management/">Sacramento</a>\n          <a href="/dvbe-project-management-california/">DVBE</a>\n          <a href="/resources/epc-project-controls/">Toolkit</a>\n          <a href="/about/">About</a>\n        </div>\n        <a class="nav-cta"`,
+    `<div class="nav-links">\n          <a href="#work">Work</a>\n          <a href="/services/public-sector-project-management/">Services</a>\n          <a href="/current-pursuits/">Pursuits</a>\n          <a href="/rocklin-project-management/">Rocklin</a>\n          <a href="/sacramento-project-management/">Sacramento</a>\n          <a href="/dvbe-project-management-california/">DVBE</a>\n          <a href="/resources/epc-project-controls/">Toolkit</a>\n          <a href="/about/">About</a>\n        </div>\n        <a class="nav-cta"`,
   )
   .replace("Letâ€™s make the next program room calmer.", "Let's make the next program room calmer.");
 
