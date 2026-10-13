@@ -81,6 +81,18 @@
       .hero { padding-top: 74px; }
       .grid, .detail, .faq { grid-template-columns: 1fr; }
     }
+    .lead-form-wrap { margin-top: 44px; padding-top: 36px; border-top: 1px solid rgba(22,19,13,.18); max-width: 560px; }
+    .lead-form-wrap h2 { font-size: 24px; text-transform: uppercase; margin-bottom: 10px; }
+    .lead-form { display: grid; gap: 14px; margin-top: 20px; }
+    .lead-form label { font-size: 12px; font-weight: 800; text-transform: uppercase; color: #16130d; }
+    .lead-form input[type="text"], .lead-form input[type="email"], .lead-form textarea {
+      font-family: Inter, Arial, sans-serif; font-size: 15px; padding: 12px 14px; border-radius: var(--radius);
+      border: 1px solid rgba(22,19,13,.22); background: #fff; color: #16130d; resize: vertical;
+    }
+    .lead-form input:focus, .lead-form textarea:focus { outline: 2px solid var(--brass); outline-offset: 1px; }
+    .lead-form button { margin-top: 6px; width: fit-content; }
+    .lead-form-success { margin-top: 20px; padding: 16px 20px; border-radius: var(--radius); background: rgba(143,227,193,.18); border: 1px solid rgba(60,140,100,.4); color: #0d2e20; font-weight: 700; }
+    .lead-form-error { margin-top: 4px; font-size: 14px; color: #8a2d1f; font-weight: 700; }
 </style>
 </head>
 <body>
@@ -110,7 +122,7 @@
         <h1>DVBE project management partner support with real delivery value.</h1>
         <p class="lead">Cadmus helps prime contractors strengthen proposals and delivery teams with certified DVBE, SDVOSB, and SB Micro participation tied to practical project-management outcomes.</p>
         <div class="hero-actions">
-          <a class="button primary" href="mailto:Garrett@cadmusprojects.com?subject=Cadmus%20Project%20Support">Start a Conversation</a>
+          <a class="button primary" href="/contact/#lead-form">Start a Conversation</a>
           <a class="button" href="/contact/">Contact Cadmus</a>
         </div>
       </div>
