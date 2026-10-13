@@ -28,7 +28,7 @@
     .nav { position: sticky; top: 0; z-index: 20; border-bottom: 1px solid rgba(245,241,232,.11); background: rgba(7,9,12,.84); backdrop-filter: blur(18px); }
     .nav-inner { width: min(1120px, calc(100% - 48px)); margin: 0 auto; min-height: 74px; display: flex; align-items: center; justify-content: space-between; gap: 22px; }
     .brand { display: inline-flex; align-items: center; gap: 12px; font-size: 14px; font-weight: 900; text-transform: uppercase; }
-    .brand-mark { width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid rgba(214,168,71,.6); border-radius: 50%; color: var(--brass-soft); font-family: "Libre Baskerville", Georgia, serif; background: rgba(214,168,71,.08); }
+    .brand-mark { width: 36px; height: 36px; object-fit: contain; }
     .nav-links { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 18px; color: rgba(245,241,232,.78); font-size: 12px; font-weight: 800; text-transform: uppercase; }
     .nav-links a:hover { color: var(--brass-soft); }
     .button { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid rgba(245,241,232,.26); border-radius: var(--radius); padding: 0 17px; font-size: 12px; font-weight: 900; text-transform: uppercase; }
@@ -63,7 +63,7 @@
 <body>
   <header class="nav">
     <div class="nav-inner">
-      <a class="brand" href="/"><span class="brand-mark">C</span>Cadmus Project Management</a>
+      <a class="brand" href="/"><img class="brand-mark" src="/assets/cadmus-logo-white.png" alt="" width="36" height="36">Cadmus Project Management</a>
       <nav class="nav-links">
         <a href="/#services">Services</a>
         <a href="/current-pursuits/">Pursuits</a>
@@ -95,6 +95,11 @@
         <li>PMO documentation for assigned project-based tasks</li>
       </ul>
       <p>The DVBE performs, manages, and supervises its own portion of the work, and coordinates with the prime and the awarding agency as required — rather than the prime performing the work and simply routing payment through the DVBE.</p>
+
+      <h2>What the regulation actually says</h2>
+      <p>CUF isn't just industry convention — it's defined in California regulation. Cal. Code Regs. Title 2, § 1896.71(a) states that a contractor, subcontractor, or supplier performs a commercially useful function "when it is responsible for the execution of a distinct element of the work of the contract, which is carried out by actually performing, managing, or supervising the work involved." Section 1896.71(c) is the flip side: a firm does <em>not</em> meet CUF "if the contractor's role is limited to that of an extra participant in a transaction, contract, or project through which funds are passed in order to obtain the appearance of DVBE participation."</p>
+      <p>This is also why staffing structure matters: a DVBE that places 1099 independent contractors rather than its own W-2 employees generally doesn't satisfy CUF in a staffing arrangement, since the DVBE must retain full employer responsibility — payroll, tax withholding, workers' compensation, and supervision — to be the one actually performing the work rather than passing it through.</p>
+      <p style="font-size:14px;color:rgba(245,241,232,.58);">References: <a href="https://www.law.cornell.edu/regulations/california/2-CCR-1896.71" target="_blank" rel="noopener" style="color:var(--mint);text-decoration:underline;">Cal. Code Regs. Tit. 2, § 1896.71</a> · <a href="https://www.dgs.ca.gov/-/media/Divisions/PD/OSDS/Certification/CUF/osds8.pdf" target="_blank" rel="noopener" style="color:var(--mint);text-decoration:underline;">DGS CUF Guidelines (OSDS 8)</a></p>
 
       <h2>Forms and documentation that typically come with it</h2>
       <p>On California state and public-agency RFPs, DVBE participation is usually backed by a documented package, which can include:</p>

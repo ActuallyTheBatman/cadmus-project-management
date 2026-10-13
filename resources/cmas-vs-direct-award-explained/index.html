@@ -24,7 +24,7 @@
     .nav { position: sticky; top: 0; z-index: 20; border-bottom: 1px solid rgba(245,241,232,.11); background: rgba(7,9,12,.84); backdrop-filter: blur(18px); }
     .nav-inner { width: min(1120px, calc(100% - 48px)); margin: 0 auto; min-height: 74px; display: flex; align-items: center; justify-content: space-between; gap: 22px; }
     .brand { display: inline-flex; align-items: center; gap: 12px; font-size: 14px; font-weight: 900; text-transform: uppercase; }
-    .brand-mark { width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid rgba(214,168,71,.6); border-radius: 50%; color: var(--brass-soft); font-family: "Libre Baskerville", Georgia, serif; background: rgba(214,168,71,.08); }
+    .brand-mark { width: 36px; height: 36px; object-fit: contain; }
     .nav-links { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 18px; color: rgba(245,241,232,.78); font-size: 12px; font-weight: 800; text-transform: uppercase; }
     .nav-links a:hover { color: var(--brass-soft); }
     .button { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid rgba(245,241,232,.26); border-radius: var(--radius); padding: 0 17px; font-size: 12px; font-weight: 900; text-transform: uppercase; }
@@ -64,7 +64,7 @@
 <body>
   <header class="nav">
     <div class="nav-inner">
-      <a class="brand" href="/"><span class="brand-mark">C</span>Cadmus Project Management</a>
+      <a class="brand" href="/"><img class="brand-mark" src="/assets/cadmus-logo-white.png" alt="" width="36" height="36">Cadmus Project Management</a>
       <nav class="nav-links">
         <a href="/#services">Services</a>
         <a href="/current-pursuits/">Pursuits</a>

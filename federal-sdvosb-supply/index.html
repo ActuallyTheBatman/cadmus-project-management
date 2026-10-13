@@ -28,7 +28,7 @@
     .nav { position: sticky; top: 0; z-index: 20; border-bottom: 1px solid var(--line); background: rgba(10,12,15,.9); backdrop-filter: blur(18px); }
     .nav-inner { width: min(1120px, calc(100% - 48px)); margin: 0 auto; min-height: 70px; display: flex; align-items: center; justify-content: space-between; gap: 22px; }
     .brand { display: inline-flex; align-items: center; gap: 12px; font-size: 13px; font-weight: 900; text-transform: uppercase; color: var(--muted); }
-    .brand-mark { width: 32px; height: 32px; display: grid; place-items: center; border: 1px solid rgba(111,163,184,.5); border-radius: 50%; color: var(--steel-soft); font-family: "Libre Baskerville", Georgia, serif; font-size: 14px; }
+    .brand-mark { width: 32px; height: 32px; object-fit: contain; }
     .nav-links { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; font-size: 11px; font-weight: 800; text-transform: uppercase; color: rgba(238,241,244,.68); }
     .nav-links a:hover { color: var(--steel-soft); }
     .divider-tag { display: inline-flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 900; text-transform: uppercase; color: var(--steel-soft); border: 1px solid rgba(111,163,184,.4); border-radius: 999px; padding: 5px 12px; }
@@ -66,7 +66,7 @@
 <body>
   <header class="nav">
     <div class="nav-inner">
-      <a class="brand" href="/"><span class="brand-mark">C</span>Cadmus Project Management</a>
+      <a class="brand" href="/"><img class="brand-mark" src="/assets/cadmus-logo-white.png" alt="" width="32" height="32">Cadmus Project Management</a>
       <nav class="nav-links">
         <span class="divider-tag">Federal Supply Line</span>
         <a href="/">CA DVBE PM Services</a>
