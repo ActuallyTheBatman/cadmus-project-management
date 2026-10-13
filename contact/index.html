@@ -85,11 +85,13 @@
     .lead-form-wrap h2 { font-size: 24px; text-transform: uppercase; margin-bottom: 10px; }
     .lead-form { display: grid; gap: 14px; margin-top: 20px; }
     .lead-form label { font-size: 12px; font-weight: 800; text-transform: uppercase; color: #16130d; }
-    .lead-form input[type="text"], .lead-form input[type="email"], .lead-form textarea {
+    .lead-form input[type="text"], .lead-form input[type="email"], .lead-form input[type="tel"], .lead-form input[type="date"], .lead-form select, .lead-form textarea {
       font-family: Inter, Arial, sans-serif; font-size: 15px; padding: 12px 14px; border-radius: var(--radius);
       border: 1px solid rgba(22,19,13,.22); background: #fff; color: #16130d; resize: vertical;
     }
-    .lead-form input:focus, .lead-form textarea:focus { outline: 2px solid var(--brass); outline-offset: 1px; }
+    .lead-form input:focus, .lead-form select:focus, .lead-form textarea:focus { outline: 2px solid var(--brass); outline-offset: 1px; }
+    .lead-form-checkbox { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; text-transform: none; color: #16130d; }
+    .lead-form-checkbox input { width: auto; }
     .lead-form button { margin-top: 6px; width: fit-content; }
     .lead-form-success { margin-top: 20px; padding: 16px 20px; border-radius: var(--radius); background: rgba(143,227,193,.18); border: 1px solid rgba(60,140,100,.4); color: #0d2e20; font-weight: 700; }
     .lead-form-error { margin-top: 4px; font-size: 14px; color: #8a2d1f; font-weight: 700; }
@@ -148,8 +150,22 @@
             <input id="lf-email" type="email" name="email" required>
             <label for="lf-org">Organization</label>
             <input id="lf-org" type="text" name="organization">
+            <label for="lf-phone">Phone (optional)</label>
+            <input id="lf-phone" type="tel" name="phone">
+            <label for="lf-inquiry-type">What's this about?</label>
+            <select id="lf-inquiry-type" name="inquiryType">
+              <option value="DVBE / SDVOSB Teaming on an RFP">DVBE / SDVOSB Teaming on an RFP</option>
+              <option value="Project Management / PMO Services">Project Management / PMO Services</option>
+              <option value="Capability Statement Request">Capability Statement Request</option>
+              <option value="Other">Other</option>
+            </select>
+            <label for="lf-rfp">RFP # / Solicitation Name (if applicable)</label>
+            <input id="lf-rfp" type="text" name="rfpNumber">
+            <label for="lf-deadline">Proposal Deadline (if applicable)</label>
+            <input id="lf-deadline" type="date" name="deadline">
             <label for="lf-message">How can Cadmus help?</label>
             <textarea id="lf-message" name="message" rows="5" required></textarea>
+            <label class="lead-form-checkbox"><input type="checkbox" name="preferCall" value="yes"> I'd prefer a call instead of email</label>
             <input type="text" name="_gotcha" style="position:absolute;left:-9999px" tabindex="-1" autocomplete="off">
             <button type="submit" class="button primary">Send Message</button>
             <p id="lead-form-error" class="lead-form-error" hidden>Something went wrong sending your message. Please email Garrett@cadmusprojects.com directly.</p>
