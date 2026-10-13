@@ -358,6 +358,7 @@ const css = `
     .lead-form input:focus, .lead-form textarea:focus { outline: 2px solid var(--brass); outline-offset: 1px; }
     .lead-form button { margin-top: 6px; width: fit-content; }
     .lead-form-success { margin-top: 20px; padding: 16px 20px; border-radius: var(--radius); background: rgba(143,227,193,.18); border: 1px solid rgba(60,140,100,.4); color: #0d2e20; font-weight: 700; }
+    .lead-form-error { margin-top: 4px; font-size: 14px; color: #8a2d1f; font-weight: 700; }
 `;
 
 function nav() {
@@ -452,10 +453,11 @@ function renderToolkitCta(page) {
         </div>`;
 }
 
-// Formspree endpoint: sign up free at https://formspree.io with Garrett@cadmusprojects.com,
-// create a form, and replace YOUR_FORM_ID below with the real endpoint ID (e.g. "xaybzwkd").
-// Until replaced, the form will not actually deliver submissions.
-const FORMSPREE_FORM_ID = "YOUR_FORM_ID";
+// Serverless lead-capture endpoint, deployed to Vercel under the same account as
+// cadmusprojects.com's other infra. Source: see the cadmus-contact-api Vercel project.
+// Requires GMAIL_USER and GMAIL_APP_PASSWORD to be set as env vars on that project
+// before it will actually deliver mail - see that project's README for setup.
+const LEAD_API_ENDPOINT = "https://cadmus-contact-api.vercel.app/api/contact";
 
 function renderLeadForm(page) {
   if (page.path !== "contact/index.html") return "";
@@ -463,9 +465,7 @@ function renderLeadForm(page) {
         <div id="lead-form" class="lead-form-wrap">
           <h2>Send Cadmus a message.</h2>
           <p class="body-copy">For capability statements, DVBE teaming inquiries, or project support requests. Cadmus typically responds within one business day.</p>
-          <form class="lead-form" action="https://formspree.io/f/${FORMSPREE_FORM_ID}" method="POST">
-            <input type="hidden" name="_next" value="${baseUrl}/contact/?sent=true#lead-form">
-            <input type="hidden" name="_subject" value="New inquiry from cadmusprojects.com">
+          <form class="lead-form" id="lead-form-el" novalidate>
             <label for="lf-name">Name</label>
             <input id="lf-name" type="text" name="name" required>
             <label for="lf-email">Email</label>
@@ -474,19 +474,47 @@ function renderLeadForm(page) {
             <input id="lf-org" type="text" name="organization">
             <label for="lf-message">How can Cadmus help?</label>
             <textarea id="lf-message" name="message" rows="5" required></textarea>
-            <input type="text" name="_gotcha" style="display:none" tabindex="-1" autocomplete="off">
+            <input type="text" name="_gotcha" style="position:absolute;left:-9999px" tabindex="-1" autocomplete="off">
             <button type="submit" class="button primary">Send Message</button>
+            <p id="lead-form-error" class="lead-form-error" hidden>Something went wrong sending your message. Please email Garrett@cadmusprojects.com directly.</p>
           </form>
           <p id="lead-form-success" class="lead-form-success" hidden>Thanks — your message has been sent. Garrett will follow up shortly.</p>
         </div>
         <script>
           (function () {
-            if (new URLSearchParams(location.search).get("sent") === "true") {
-              var form = document.querySelector(".lead-form");
-              var success = document.getElementById("lead-form-success");
-              if (form) form.hidden = true;
-              if (success) success.hidden = false;
-            }
+            var form = document.getElementById("lead-form-el");
+            var success = document.getElementById("lead-form-success");
+            var error = document.getElementById("lead-form-error");
+            if (!form) return;
+            form.addEventListener("submit", function (e) {
+              e.preventDefault();
+              error.hidden = true;
+              var data = Object.fromEntries(new FormData(form).entries());
+              var submitBtn = form.querySelector("button[type=submit]");
+              submitBtn.disabled = true;
+              submitBtn.textContent = "Sending...";
+              fetch("${LEAD_API_ENDPOINT}", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(data),
+              })
+                .then(function (res) { return res.json().then(function (json) { return { ok: res.ok, json: json }; }); })
+                .then(function (result) {
+                  if (result.ok && result.json.ok) {
+                    form.hidden = true;
+                    success.hidden = false;
+                  } else {
+                    error.hidden = false;
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = "Send Message";
+                  }
+                })
+                .catch(function () {
+                  error.hidden = false;
+                  submitBtn.disabled = false;
+                  submitBtn.textContent = "Send Message";
+                });
+            });
           })();
         </script>`;
 }
